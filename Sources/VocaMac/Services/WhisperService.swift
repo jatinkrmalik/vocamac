@@ -1,0 +1,210 @@
+// WhisperService.swift
+// VocaMac
+//
+// Swift wrapper around WhisperKit for local speech-to-text transcription.
+// Uses CoreML with Metal/Neural Engine acceleration on Apple Silicon.
+
+import Foundation
+import WhisperKit
+
+// MARK: - WhisperError
+
+enum WhisperError: LocalizedError {
+    case modelNotLoaded
+    case initializationFailed(reason: String)
+    case transcriptionFailed(reason: String)
+    case emptyAudio
+
+    var errorDescription: String? {
+        switch self {
+        case .modelNotLoaded:
+            return "No whisper model is loaded. Please load a model first."
+        case .initializationFailed(let reason):
+            return "Failed to initialize WhisperKit: \(reason)"
+        case .transcriptionFailed(let reason):
+            return "Transcription failed: \(reason)"
+        case .emptyAudio:
+            return "No audio data to transcribe."
+        }
+    }
+}
+
+// MARK: - WhisperService
+
+final class WhisperService: @unchecked Sendable {
+
+    // MARK: - Properties
+
+    /// The WhisperKit instance (initialized when a model is loaded)
+    private var whisperKit: WhisperKit?
+
+    /// Whether a model is currently loaded and ready
+    var isModelLoaded: Bool { whisperKit != nil }
+
+    /// The name/variant of the currently loaded model
+    private(set) var loadedModelName: String?
+
+    /// Lock to prevent concurrent transcription
+    private let transcriptionLock = NSLock()
+
+    // MARK: - Lifecycle
+
+    deinit {
+        whisperKit = nil
+    }
+
+    // MARK: - Model Management
+
+    /// Initialize WhisperKit with a specific model (or auto-select best for device)
+    /// - Parameters:
+    ///   - modelName: The model variant to load (e.g., "openai_whisper-tiny"), or nil for auto-select
+    ///   - modelFolder: Optional local folder containing pre-downloaded models
+    func loadModel(name modelName: String? = nil, folder modelFolder: URL? = nil) async throws {
+        // Unload any existing model
+        unloadModel()
+
+        let displayName = modelName ?? "auto-detect"
+        print("[WhisperService] Loading model: \(displayName)...")
+        let startTime = CFAbsoluteTimeGetCurrent()
+
+        do {
+            let config = WhisperKitConfig()
+
+            // Set model if specified, otherwise WhisperKit auto-selects
+            if let name = modelName {
+                config.model = name
+            }
+
+            // Verbose logging for debugging
+            config.verbose = true
+
+            // If a local model folder is specified, use it
+            if let folder = modelFolder {
+                config.modelFolder = folder.path
+                config.download = false
+            }
+
+            let kit = try await WhisperKit(config)
+            self.whisperKit = kit
+            self.loadedModelName = modelName ?? kit.modelVariant.description
+
+            let elapsed = CFAbsoluteTimeGetCurrent() - startTime
+            print("[WhisperService] Model loaded in \(String(format: "%.2f", elapsed))s")
+        } catch {
+            print("[WhisperService] ERROR loading model: \(error)")
+            throw WhisperError.initializationFailed(reason: error.localizedDescription)
+        }
+    }
+
+    /// Unload the current model and free memory
+    func unloadModel() {
+        if whisperKit != nil {
+            whisperKit = nil
+            loadedModelName = nil
+            print("[WhisperService] Model unloaded")
+        }
+    }
+
+    // MARK: - Transcription
+
+    /// Transcribe audio samples
+    /// - Parameters:
+    ///   - audioData: Array of Float32 PCM samples at 16kHz mono
+    ///   - language: ISO 639-1 language code (e.g., "en"), or nil for auto-detection
+    /// - Returns: VocaTranscription with the transcribed text and metadata
+    func transcribe(
+        audioData: [Float],
+        language: String? = nil
+    ) async throws -> VocaTranscription {
+        guard let kit = whisperKit else {
+            throw WhisperError.modelNotLoaded
+        }
+
+        guard !audioData.isEmpty else {
+            throw WhisperError.emptyAudio
+        }
+
+        let audioLengthSeconds = Double(audioData.count) / 16000.0
+        print("[WhisperService] Transcribing \(String(format: "%.1f", audioLengthSeconds))s of audio...")
+
+        let startTime = CFAbsoluteTimeGetCurrent()
+
+        // Configure decoding options — optimized for low latency dictation
+        let options = DecodingOptions(
+            task: .transcribe,
+            language: language,
+            temperature: 0.0,
+            temperatureFallbackCount: 0,  // No fallback for speed
+            usePrefillPrompt: language != nil,
+            detectLanguage: language == nil,
+            wordTimestamps: false,
+            chunkingStrategy: nil  // No chunking for short dictation clips
+        )
+
+        do {
+            let results = try await kit.transcribe(
+                audioArray: audioData,
+                decodeOptions: options
+            )
+
+            let elapsed = CFAbsoluteTimeGetCurrent() - startTime
+
+            // Concatenate all segment texts
+            let fullText = results.map { $0.text }.joined(separator: " ")
+
+            // Get detected language from first result
+            let detectedLanguage = results.first?.language ?? language ?? "en"
+
+            let modelUsed = modelSizeFromName(loadedModelName ?? "tiny")
+
+            print("[WhisperService] Transcription completed in \(String(format: "%.2f", elapsed))s")
+            print("[WhisperService] Result: \(fullText.prefix(100))...")
+
+            return VocaTranscription(
+                text: fullText,
+                duration: elapsed,
+                detectedLanguage: detectedLanguage,
+                audioLengthSeconds: audioLengthSeconds,
+                modelUsed: modelUsed
+            )
+        } catch {
+            throw WhisperError.transcriptionFailed(reason: error.localizedDescription)
+        }
+    }
+
+    // MARK: - Device Recommendations
+
+    /// Get recommended models for the current device
+    static func recommendedModels() -> (defaultModel: String, supported: [String]) {
+        let recommendation = WhisperKit.recommendedModels()
+        return (
+            defaultModel: recommendation.default,
+            supported: recommendation.supported
+        )
+    }
+
+    /// Get the device name (e.g., "MacBookPro18,1")
+    static func deviceName() -> String {
+        WhisperKit.deviceName()
+    }
+
+    // MARK: - Utilities
+
+    /// Map a model name string to our ModelSize enum
+    private func modelSizeFromName(_ name: String) -> ModelSize {
+        let lowered = name.lowercased()
+        if lowered.contains("large") { return .largeV3 }
+        if lowered.contains("medium") { return .medium }
+        if lowered.contains("small") { return .small }
+        if lowered.contains("base") { return .base }
+        return .tiny
+    }
+
+    /// Get WhisperKit system info for debugging
+    func systemInfo() -> String {
+        if whisperKit != nil {
+            return "WhisperKit loaded | Model: \(loadedModelName ?? "unknown") | Device: \(WhisperKit.deviceName())"
+        }
+        return "WhisperKit not loaded | Device: \(WhisperKit.deviceName())"
+    }
+}

@@ -1,0 +1,35 @@
+# Swift / Xcode
+.build/
+*.xcodeproj/
+*.xcworkspace/
+xcuserdata/
+DerivedData/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Model files (too large for git)
+*.bin
+Sources/VocaMac/Resources/models/*.bin
+
+# IDE
+.idea/
+.vscode/
+*.code-workspace
+
+# Swift Package Manager
+Packages/
+Package.resolved
+.swiftpm/
+
+# Built app bundle
+VocaMac.app/
+
+# Legacy stubs
+Sources/CWhisper/

@@ -1,0 +1,155 @@
+// VocaMacApp.swift
+// VocaMac
+//
+// Main entry point for the VocaMac application.
+// Configures the app as a menu bar-only application (no Dock icon).
+
+import SwiftUI
+
+/// Manages the settings window for menu-bar-only apps
+final class SettingsWindowManager: ObservableObject {
+    private var settingsWindow: NSWindow?
+
+    func open(appState: AppState) {
+        // If window already exists, just bring it to front
+        if let window = settingsWindow, window.isVisible {
+            window.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+
+        // Create the settings view
+        let settingsView = SettingsView()
+            .environmentObject(appState)
+
+        // Create a new window
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 560, height: 480),
+            styleMask: [.titled, .closable, .miniaturizable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "VocaMac Settings"
+        window.contentView = NSHostingView(rootView: settingsView)
+        window.center()
+        window.isReleasedWhenClosed = false
+        window.makeKeyAndOrderFront(nil)
+
+        self.settingsWindow = window
+
+        // Temporarily show in dock so the window can receive focus
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+
+        // Watch for window close to hide from dock again
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification,
+            object: window,
+            queue: .main
+        ) { [weak self] _ in
+            self?.settingsWindow = nil
+            // Hide from dock again when settings closes
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                NSApp.setActivationPolicy(.accessory)
+            }
+        }
+    }
+}
+
+@main
+struct VocaMacApp: App {
+    @StateObject private var appState = AppState()
+    @StateObject private var settingsManager = SettingsWindowManager()
+
+    var body: some Scene {
+        // Menu bar presence — the primary UI for VocaMac
+        MenuBarExtra {
+            MenuBarView(settingsManager: settingsManager)
+                .environmentObject(appState)
+        } label: {
+            MenuBarIcon(appStatus: appState.appStatus, audioLevel: appState.audioLevel)
+        }
+        .menuBarExtraStyle(.window)
+    }
+
+    init() {
+        // Ensure only one instance of VocaMac is running
+        Self.ensureSingleInstance()
+
+        // For .app bundles, Dock hiding is handled by LSUIElement=true in Info.plist.
+        // For direct binary execution, we set it programmatically.
+        DispatchQueue.main.async {
+            NSApp?.setActivationPolicy(.accessory)
+        }
+    }
+
+    /// Terminate any other running instances of VocaMac
+    private static func ensureSingleInstance() {
+        let currentPID = ProcessInfo.processInfo.processIdentifier
+        let runningApps = NSRunningApplication.runningApplications(withBundleIdentifier: "com.vocamac.app")
+
+        for app in runningApps where app.processIdentifier != currentPID {
+            NSLog("[VocaMac] Terminating previous instance (PID %d)", app.processIdentifier)
+            app.terminate()
+        }
+
+        // Also kill by process name for direct binary execution (no bundle ID)
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
+        task.arguments = ["-f", "VocaMac"]
+
+        let pipe = Pipe()
+        task.standardOutput = pipe
+
+        do {
+            try task.run()
+            task.waitUntilExit()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            if let output = String(data: data, encoding: .utf8) {
+                let pids = output.split(separator: "\n").compactMap { Int32($0) }
+                for pid in pids where pid != currentPID {
+                    NSLog("[VocaMac] Killing previous VocaMac process (PID %d)", pid)
+                    kill(pid, SIGTERM)
+                }
+            }
+        } catch {
+            // pgrep not found or failed — not critical
+        }
+    }
+}
+
+// MARK: - Menu Bar Icon
+
+/// Renders the appropriate icon in the menu bar based on app status
+struct MenuBarIcon: View {
+    let appStatus: AppStatus
+    let audioLevel: Float
+
+    var body: some View {
+        Image(systemName: iconName)
+            .symbolRenderingMode(.hierarchical)
+            .foregroundStyle(iconColor)
+    }
+
+    private var iconName: String {
+        switch appStatus {
+        case .idle:
+            return "mic"
+        case .recording:
+            return "mic.fill"
+        case .processing:
+            return "ellipsis.circle"
+        case .error:
+            return "exclamationmark.triangle"
+        }
+    }
+
+    private var iconColor: Color {
+        switch appStatus {
+        case .idle:       return .primary
+        case .recording:  return .red
+        case .processing: return .orange
+        case .error:      return .yellow
+        }
+    }
+}
