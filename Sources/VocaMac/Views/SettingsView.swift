@@ -161,9 +161,7 @@ struct GeneralSettingsTab: View {
                     icon: "keyboard",
                     status: appState.inputMonitoringPermission,
                     action: {
-                        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent") {
-                            NSWorkspace.shared.open(url)
-                        }
+                        appState.requestInputMonitoringPermission()
                     },
                     actionLabel: "Open Settings"
                 )

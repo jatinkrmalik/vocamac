@@ -252,6 +252,32 @@ final class AppState: ObservableObject {
         }
     }
 
+    func requestInputMonitoringPermission() {
+        // Attempting to create an event tap triggers macOS to auto-add
+        // the app to the Input Monitoring list in System Settings.
+        let tap = CGEvent.tapCreate(
+            tap: .cgSessionEventTap,
+            place: .headInsertEventTap,
+            options: .listenOnly,
+            eventsOfInterest: CGEventMask(1 << CGEventType.keyDown.rawValue),
+            callback: { _, _, event, _ in Unmanaged.passRetained(event) },
+            userInfo: nil
+        )
+        if let tap = tap {
+            CFMachPortInvalidate(tap)
+        }
+
+        // Open Input Monitoring settings pane
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent") {
+            NSWorkspace.shared.open(url)
+        }
+
+        // Re-check after user has time to toggle
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+            self?.checkPermissions()
+        }
+    }
+
     // MARK: - Recording Flow
 
     func startRecording() async {

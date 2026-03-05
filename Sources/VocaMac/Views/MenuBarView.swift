@@ -284,12 +284,7 @@ struct MenuBarView: View {
 
             if appState.inputMonitoringPermission != .granted {
                 Button {
-                    if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent") {
-                        NSWorkspace.shared.open(url)
-                    }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                        appState.checkPermissions()
-                    }
+                    appState.requestInputMonitoringPermission()
                 } label: {
                     Label("Grant Input Monitoring", systemImage: "keyboard")
                         .font(.callout)
