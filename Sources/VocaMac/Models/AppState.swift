@@ -209,10 +209,18 @@ final class AppState: ObservableObject {
         inputMonitoringPermission = inputMonitoringGranted ? .granted : .denied
     }
 
-    /// Check Input Monitoring permission by attempting to create a passive event tap.
-    /// Returns true if the permission is granted.
+    /// Check Input Monitoring permission.
+    /// If the HotKeyManager has an active event tap, we check if macOS has disabled it
+    /// (which happens when the user revokes Input Monitoring permission).
+    /// Otherwise, we try to create a temporary tap to test.
     private func checkInputMonitoringPermission() -> Bool {
-        // Try creating a passive listen-only event tap
+        // If HotKeyManager has an active tap, check if it's still enabled
+        // macOS disables existing taps when Input Monitoring is revoked
+        if hotKeyManager.isListening, let tap = hotKeyManager.activeEventTap {
+            return CGEvent.tapIsEnabled(tap: tap)
+        }
+
+        // No active tap — try creating a temporary one to test permission
         let tap = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
             place: .headInsertEventTap,
@@ -222,7 +230,6 @@ final class AppState: ObservableObject {
             userInfo: nil
         )
         if let tap = tap {
-            // Successfully created — permission is granted. Clean up immediately.
             CFMachPortInvalidate(tap)
             return true
         }

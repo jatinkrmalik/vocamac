@@ -12,7 +12,10 @@ final class HotKeyManager {
     // MARK: - Properties
 
     /// Event tap Mach port
-    private var eventTap: CFMachPort?
+    private(set) var eventTap: CFMachPort?
+
+    /// Public accessor for permission checking
+    var activeEventTap: CFMachPort? { eventTap }
 
     /// Run loop source for the event tap
     private var runLoopSource: CFRunLoopSource?

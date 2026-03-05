@@ -261,6 +261,10 @@ struct MenuBarView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.orange)
+
+                Text("Required to capture your voice for transcription.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             if appState.accessibilityPermission != .granted {
