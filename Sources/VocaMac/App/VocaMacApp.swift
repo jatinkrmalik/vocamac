@@ -122,19 +122,52 @@ struct VocaMacApp: App {
 
 /// Renders a mic icon in the menu bar with color changes based on app status.
 ///
+/// Uses NSImage to create properly tinted menu bar icons because MenuBarExtra's
+/// label treats SwiftUI `.foregroundStyle()` colors as template images, stripping
+/// color. By setting `isTemplate = false` for non-idle states, macOS renders
+/// the actual color in the menu bar.
+///
 /// States:
-///   • idle       → default system color (outlined mic)
-///   • recording  → red (filled mic)
-///   • processing → orange (spinner)
-///   • error      → yellow (warning)
+///   • idle       → system default (template mic, adapts to menu bar appearance)
+///   • recording  → red filled mic (non-template, colored)
+///   • processing → orange spinner (non-template, colored)
+///   • error      → yellow warning (non-template, colored)
 struct MenuBarIcon: View {
     let appStatus: AppStatus
     let audioLevel: Float
 
     var body: some View {
-        Image(systemName: iconName)
-            .symbolRenderingMode(.hierarchical)
-            .foregroundStyle(iconColor)
+        Image(nsImage: makeMenuBarIcon())
+    }
+
+    private func makeMenuBarIcon() -> NSImage {
+        let config = NSImage.SymbolConfiguration(pointSize: 16, weight: .regular)
+
+        guard let baseImage = NSImage(systemSymbolName: iconName, accessibilityDescription: "VocaMac")?
+            .withSymbolConfiguration(config) else {
+            // Fallback to a basic mic if symbol lookup fails
+            return NSImage(systemSymbolName: "mic", accessibilityDescription: "VocaMac") ?? NSImage()
+        }
+
+        if appStatus == .idle {
+            // Template mode: macOS handles light/dark menu bar tinting
+            let image = baseImage.copy() as! NSImage
+            image.isTemplate = true
+            return image
+        }
+
+        // For active states, tint the icon with the status color
+        let tintColor = nsColor
+        let size = baseImage.size
+
+        let tinted = NSImage(size: size, flipped: false) { rect in
+            baseImage.draw(in: rect)
+            tintColor.set()
+            rect.fill(using: .sourceAtop)
+            return true
+        }
+        tinted.isTemplate = false
+        return tinted
     }
 
     private var iconName: String {
@@ -150,12 +183,12 @@ struct MenuBarIcon: View {
         }
     }
 
-    private var iconColor: Color {
+    private var nsColor: NSColor {
         switch appStatus {
-        case .idle:       return .primary
-        case .recording:  return .red
-        case .processing: return .orange
-        case .error:      return .yellow
+        case .idle:       return .labelColor
+        case .recording:  return .systemRed
+        case .processing: return .systemOrange
+        case .error:      return .systemYellow
         }
     }
 }
