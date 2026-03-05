@@ -612,10 +612,14 @@ struct AboutTab: View {
 
             Spacer()
 
-            Text("Made with ❤️ by Jatin Kumar Malik")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
-                .padding(.bottom, 8)
+            HStack(spacing: 0) {
+                Text("Made with ❤️ by ")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                Link("Jatin Kumar Malik", destination: URL(string: "https://x.com/intent/user?screen_name=jatinkrmalik")!)
+                    .font(.caption2)
+            }
+            .padding(.bottom, 8)
         }
         .frame(maxWidth: .infinity)
         .padding()
