@@ -1,188 +1,316 @@
 // VocaMacTests.swift
 // VocaMac Tests
 //
-// Unit tests for VocaMac core services.
-// These tests require Xcode to run (XCTest framework).
-// Run with: xcodebuild test -scheme VocaMac -destination 'platform=macOS'
+// Unit tests for VocaMac core logic and data models.
+// Run with: swift test
 
-import Testing
+import XCTest
 @testable import VocaMac
 
 // MARK: - SystemInfo Tests
 
-@Suite("SystemInfo Tests")
-struct SystemInfoTests {
+final class SystemInfoTests: XCTestCase {
 
-    @Test("Detect system capabilities returns valid values")
-    func detectSystemCapabilities() {
+    func testDetectSystemCapabilities() {
         let capabilities = SystemInfo.detect()
-
-        #expect(capabilities.physicalMemoryGB > 0)
-        #expect(capabilities.coreCount > 0)
-        #expect(!capabilities.processorName.isEmpty)
+        XCTAssertGreaterThan(capabilities.physicalMemoryGB, 0)
+        XCTAssertGreaterThan(capabilities.coreCount, 0)
+        XCTAssertFalse(capabilities.processorName.isEmpty)
     }
 
-    @Test("Model recommendation for Apple Silicon")
-    func modelRecommendationAppleSilicon() {
-        let model4GB = SystemInfo.recommendModel(isAppleSilicon: true, memoryGB: 4)
-        #expect(model4GB == .tiny)
-
-        let model8GB = SystemInfo.recommendModel(isAppleSilicon: true, memoryGB: 8)
-        #expect(model8GB == .base)
-
-        let model16GB = SystemInfo.recommendModel(isAppleSilicon: true, memoryGB: 16)
-        #expect(model16GB == .small)
+    func testModelRecommendationAppleSilicon() {
+        XCTAssertEqual(SystemInfo.recommendModel(isAppleSilicon: true, memoryGB: 4), .tiny)
+        XCTAssertEqual(SystemInfo.recommendModel(isAppleSilicon: true, memoryGB: 8), .base)
+        XCTAssertEqual(SystemInfo.recommendModel(isAppleSilicon: true, memoryGB: 16), .small)
+        XCTAssertEqual(SystemInfo.recommendModel(isAppleSilicon: true, memoryGB: 24), .medium)
+        XCTAssertEqual(SystemInfo.recommendModel(isAppleSilicon: true, memoryGB: 48), .medium)
     }
 
-    @Test("Model recommendation for Intel")
-    func modelRecommendationIntel() {
-        let model8GB = SystemInfo.recommendModel(isAppleSilicon: false, memoryGB: 8)
-        #expect(model8GB == .tiny)
-
-        let model16GB = SystemInfo.recommendModel(isAppleSilicon: false, memoryGB: 16)
-        #expect(model16GB == .base)
+    func testModelRecommendationIntel() {
+        XCTAssertEqual(SystemInfo.recommendModel(isAppleSilicon: false, memoryGB: 8), .tiny)
+        XCTAssertEqual(SystemInfo.recommendModel(isAppleSilicon: false, memoryGB: 16), .base)
+        XCTAssertEqual(SystemInfo.recommendModel(isAppleSilicon: false, memoryGB: 32), .small)
     }
 
-    @Test("Recommended thread count is within bounds")
-    func recommendedThreadCount() {
+    func testRecommendedThreadCount() {
         let threads = SystemInfo.recommendedThreadCount
-        #expect(threads >= 2)
-        #expect(threads <= 8)
+        XCTAssertGreaterThanOrEqual(threads, 2)
+        XCTAssertLessThanOrEqual(threads, 8)
+    }
+
+    func testModelIdentifier() {
+        XCTAssertFalse(SystemInfo.modelIdentifier.isEmpty)
+    }
+
+    func testSummaryDescription() {
+        let capabilities = SystemInfo.detect()
+        let summary = capabilities.summaryDescription
+        XCTAssertTrue(summary.contains("Processor:"))
+        XCTAssertTrue(summary.contains("Architecture:"))
+        XCTAssertTrue(summary.contains("Memory:"))
+        XCTAssertTrue(summary.contains("Cores:"))
+        XCTAssertTrue(summary.contains("Metal:"))
+        XCTAssertTrue(summary.contains("Recommended Model:"))
     }
 }
 
 // MARK: - ModelSize Tests
 
-@Suite("ModelSize Tests")
-struct ModelSizeTests {
+final class ModelSizeTests: XCTestCase {
 
-    @Test("All model sizes have valid file names")
-    func allModelSizesHaveFileNames() {
-        for size in ModelSize.allCases {
-            #expect(!size.fileName.isEmpty)
-            #expect(size.fileName.hasPrefix("ggml-"))
-            #expect(size.fileName.hasSuffix(".bin"))
-        }
-    }
-
-    @Test("Model sizes are in ascending order by file size")
-    func modelSizesAreOrdered() {
+    func testModelSizesAscendingFileSize() {
         let sizes = ModelSize.allCases.map { $0.fileSizeBytes }
         for i in 1..<sizes.count {
-            #expect(sizes[i] > sizes[i - 1], "Model sizes should be in ascending order")
+            XCTAssertGreaterThan(sizes[i], sizes[i - 1])
         }
     }
 
-    @Test("File size description is not empty")
-    func fileSizeDescription() {
-        let description = ModelSize.tiny.fileSizeDescription
-        #expect(!description.isEmpty)
-    }
-
-    @Test("All models have display names")
-    func displayNames() {
+    func testFileSizeDescription() {
         for size in ModelSize.allCases {
-            #expect(!size.displayName.isEmpty)
+            XCTAssertFalse(size.fileSizeDescription.isEmpty)
         }
     }
 
-    @Test("RAM requirements increase with model size")
-    func ramRequirements() {
+    func testDisplayNames() {
+        for size in ModelSize.allCases {
+            XCTAssertFalse(size.displayName.isEmpty)
+        }
+    }
+
+    func testRAMRequirementsIncreasing() {
         let rams = ModelSize.allCases.map { $0.ramRequiredGB }
         for i in 1..<rams.count {
-            #expect(rams[i] >= rams[i - 1], "RAM requirements should increase with model size")
+            XCTAssertGreaterThanOrEqual(rams[i], rams[i - 1])
         }
+    }
+
+    func testQualityDescriptions() {
+        for size in ModelSize.allCases {
+            XCTAssertFalse(size.qualityDescription.isEmpty)
+        }
+    }
+
+    func testRelativeSpeedIncreasing() {
+        let speeds = ModelSize.allCases.map { $0.relativeSpeed }
+        for i in 1..<speeds.count {
+            XCTAssertGreaterThan(speeds[i], speeds[i - 1])
+        }
+    }
+
+    func testAllCasesCount() {
+        XCTAssertEqual(ModelSize.allCases.count, 5)
+    }
+
+    func testRawValues() {
+        XCTAssertEqual(ModelSize.tiny.rawValue, "tiny")
+        XCTAssertEqual(ModelSize.base.rawValue, "base")
+        XCTAssertEqual(ModelSize.small.rawValue, "small")
+        XCTAssertEqual(ModelSize.medium.rawValue, "medium")
+        XCTAssertEqual(ModelSize.largeV3.rawValue, "large-v3")
+    }
+}
+
+// MARK: - ModelManager Tests
+
+final class ModelManagerTests: XCTestCase {
+
+    func testWhisperKitModelNames() {
+        let manager = ModelManager()
+        XCTAssertEqual(manager.whisperKitModelName(for: .tiny), "openai_whisper-tiny")
+        XCTAssertEqual(manager.whisperKitModelName(for: .base), "openai_whisper-base")
+        XCTAssertEqual(manager.whisperKitModelName(for: .small), "openai_whisper-small")
+        XCTAssertEqual(manager.whisperKitModelName(for: .medium), "openai_whisper-medium")
+        XCTAssertEqual(manager.whisperKitModelName(for: .largeV3), "openai_whisper-large-v3")
+    }
+
+    func testDownloadedModelsReturnsArray() {
+        let manager = ModelManager()
+        let downloaded = manager.downloadedModels()
+        XCTAssertGreaterThanOrEqual(downloaded.count, 0)
+    }
+
+    func testDiskUsageDescriptionNotEmpty() {
+        let manager = ModelManager()
+        XCTAssertFalse(manager.diskUsageDescription().isEmpty)
+    }
+
+    func testTotalDiskUsageNonNegative() {
+        let manager = ModelManager()
+        XCTAssertGreaterThanOrEqual(manager.totalDiskUsage(), 0)
     }
 }
 
 // MARK: - WhisperModelInfo Tests
 
-@Suite("WhisperModelInfo Tests")
-struct WhisperModelInfoTests {
+final class WhisperModelInfoTests: XCTestCase {
 
-    @Test("Status description reflects state correctly")
-    func statusDescription() {
+    func testStatusDescription() {
         var model = WhisperModelInfo(
-            size: .tiny,
-            filePath: nil,
-            isDownloaded: false,
-            isActive: false,
-            isSupported: true
+            size: .tiny, filePath: nil, isDownloaded: false,
+            isActive: false, isSupported: true
         )
-        #expect(model.statusDescription == "Not Downloaded")
+        XCTAssertEqual(model.statusDescription, "Not Downloaded")
 
         model.isDownloaded = true
-        #expect(model.statusDescription == "Downloaded")
+        XCTAssertEqual(model.statusDescription, "Downloaded")
 
         model.isActive = true
-        #expect(model.statusDescription == "Active")
+        XCTAssertEqual(model.statusDescription, "Active")
 
         model.isActive = false
         model.downloadProgress = 0.5
-        #expect(model.statusDescription == "Downloading (50%)")
+        XCTAssertEqual(model.statusDescription, "Downloading (50%)")
     }
 
-    @Test("Status icon reflects state")
-    func statusIcon() {
+    func testLoadingState() {
         var model = WhisperModelInfo(
-            size: .base,
-            filePath: nil,
-            isDownloaded: false,
-            isActive: false,
-            isSupported: true
+            size: .base, filePath: nil, isDownloaded: true,
+            isActive: false, isSupported: true
         )
-        #expect(model.statusIconName == "arrow.down.to.line")
+        model.isLoading = true
+        XCTAssertEqual(model.statusDescription, "Loading...")
+        XCTAssertEqual(model.statusIconName, "arrow.trianglehead.2.clockwise")
+    }
+
+    func testDefaultIsLoading() {
+        let model = WhisperModelInfo(
+            size: .tiny, filePath: nil, isDownloaded: false,
+            isActive: false, isSupported: true
+        )
+        XCTAssertFalse(model.isLoading)
+    }
+
+    func testStatusIcon() {
+        var model = WhisperModelInfo(
+            size: .base, filePath: nil, isDownloaded: false,
+            isActive: false, isSupported: true
+        )
+        XCTAssertEqual(model.statusIconName, "arrow.down.to.line")
 
         model.isDownloaded = true
-        #expect(model.statusIconName == "checkmark.circle")
+        XCTAssertEqual(model.statusIconName, "checkmark.circle")
 
         model.isActive = true
-        #expect(model.statusIconName == "checkmark.circle.fill")
+        XCTAssertEqual(model.statusIconName, "checkmark.circle.fill")
+
+        model.isActive = false
+        model.downloadProgress = 0.3
+        XCTAssertEqual(model.statusIconName, "arrow.down.circle")
+    }
+
+    func testIDMatchesSize() {
+        let model = WhisperModelInfo(
+            size: .small, filePath: nil, isDownloaded: false,
+            isActive: false, isSupported: true
+        )
+        XCTAssertEqual(model.id, "small")
     }
 }
 
 // MARK: - TranscriptionResult Tests
 
-@Suite("VocaTranscription Tests")
-struct VocaTranscriptionTests {
+final class VocaTranscriptionTests: XCTestCase {
 
-    @Test("VocaTranscription creation preserves values")
-    func vocaTranscriptionCreation() {
+    func testCreationPreservesValues() {
         let result = VocaTranscription(
-            text: "Hello world",
-            duration: 1.5,
-            detectedLanguage: "en",
-            audioLengthSeconds: 3.0,
-            modelUsed: .tiny
+            text: "Hello world", duration: 1.5,
+            detectedLanguage: "en", audioLengthSeconds: 3.0, modelUsed: .tiny
         )
+        XCTAssertEqual(result.text, "Hello world")
+        XCTAssertEqual(result.duration, 1.5)
+        XCTAssertEqual(result.detectedLanguage, "en")
+        XCTAssertEqual(result.audioLengthSeconds, 3.0)
+        XCTAssertEqual(result.modelUsed, .tiny)
+    }
 
-        #expect(result.text == "Hello world")
-        #expect(result.duration == 1.5)
-        #expect(result.detectedLanguage == "en")
-        #expect(result.audioLengthSeconds == 3.0)
-        #expect(result.modelUsed == .tiny)
+    func testUniqueID() {
+        let r1 = VocaTranscription(
+            text: "Hello", duration: 1.0,
+            detectedLanguage: "en", audioLengthSeconds: 2.0, modelUsed: .tiny
+        )
+        let r2 = VocaTranscription(
+            text: "Hello", duration: 1.0,
+            detectedLanguage: "en", audioLengthSeconds: 2.0, modelUsed: .tiny
+        )
+        XCTAssertNotEqual(r1.id, r2.id)
+    }
+}
+
+// MARK: - AppStatus Tests
+
+final class AppStatusTests: XCTestCase {
+
+    func testRawValues() {
+        XCTAssertEqual(AppStatus.idle.rawValue, "idle")
+        XCTAssertEqual(AppStatus.recording.rawValue, "recording")
+        XCTAssertEqual(AppStatus.processing.rawValue, "processing")
+        XCTAssertEqual(AppStatus.error.rawValue, "error")
+    }
+}
+
+// MARK: - ActivationMode Tests
+
+final class ActivationModeTests: XCTestCase {
+
+    func testDisplayNames() {
+        for mode in ActivationMode.allCases {
+            XCTAssertFalse(mode.displayName.isEmpty)
+        }
+    }
+
+    func testDescriptions() {
+        for mode in ActivationMode.allCases {
+            XCTAssertFalse(mode.description.isEmpty)
+        }
+    }
+
+    func testActivationModeCaseCount() {
+        XCTAssertEqual(ActivationMode.allCases.count, 2)
+    }
+
+    func testRawValues() {
+        XCTAssertEqual(ActivationMode.pushToTalk.rawValue, "pushToTalk")
+        XCTAssertEqual(ActivationMode.doubleTapToggle.rawValue, "doubleTapToggle")
     }
 }
 
 // MARK: - KeyCodeReference Tests
 
-@Suite("KeyCodeReference Tests")
-struct KeyCodeReferenceTests {
+final class KeyCodeReferenceTests: XCTestCase {
 
-    @Test("Common hotkeys list is not empty")
-    func commonHotKeysNotEmpty() {
-        #expect(!KeyCodeReference.commonHotKeys.isEmpty)
+    func testCommonHotKeysNotEmpty() {
+        XCTAssertFalse(KeyCodeReference.commonHotKeys.isEmpty)
     }
 
-    @Test("Display name for Right Option key code")
-    func displayNameForKnownKeyCode() {
-        let name = KeyCodeReference.displayName(for: 61)
-        #expect(name == "Right Option (⌥)")
+    func testDisplayNameForKnownKeyCode() {
+        XCTAssertEqual(KeyCodeReference.displayName(for: 61), "Right Option (⌥)")
     }
 
-    @Test("Display name for unknown key code falls back gracefully")
-    func displayNameForUnknownKeyCode() {
-        let name = KeyCodeReference.displayName(for: 999)
-        #expect(name == "Key 999")
+    func testDisplayNameForUnknownKeyCode() {
+        XCTAssertEqual(KeyCodeReference.displayName(for: 999), "Key 999")
+    }
+
+    func testCommonHotKeysValid() {
+        for hotkey in KeyCodeReference.commonHotKeys {
+            XCTAssertGreaterThanOrEqual(hotkey.keyCode, 0)
+            XCTAssertFalse(hotkey.name.isEmpty)
+        }
+    }
+}
+
+// MARK: - TextInjector Tests
+
+final class TextInjectorTests: XCTestCase {
+
+    func testInstantiation() {
+        let injector = TextInjector()
+        XCTAssertNotNil(injector)
+    }
+
+    func testInjectEmptyStringDoesNothing() {
+        let injector = TextInjector()
+        // Should return immediately without crashing
+        injector.inject(text: "", preserveClipboard: true)
+        injector.inject(text: "", preserveClipboard: false)
     }
 }

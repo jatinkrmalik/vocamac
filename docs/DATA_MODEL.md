@@ -114,7 +114,7 @@ VocaMac is a stateful desktop application with no database. All state is held in
 enum AppStatus: String {
     case idle          // Ready for input, not recording
     case recording     // Actively capturing microphone audio
-    case processing    // Transcribing audio via whisper.cpp
+    case processing    // Transcribing audio via WhisperKit
     case error         // Something went wrong, showing error state
 }
 ```
@@ -161,9 +161,9 @@ enum ModelSize: String, CaseIterable, Codable, Identifiable {
         }
     }
 
-    /// Model file name in GGML format
+    /// Model file name in CoreML format
     var fileName: String {
-        "ggml-\(rawValue).bin"
+        "openai_whisper-\(rawValue)"
     }
 
     /// Approximate file size on disk
@@ -190,7 +190,7 @@ enum ModelSize: String, CaseIterable, Codable, Identifiable {
 
     /// Download URL from Hugging Face
     var downloadURL: URL {
-        URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/\(fileName)")!
+        URL(string: "https://huggingface.co/ggerganov/WhisperKit/resolve/main/\(fileName)")!
     }
 }
 ```
@@ -333,11 +333,11 @@ struct AudioDevice: Identifiable, Hashable {
 ```
 ~/Library/Application Support/VocaMac/
 ├── models/
-│   ├── ggml-tiny.bin          ← Always present (bundled or downloaded)
-│   ├── ggml-base.bin          ← Optional (downloaded)
-│   ├── ggml-small.bin         ← Optional (downloaded)
-│   ├── ggml-medium.bin        ← Optional (downloaded)
-│   └── ggml-large-v3.bin     ← Optional (downloaded)
+│   ├── openai_whisper-tiny          ← Always present (bundled or downloaded)
+│   ├── openai_whisper-base          ← Optional (downloaded)
+│   ├── openai_whisper-small         ← Optional (downloaded)
+│   ├── openai_whisper-medium        ← Optional (downloaded)
+│   └── openai_whisper-large-v3     ← Optional (downloaded)
 └── logs/                      ← Future: debug logging
 ```
 

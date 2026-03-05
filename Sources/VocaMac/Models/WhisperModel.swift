@@ -28,11 +28,6 @@ enum ModelSize: String, CaseIterable, Codable, Identifiable {
         }
     }
 
-    /// Model file name in GGML format
-    var fileName: String {
-        "ggml-\(rawValue).bin"
-    }
-
     /// Approximate file size on disk in bytes
     var fileSizeBytes: Int64 {
         switch self {
@@ -83,11 +78,6 @@ enum ModelSize: String, CaseIterable, Codable, Identifiable {
         case .largeV3: return "Best"
         }
     }
-
-    /// Download URL from Hugging Face
-    var downloadURL: URL {
-        URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/\(fileName)")!
-    }
 }
 
 // MARK: - WhisperModelInfo
@@ -120,6 +110,7 @@ struct WhisperModelInfo: Identifiable {
     /// Human-readable status description
     var statusDescription: String {
         if isActive { return "Active" }
+        if isLoading { return "Loading..." }
         if let progress = downloadProgress {
             return "Downloading (\(Int(progress * 100))%)"
         }
@@ -130,6 +121,7 @@ struct WhisperModelInfo: Identifiable {
     /// SF Symbol name for the status icon
     var statusIconName: String {
         if isActive { return "checkmark.circle.fill" }
+        if isLoading { return "arrow.trianglehead.2.clockwise" }
         if downloadProgress != nil { return "arrow.down.circle" }
         if isDownloaded { return "checkmark.circle" }
         return "arrow.down.to.line"

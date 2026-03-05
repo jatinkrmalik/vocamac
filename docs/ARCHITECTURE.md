@@ -9,7 +9,7 @@
 
 ## 1. System Overview
 
-VocaMac is a native macOS menu bar application built with Swift and SwiftUI. It captures microphone audio, transcribes it locally using whisper.cpp, and injects the resulting text at the cursor position in any application.
+VocaMac is a native macOS menu bar application built with Swift and SwiftUI. It captures microphone audio, transcribes it locally using WhisperKit, and injects the resulting text at the cursor position in any application.
 
 ### High-Level Architecture
 
@@ -38,7 +38,7 @@ VocaMac is a native macOS menu bar application built with Swift and SwiftUI. It 
 │                          ▼                                    │
 │  ┌──────────────────────────────────────────────────────┐    │
 │  │              WhisperService                          │    │
-│  │         (whisper.cpp via C Bridge)                   │    │
+│  │         (WhisperKit (CoreML))                   │    │
 │  │     ┌──────────────────────────────┐                 │    │
 │  │     │       ModelManager           │                 │    │
 │  │     │  (Download, Load, Detect)    │                 │    │
@@ -48,7 +48,7 @@ VocaMac is a native macOS menu bar application built with Swift and SwiftUI. It 
 │  ┌──────────────────────────────────────────────────────┐    │
 │  │                   SwiftUI Layer                       │    │
 │  │  ┌──────────────┐  ┌────────────┐  ┌──────────────┐ │    │
-│  │  │ MenuBarView  │  │SettingsView│  │OnboardingView│ │    │
+│  │  │ MenuBarView  │  │SettingsView│  │SettingsView│ │    │
 │  │  └──────────────┘  └────────────┘  └──────────────┘ │    │
 │  └──────────────────────────────────────────────────────┘    │
 └──────────────────────────────────────────────────────────────┘
@@ -65,7 +65,7 @@ VocaMac is a native macOS menu bar application built with Swift and SwiftUI. It 
 | Audio | AVAudioEngine | macOS 13+ | Real-time microphone capture |
 | Hotkeys | CGEventTap (Quartz) | macOS 13+ | System-wide key event interception |
 | Text Injection | NSPasteboard + CGEvent | macOS 13+ | Clipboard-based text insertion |
-| STT Engine | whisper.cpp | Latest | Local speech-to-text inference |
+| STT Engine | WhisperKit | 0.9.4+ | CoreML-based on-device speech-to-text |
 | Acceleration | Metal | macOS 13+ | GPU-accelerated inference on Apple Silicon |
 | Build | Swift Package Manager | 5.9+ | Dependency management and build |
 | Min OS | macOS 13 Ventura | — | Minimum supported macOS version |
@@ -87,7 +87,7 @@ VocaMacApp (entry point)
     │     └── TextInjector
     ├── MenuBarView
     ├── SettingsView
-    └── OnboardingView
+    └── SettingsView
 ```
 
 ### 3.2 Module Specifications
@@ -179,7 +179,7 @@ On keyUp:
 
 #### 3.2.4 `AudioEngine` — Microphone Capture
 
-**Responsibility:** Capture audio from the microphone in the format required by whisper.cpp.
+**Responsibility:** Capture audio from the microphone in the format required by WhisperKit.
 
 **Audio Pipeline:**
 ```
@@ -189,7 +189,7 @@ Microphone → AVAudioInputNode → Format Converter → Buffer Accumulator
 ```
 
 **Key Configuration:**
-- Sample rate: 16,000 Hz (whisper.cpp requirement)
+- Sample rate: 16,000 Hz (WhisperKit requirement)
 - Channels: 1 (mono)
 - Format: Float32 PCM
 - Buffer size: 4096 frames per callback
@@ -207,11 +207,11 @@ Microphone → AVAudioInputNode → Format Converter → Buffer Accumulator
 
 #### 3.2.5 `WhisperService` — Speech-to-Text Engine
 
-**Responsibility:** Load whisper.cpp models and perform transcription.
+**Responsibility:** Load WhisperKit models and perform transcription.
 
 **Integration Strategy:**
-- whisper.cpp source code is included as a git submodule or vendored dependency
-- C bridging header (`whisper-bridge.h`) exposes whisper.cpp's C API to Swift
+- WhisperKit source code is included as a git submodule or vendored dependency
+- C bridging header (`whisper-bridge.h`) exposes WhisperKit's C API to Swift
 - Swift wrapper class provides a clean async API
 
 **Core API:**
@@ -240,8 +240,8 @@ audioData: [Float]
 - Model loading also happens on background thread
 
 **Metal Acceleration:**
-- Enabled by default on Apple Silicon when whisper.cpp is compiled with Metal support
-- Compile flag: `WHISPER_METAL=1` or `GGML_METAL=1`
+- Enabled by default on Apple Silicon when WhisperKit is compiled with Metal support
+- Compile flag: `WHISPER_METAL=1` or `CoreML_METAL=1`
 - Falls back to CPU on Intel Macs
 
 #### 3.2.6 `ModelManager` — Model Lifecycle Management
@@ -268,7 +268,7 @@ audioData: [Float]
 | medium | 1.5 GB | ~5 GB | 8x | Excellent |
 | large-v3 | 3.1 GB | ~10 GB | 16x | Best |
 
-**Download Source:** Hugging Face (`https://huggingface.co/ggerganov/whisper.cpp/resolve/main/`)
+**Download Source:** Hugging Face (`https://huggingface.co/ggerganov/WhisperKit/resolve/main/`)
 
 **Download Process:**
 1. Check if model file exists locally
@@ -354,7 +354,7 @@ AudioEngine (AVAudioEngine)
 AppState (orchestrator)
   │ sets status = .processing
   ▼
-WhisperService (whisper.cpp)
+WhisperService (WhisperKit)
   │ transcribes [Float] → String
   ▼
 AppState (orchestrator)
@@ -376,8 +376,8 @@ Done
 | Microphone input | Hardware-dependent | Usually 44.1kHz or 48kHz, stereo |
 | After format conversion | Float32 PCM | 16kHz, mono, [-1.0, 1.0] range |
 | Audio buffer | `[Float]` | Swift array of samples |
-| whisper.cpp input | `const float *` | C pointer to samples array |
-| whisper.cpp output | `const char *` | C string per segment |
+| WhisperKit input | `const float *` | C pointer to samples array |
+| WhisperKit output | `const char *` | C string per segment |
 | Transcription result | `String` | Swift string, all segments concatenated |
 | Clipboard | `NSPasteboard.string` | UTF-8 string |
 | Key simulation | `CGEvent` | Keyboard events posted to HID |
@@ -439,9 +439,9 @@ Note: Unlike microphone access, Accessibility permission cannot be granted via a
 Package.swift
   ├── Platform: .macOS(.v13)
   ├── Products: VocaMac executable
-  ├── Dependencies: whisper.cpp (vendored or submodule)
+  ├── Dependencies: WhisperKit (vendored or submodule)
   ├── Swift settings: -O (optimized for release)
-  └── C settings: -DGGML_METAL=1 (Metal acceleration)
+  └── C settings: -DCoreML_METAL=1 (Metal acceleration)
 ```
 
 ### 7.2 Build Commands
@@ -476,8 +476,8 @@ While VocaMac is a native macOS app, the architecture is designed to facilitate 
 
 ```
 Shared (C/C++):
-  └── whisper.cpp           ← Already cross-platform
-  └── Model format (GGML)   ← Already cross-platform
+  └── WhisperKit           ← Already cross-platform
+  └── Model format (CoreML)   ← Already cross-platform
 
 Platform-Specific:
   ┌──────────────────────┬──────────────────────┐
@@ -494,8 +494,8 @@ Platform-Specific:
 
 ### 8.2 What Can Be Shared
 
-- **whisper.cpp** — The core engine is already cross-platform
-- **Model files** — GGML model format works on all platforms
+- **WhisperKit** — The core engine is already cross-platform
+- **Model files** — CoreML model format works on all platforms
 - **Model catalog** — Same download URLs, checksums, metadata
 - **UX patterns** — Same user flows and interaction design
 
