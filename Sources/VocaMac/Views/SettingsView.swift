@@ -148,7 +148,7 @@ struct GeneralSettingsTab: View {
 
                 PermissionRow(
                     name: "Accessibility",
-                    icon: "universal.access",
+                    icon: "accessibility",
                     status: appState.accessibilityPermission,
                     action: { appState.requestAccessibilityPermission() },
                     actionLabel: "Open Settings"
