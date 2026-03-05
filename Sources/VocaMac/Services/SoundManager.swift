@@ -11,11 +11,11 @@ final class SoundManager {
 
     // MARK: - Sound Names
 
-    /// Soft tap sound for recording start
-    private let startSoundName = "Tink"
+    /// Soft pop sound for recording start
+    private let startSoundName = "Pop"
 
-    /// Soft pop sound for recording stop
-    private let stopSoundName = "Pop"
+    /// Hollow bottle sound for recording stop
+    private let stopSoundName = "Bottle"
 
     // MARK: - Properties
 
