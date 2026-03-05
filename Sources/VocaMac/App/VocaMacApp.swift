@@ -120,97 +120,34 @@ struct VocaMacApp: App {
 
 // MARK: - Menu Bar Icon
 
-/// Renders the Circle Mic icon in the menu bar based on app status.
-/// Creates an NSImage-based template icon that matches the VocaMac branding
-/// (Logo #4 — "Circle Mic"). Uses NSImage so it works with MenuBarExtra's label.
+/// Renders a mic icon in the menu bar with color changes based on app status.
+///
+/// States:
+///   • idle       → default system color (outlined mic)
+///   • recording  → red (filled mic)
+///   • processing → orange (spinner)
+///   • error      → yellow (warning)
 struct MenuBarIcon: View {
     let appStatus: AppStatus
     let audioLevel: Float
 
     var body: some View {
-        Image(nsImage: makeMenuBarImage())
+        Image(systemName: iconName)
+            .symbolRenderingMode(.hierarchical)
             .foregroundStyle(iconColor)
     }
 
-    /// Draws the Circle Mic icon into an NSImage suitable for the menu bar.
-    /// The image is set as a template so macOS handles light/dark appearance,
-    /// except when a specific status color override is applied.
-    private func makeMenuBarImage() -> NSImage {
-        let size = NSSize(width: 18, height: 18)
-        let image = NSImage(size: size, flipped: false) { rect in
-            let s = min(rect.width, rect.height)
-            let cx = rect.width / 2
-            let cy = rect.height / 2
-            let scale = s / 512.0
-
-            // Use black for template rendering — macOS will tint it
-            NSColor.black.setStroke()
-            NSColor.black.setFill()
-
-            // --- Circle outline (subtle) ---
-            let circleRect = NSRect(
-                x: cx - 140 * scale,
-                y: cy - 140 * scale,
-                width: 280 * scale,
-                height: 280 * scale
-            )
-            let circlePath = NSBezierPath(ovalIn: circleRect)
-            circlePath.lineWidth = 1.0
-            NSColor.black.withAlphaComponent(0.3).setStroke()
-            circlePath.stroke()
-
-            // Reset stroke color to full black
-            NSColor.black.setStroke()
-
-            // --- Microphone capsule (rounded rect) ---
-            let capsuleW = 56.0 * scale
-            let capsuleH = 100.0 * scale
-            let capsuleRect = NSRect(
-                x: cx - capsuleW / 2,
-                y: cy - capsuleH / 2 + 20 * scale,
-                width: capsuleW,
-                height: capsuleH
-            )
-            let capsulePath = NSBezierPath(roundedRect: capsuleRect, xRadius: 28 * scale, yRadius: 28 * scale)
-            capsulePath.fill()
-
-            // --- Mic cradle arc ---
-            let cradleCenterY = cy - 28 * scale
-            let cradleRadius = 50.0 * scale
-            let cradlePath = NSBezierPath()
-            cradlePath.appendArc(
-                withCenter: NSPoint(x: cx, y: cradleCenterY),
-                radius: cradleRadius,
-                startAngle: 180,
-                endAngle: 0,
-                clockwise: true
-            )
-            cradlePath.lineWidth = 1.2
-            cradlePath.lineCapStyle = .round
-            cradlePath.stroke()
-
-            // --- Stem ---
-            let stemPath = NSBezierPath()
-            let stemTop = cradleCenterY - cradleRadius
-            let stemBottom = stemTop - 28 * scale
-            stemPath.move(to: NSPoint(x: cx, y: stemTop))
-            stemPath.line(to: NSPoint(x: cx, y: stemBottom))
-            stemPath.lineWidth = 1.2
-            stemPath.lineCapStyle = .round
-            stemPath.stroke()
-
-            // --- Base ---
-            let basePath = NSBezierPath()
-            basePath.move(to: NSPoint(x: cx - 22 * scale, y: stemBottom))
-            basePath.line(to: NSPoint(x: cx + 22 * scale, y: stemBottom))
-            basePath.lineWidth = 1.2
-            basePath.lineCapStyle = .round
-            basePath.stroke()
-
-            return true
+    private var iconName: String {
+        switch appStatus {
+        case .idle:
+            return "mic"
+        case .recording:
+            return "mic.fill"
+        case .processing:
+            return "ellipsis.circle"
+        case .error:
+            return "exclamationmark.triangle"
         }
-        image.isTemplate = (appStatus == .idle)
-        return image
     }
 
     private var iconColor: Color {

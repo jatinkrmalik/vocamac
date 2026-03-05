@@ -1,24 +1,24 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#2A2A2C"/>
-      <stop offset="100%" stop-color="#1A1A1C"/>
-    </linearGradient>
     <linearGradient id="accent" x1="0.5" y1="0" x2="0.5" y2="1">
       <stop offset="0%" stop-color="#64B5F6"/>
       <stop offset="100%" stop-color="#2196F3"/>
     </linearGradient>
   </defs>
-  <!-- Squircle background -->
-  <rect x="16" y="16" width="480" height="480" rx="112" ry="112" fill="url(#bg)"/>
+
   <!-- Circle outline -->
-  <circle cx="256" cy="256" r="140" fill="none" stroke="url(#accent)" stroke-width="12" opacity="0.2"/>
+  <circle cx="256" cy="256" r="140" fill="none" stroke="url(#accent)" stroke-width="12" opacity="0.25"/>
+
   <!-- Microphone capsule -->
   <rect x="228" y="168" width="56" height="100" rx="28" fill="url(#accent)"/>
+
   <!-- Mic cradle -->
-  <path d="M206 260C206 290 228 312 256 312C284 312 306 290 306 260" fill="none" stroke="url(#accent)" stroke-width="12" stroke-linecap="round"/>
+  <path d="M206 260C206 290 228 312 256 312C284 312 306 290 306 260"
+        fill="none" stroke="url(#accent)" stroke-width="12" stroke-linecap="round"/>
+
   <!-- Stem -->
   <line x1="256" y1="312" x2="256" y2="340" stroke="url(#accent)" stroke-width="12" stroke-linecap="round"/>
+
   <!-- Base -->
   <line x1="234" y1="340" x2="278" y2="340" stroke="url(#accent)" stroke-width="12" stroke-linecap="round"/>
 </svg>
