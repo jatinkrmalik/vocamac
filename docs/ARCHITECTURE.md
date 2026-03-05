@@ -1,4 +1,4 @@
-# VocaMac — Technical Architecture Document
+# VocaMac - Technical Architecture Document
 
 **Version:** 1.0
 **Date:** 2026-03-04
@@ -48,7 +48,7 @@ VocaMac is a native macOS menu bar application built with Swift and SwiftUI. It 
 │  ┌──────────────────────────────────────────────────────┐    │
 │  │                   SwiftUI Layer                       │    │
 │  │  ┌──────────────┐  ┌────────────┐  ┌──────────────┐ │    │
-│  │  │ MenuBarView  │  │SettingsView│  │SettingsView│ │    │
+│  │  │ MenuBarView  │  │SettingsView│                  │    │
 │  │  └──────────────┘  └────────────┘  └──────────────┘ │    │
 │  └──────────────────────────────────────────────────────┘    │
 └──────────────────────────────────────────────────────────────┘
@@ -68,7 +68,7 @@ VocaMac is a native macOS menu bar application built with Swift and SwiftUI. It 
 | STT Engine | WhisperKit | 0.9.4+ | CoreML-based on-device speech-to-text |
 | Acceleration | Metal | macOS 13+ | GPU-accelerated inference on Apple Silicon |
 | Build | Swift Package Manager | 5.9+ | Dependency management and build |
-| Min OS | macOS 13 Ventura | — | Minimum supported macOS version |
+| Min OS | macOS 13 Ventura | - | Minimum supported macOS version |
 
 ---
 
@@ -85,6 +85,7 @@ VocaMacApp (entry point)
     │     │     └── ModelManager
     │     │           └── SystemInfo
     │     └── TextInjector
+    │     └── SoundManager
     ├── MenuBarView
     ├── SettingsView
     └── SettingsView
@@ -92,7 +93,7 @@ VocaMacApp (entry point)
 
 ### 3.2 Module Specifications
 
-#### 3.2.1 `VocaMacApp` — Application Entry Point
+#### 3.2.1 `VocaMacApp` - Application Entry Point
 
 **Responsibility:** Bootstrap the app, configure as menu bar-only (no Dock icon), initialize all services.
 
@@ -112,7 +113,7 @@ App Launch
   → App is ready
 ```
 
-#### 3.2.2 `AppState` — Central State Management
+#### 3.2.2 `AppState` - Central State Management
 
 **Responsibility:** Single source of truth for all app state. Observable object that drives reactive UI updates.
 
@@ -143,7 +144,7 @@ HotKey Triggered (stop)
   → Set appStatus = .idle
 ```
 
-#### 3.2.3 `HotKeyManager` — Global Hotkey Listener
+#### 3.2.3 `HotKeyManager` - Global Hotkey Listener
 
 **Responsibility:** Listen for system-wide key events to trigger recording start/stop.
 
@@ -177,7 +178,7 @@ On keyUp:
 
 **Required Permission:** Accessibility (System Settings → Privacy & Security → Accessibility)
 
-#### 3.2.4 `AudioEngine` — Microphone Capture
+#### 3.2.4 `AudioEngine` - Microphone Capture
 
 **Responsibility:** Capture audio from the microphone in the format required by WhisperKit.
 
@@ -205,7 +206,7 @@ Microphone → AVAudioInputNode → Format Converter → Buffer Accumulator
 - Report to AppState on each buffer for UI visualization
 - Throttle updates to ~15 Hz to avoid excessive UI refreshes
 
-#### 3.2.5 `WhisperService` — Speech-to-Text Engine
+#### 3.2.5 `WhisperService` - Speech-to-Text Engine
 
 **Responsibility:** Load WhisperKit models and perform transcription.
 
@@ -244,7 +245,7 @@ audioData: [Float]
 - Compile flag: `WHISPER_METAL=1` or `CoreML_METAL=1`
 - Falls back to CPU on Intel Macs
 
-#### 3.2.6 `ModelManager` — Model Lifecycle Management
+#### 3.2.6 `ModelManager` - Model Lifecycle Management
 
 **Responsibility:** Discover, download, verify, and manage whisper model files.
 
@@ -277,7 +278,7 @@ audioData: [Float]
 4. Verify SHA256 checksum after download
 5. Move to models directory on success
 
-#### 3.2.7 `SystemInfo` — Hardware Detection
+#### 3.2.7 `SystemInfo` - Hardware Detection
 
 **Responsibility:** Detect system hardware capabilities and recommend optimal model size.
 
@@ -300,7 +301,7 @@ Intel:
   RAM ≥ 32 GB → small
 ```
 
-#### 3.2.8 `TextInjector` — System-Wide Text Insertion
+#### 3.2.8 `TextInjector` - System-Wide Text Insertion
 
 **Responsibility:** Insert transcribed text at the cursor position in any application.
 
@@ -406,8 +407,8 @@ Main Thread (Text Injection)
 ```
 
 **Key Threading Rules:**
-1. Audio capture callbacks run on AVAudioEngine's internal thread — keep work minimal
-2. Transcription runs via `Task { }` on a background executor — never block the main thread
+1. Audio capture callbacks run on AVAudioEngine's internal thread - keep work minimal
+2. Transcription runs via `Task { }` on a background executor - never block the main thread
 3. UI updates via `@MainActor` or `DispatchQueue.main`
 4. CGEvent posting should happen from the main thread
 5. Model loading/downloading uses async/await on background threads
@@ -427,7 +428,7 @@ let options = [kAXTrustedCheckOptionPrompt.takeRetainedValue(): true] as CFDicti
 let isTrusted = AXIsProcessTrustedWithOptions(options)
 ```
 
-Note: Unlike microphone access, Accessibility permission cannot be granted via a system dialog — the user must manually add the app in System Settings. The app should provide clear instructions.
+Note: Unlike microphone access, Accessibility permission cannot be granted via a system dialog - the user must manually add the app in System Settings. The app should provide clear instructions.
 
 ---
 
@@ -441,7 +442,7 @@ Package.swift
   ├── Products: VocaMac executable
   ├── Dependencies: WhisperKit (vendored or submodule)
   ├── Swift settings: -O (optimized for release)
-  └── C settings: -DCoreML_METAL=1 (Metal acceleration)
+  └── Platforms: .macOS(.v13)
 ```
 
 ### 7.2 Build Commands
@@ -457,14 +458,14 @@ swift build -c release
 swift run VocaMac
 
 # Create app bundle (requires additional scripting)
-./scripts/bundle.sh
+./scripts/build.sh
 ```
 
 ### 7.3 Distribution Strategy (MVP)
 
-1. **GitHub Releases** — DMG or ZIP containing the .app bundle
-2. **Homebrew Cask** — `brew install --cask vocamac` (post-MVP)
-3. **Mac App Store** — Future consideration (requires sandbox compliance)
+1. **GitHub Releases** - DMG or ZIP containing the .app bundle
+2. **Homebrew Cask** - `brew install --cask vocamac` (post-MVP)
+3. **Mac App Store** - Future consideration (requires sandbox compliance)
 
 ---
 
@@ -475,9 +476,9 @@ swift run VocaMac
 While VocaMac is a native macOS app, the architecture is designed to facilitate a future Windows port (VocaWin):
 
 ```
-Shared (C/C++):
-  └── WhisperKit           ← Already cross-platform
-  └── Model format (CoreML)   ← Already cross-platform
+Shared Concepts:
+  └── Whisper models        ← Same model family across platforms
+  └── UX patterns           ← Same user interaction design
 
 Platform-Specific:
   ┌──────────────────────┬──────────────────────┐
@@ -494,10 +495,10 @@ Platform-Specific:
 
 ### 8.2 What Can Be Shared
 
-- **WhisperKit** — The core engine is already cross-platform
-- **Model files** — CoreML model format works on all platforms
-- **Model catalog** — Same download URLs, checksums, metadata
-- **UX patterns** — Same user flows and interaction design
+- **Whisper models** - Same OpenAI Whisper model family on all platforms
+- **Model files** - Each platform uses its optimal format (CoreML on macOS, GGML on Linux/Windows)
+- **Model catalog** - Same model variants and metadata
+- **UX patterns** - Same user flows and interaction design
 
 ### 8.3 What Must Be Platform-Specific
 
@@ -519,7 +520,7 @@ Platform-Specific:
 | Model file corrupted/missing | Re-download model, fall back to bundled tiny |
 | Audio device disconnected | Detect and notify user, pause recording |
 | Transcription fails | Show error in menu bar popover, log details |
-| Clipboard restore fails | Log warning, don't crash — clipboard is transient |
+| Clipboard restore fails | Log warning, don't crash - clipboard is transient |
 | Out of memory during transcription | Suggest a smaller model, show clear error |
 | Network error during model download | Retry with exponential backoff, allow manual retry |
 
@@ -528,9 +529,9 @@ Platform-Specific:
 ## 10. Security Considerations
 
 1. **No network communication** except model downloads from Hugging Face
-2. **No telemetry or analytics** — fully offline operation
-3. **Audio data never leaves the device** — processed entirely in-memory
-4. **No persistent audio storage** — audio buffers are discarded after transcription
-5. **Model files verified by checksum** — prevent tampering
-6. **Code signing** — App should be signed with a Developer ID certificate
-7. **Hardened runtime** — Enable for Gatekeeper compatibility
+2. **No telemetry or analytics** - fully offline operation
+3. **Audio data never leaves the device** - processed entirely in-memory
+4. **No persistent audio storage** - audio buffers are discarded after transcription
+5. **Model files verified by checksum** - prevent tampering
+6. **Code signing** - App should be signed with a Developer ID certificate
+7. **Hardened runtime** - Enable for Gatekeeper compatibility
