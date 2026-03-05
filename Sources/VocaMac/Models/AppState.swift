@@ -259,10 +259,12 @@ final class AppState: ObservableObject {
             soundManager.playStopSound()
         }
 
-        // Hide cursor indicator
-        cursorOverlay.hide()
+        // Transition cursor indicator to processing state (red -> purple)
+        // Keeps the overlay visible so the user knows text is on its way
+        cursorOverlay.transitionToProcessing()
 
         guard !audioData.isEmpty else {
+            cursorOverlay.hide()
             appStatus = .idle
             return
         }
@@ -286,8 +288,10 @@ final class AppState: ObservableObject {
                 )
             }
 
+            cursorOverlay.hide()
             appStatus = .idle
         } catch {
+            cursorOverlay.hide()
             errorMessage = "Transcription failed: \(error.localizedDescription)"
             appStatus = .error
 

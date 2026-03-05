@@ -3,7 +3,7 @@
 //
 // Shows a floating mic indicator near the text cursor during recording.
 // Uses the Accessibility API to locate the caret position in the focused app,
-// then renders a small, non-interactive overlay that pulses with audio level.
+// then renders a small, non-interactive overlay that shows recording/processing state.
 
 import AppKit
 import SwiftUI
@@ -21,7 +21,7 @@ final class CursorOverlayManager {
     /// Hosting view for the SwiftUI indicator content
     private var hostingView: NSHostingView<MicIndicatorView>?
 
-    /// The SwiftUI view model driving the indicator animation
+    /// The SwiftUI view model driving the indicator
     private let viewModel = MicIndicatorViewModel()
 
     /// Timer to periodically reposition the overlay to follow the cursor
@@ -31,7 +31,13 @@ final class CursorOverlayManager {
 
     /// Show the recording indicator near the text cursor
     func show() {
-        guard overlayPanel == nil else { return }
+        guard overlayPanel == nil else {
+            // Already showing - just ensure it's in recording state
+            viewModel.phase = .recording
+            return
+        }
+
+        viewModel.phase = .recording
 
         let indicatorView = MicIndicatorView(viewModel: viewModel)
         let hosting = NSHostingView(rootView: indicatorView)
@@ -67,7 +73,14 @@ final class CursorOverlayManager {
         }
 
         viewModel.isActive = true
-        NSLog("[CursorOverlay] Indicator shown")
+        NSLog("[CursorOverlay] Indicator shown (recording)")
+    }
+
+    /// Transition the indicator from recording (red) to processing (purple)
+    /// Keeps the overlay visible so the user knows text is on its way.
+    func transitionToProcessing() {
+        viewModel.phase = .processing
+        NSLog("[CursorOverlay] Transitioned to processing")
     }
 
     /// Hide the recording indicator
@@ -75,13 +88,14 @@ final class CursorOverlayManager {
         repositionTimer?.invalidate()
         repositionTimer = nil
         viewModel.isActive = false
+        viewModel.phase = .idle
         overlayPanel?.orderOut(nil)
         overlayPanel = nil
         hostingView = nil
         NSLog("[CursorOverlay] Indicator hidden")
     }
 
-    /// Update the audio level for the pulsing animation
+    /// Update the audio level (kept for future use)
     func updateAudioLevel(_ level: Float) {
         viewModel.audioLevel = level
     }
@@ -159,12 +173,21 @@ final class CursorOverlayManager {
     }
 }
 
+// MARK: - IndicatorPhase
+
+enum IndicatorPhase {
+    case idle
+    case recording
+    case processing
+}
+
 // MARK: - MicIndicatorViewModel
 
 @MainActor
 final class MicIndicatorViewModel: ObservableObject {
     @Published var isActive: Bool = false
     @Published var audioLevel: Float = 0.0
+    @Published var phase: IndicatorPhase = .idle
 }
 
 // MARK: - MicIndicatorView
@@ -172,34 +195,47 @@ final class MicIndicatorViewModel: ObservableObject {
 struct MicIndicatorView: View {
     @ObservedObject var viewModel: MicIndicatorViewModel
 
+    /// Recording state - red, matching menu bar icon (.systemRed)
+    private let recordingColor = Color(nsColor: .systemRed)
+
+    /// Processing state - purple (#BF5AF2), matching menu bar icon
+    private let processingColor = Color(
+        red: 0.749, green: 0.353, blue: 0.949
+    )
+
     var body: some View {
         ZStack {
-            // Pulsing background circle
+            // Background circle with color transition
             Circle()
-                .fill(Color.red.opacity(0.2))
-                .frame(width: pulseSize, height: pulseSize)
-                .animation(.easeInOut(duration: 0.3), value: viewModel.audioLevel)
-
-            // Background circle
-            Circle()
-                .fill(Color.red.opacity(0.85))
+                .fill(phaseColor)
                 .frame(width: 28, height: 28)
-                .shadow(color: .red.opacity(0.4), radius: 4, x: 0, y: 0)
+                .shadow(color: phaseColor.opacity(0.4), radius: 4, x: 0, y: 0)
 
-            // Mic icon
-            Image(systemName: "mic.fill")
+            // Icon changes based on phase
+            Image(systemName: phaseIcon)
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(.white)
         }
         .opacity(viewModel.isActive ? 1 : 0)
-        .animation(.easeInOut(duration: 0.2), value: viewModel.isActive)
+        .animation(.easeInOut(duration: 0.3), value: viewModel.isActive)
+        .animation(.easeInOut(duration: 0.4), value: viewModel.phase)
     }
 
-    /// Size of the pulse circle, driven by audio level
-    private var pulseSize: CGFloat {
-        let base: CGFloat = 28
-        let maxPulse: CGFloat = 36
-        let level = CGFloat(min(max(viewModel.audioLevel, 0), 1))
-        return base + (maxPulse - base) * level
+    /// Color based on current phase
+    private var phaseColor: Color {
+        switch viewModel.phase {
+        case .idle:       return recordingColor
+        case .recording:  return recordingColor
+        case .processing: return processingColor
+        }
+    }
+
+    /// Icon based on current phase
+    private var phaseIcon: String {
+        switch viewModel.phase {
+        case .idle:       return "mic.fill"
+        case .recording:  return "mic.fill"
+        case .processing: return "ellipsis.circle"
+        }
     }
 }
