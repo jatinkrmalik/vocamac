@@ -79,8 +79,17 @@ jobs:
 
             1. Download `VocaMac-${{ steps.version.outputs.VERSION }}-arm64.dmg`
             2. Open the DMG and drag VocaMac to Applications
-            3. Open VocaMac from Applications
-            4. Grant Microphone, Accessibility, and Input Monitoring permissions when prompted
+            3. **Important:** Remove the quarantine attribute before launching:
+               ```bash
+               xattr -cr /Applications/VocaMac.app
+               ```
+            4. Open VocaMac from Applications
+            5. Grant Microphone, Accessibility, and Input Monitoring permissions when prompted
+
+            > **Why step 3?** macOS Gatekeeper blocks apps that aren't notarized with Apple.
+            > Since VocaMac is ad-hoc signed (no Apple Developer certificate yet), you need to
+            > clear the quarantine flag manually. This is safe - you can verify the checksums below.
+            > Proper code signing and notarization is planned for a future release.
 
             ### Checksums (SHA-256)
             See `checksums.txt` for verification.
