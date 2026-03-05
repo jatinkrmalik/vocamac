@@ -1,4 +1,8 @@
-# 🎙️ VocaMac
+<p align="center">
+  <img src="web/logo.png" alt="VocaMac" width="128" height="128">
+</p>
+
+<h1 align="center">VocaMac</h1>
 
 [![Build & Test](https://github.com/jatinkrmalik/vocamac/actions/workflows/ci.yml/badge.svg)](https://github.com/jatinkrmalik/vocamac/actions/workflows/ci.yml) [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0) [![Platform: macOS](https://img.shields.io/badge/Platform-macOS%2013%2B-lightgrey.svg)](https://github.com/jatinkrmalik/vocamac) [![Swift 5.9+](https://img.shields.io/badge/Swift-5.9%2B-orange.svg)](https://swift.org) [![Website](https://img.shields.io/badge/Web-vocamac.com-007AFF.svg)](https://vocamac.com) [![GitHub stars](https://img.shields.io/github/stars/jatinkrmalik/vocamac?style=social)](https://github.com/jatinkrmalik/vocamac/stargazers)
 
