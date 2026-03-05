@@ -544,6 +544,14 @@ struct AudioSettingsTab: View {
                     .foregroundStyle(.secondary)
             }
 
+            Section("Sound Effects") {
+                Toggle("Enable sound effects", isOn: $appState.soundEffectsEnabled)
+
+                Text("Play subtle audio cues when recording starts and stops.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("Input Device") {
                 if audioDevices.isEmpty {
                     HStack {
