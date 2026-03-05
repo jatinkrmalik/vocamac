@@ -50,9 +50,16 @@ struct MenuBarView: View {
                 .foregroundStyle(.blue)
 
             VStack(alignment: .leading, spacing: 3) {
-                Text("VocaMac")
-                    .font(.title3)
-                    .fontWeight(.semibold)
+                HStack(spacing: 6) {
+                    Text("VocaMac")
+                        .font(.title3)
+                        .fontWeight(.semibold)
+
+                    // Status indicator dot — next to title
+                    Circle()
+                        .fill(statusColor)
+                        .frame(width: 10, height: 10)
+                }
 
                 if let model = appState.currentModel {
                     Text("Model: \(model.size.displayName)")
@@ -71,10 +78,11 @@ struct MenuBarView: View {
 
             Spacer()
 
-            // Status indicator dot
-            Circle()
-                .fill(statusColor)
-                .frame(width: 10, height: 10)
+            // RAM usage display
+            Text(currentMemoryUsage)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
         }
     }
 
@@ -191,7 +199,7 @@ struct MenuBarView: View {
     // MARK: - Actions
 
     private var actionsSection: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 2) {
             Button {
                 settingsManager.open(appState: appState)
             } label: {
@@ -203,11 +211,16 @@ struct MenuBarView: View {
                         .foregroundStyle(.secondary)
                 }
                 .font(.body)
+                .padding(.vertical, 6)
+                .padding(.horizontal, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.primary.opacity(0.0001))
+                )
             }
-            .buttonStyle(.plain)
-            .padding(.vertical, 4)
-
-            Divider()
+            .buttonStyle(MenuRowButtonStyle())
 
             Button {
                 NSApplication.shared.terminate(nil)
@@ -220,10 +233,18 @@ struct MenuBarView: View {
                         .foregroundStyle(.secondary)
                 }
                 .font(.body)
+                .padding(.vertical, 6)
+                .padding(.horizontal, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.primary.opacity(0.0001))
+                )
             }
-            .buttonStyle(.plain)
-            .padding(.vertical, 4)
+            .buttonStyle(MenuRowButtonStyle())
         }
+        .padding(.horizontal, -8)
     }
 
     // MARK: - Helpers
@@ -254,6 +275,41 @@ struct MenuBarView: View {
         case .doubleTapToggle:
             return "Double-tap \(keyName)"
         }
+    }
+
+    /// Current app memory usage formatted as a human-readable string
+    private var currentMemoryUsage: String {
+        var info = mach_task_basic_info()
+        var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size) / 4
+        let result = withUnsafeMutablePointer(to: &info) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                task_info(mach_task_self_, task_flavor_t(MACH_TASK_BASIC_INFO), $0, &count)
+            }
+        }
+        guard result == KERN_SUCCESS else { return "— MB" }
+        let mb = Double(info.resident_size) / (1024 * 1024)
+        if mb >= 1024 {
+            return String(format: "%.1f GB", mb / 1024)
+        }
+        return String(format: "%.0f MB", mb)
+    }
+}
+
+// MARK: - Menu Row Button Style
+
+/// A button style that highlights on hover, matching native macOS menu behavior.
+struct MenuRowButtonStyle: ButtonStyle {
+    @State private var isHovered = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(isHovered ? Color.primary.opacity(0.1) : Color.clear)
+            )
+            .onHover { hovering in
+                isHovered = hovering
+            }
     }
 }
 
