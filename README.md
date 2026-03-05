@@ -4,14 +4,15 @@
 
 <h1 align="center">VocaMac</h1>
 
+<div align="center">
+  
 [![Build & Test](https://github.com/jatinkrmalik/vocamac/actions/workflows/ci.yml/badge.svg)](https://github.com/jatinkrmalik/vocamac/actions/workflows/ci.yml) [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0) [![Platform: macOS](https://img.shields.io/badge/Platform-macOS%2013%2B-lightgrey.svg)](https://github.com/jatinkrmalik/vocamac) [![Swift 5.9+](https://img.shields.io/badge/Swift-5.9%2B-orange.svg)](https://swift.org)
 
+</div>
 
-**Local voice-to-text for macOS - powered by [WhisperKit](https://github.com/argmaxinc/WhisperKit)**
+**Opensource Private Local voice-to-text transcription app for macOS - powered by [WhisperKit](https://github.com/argmaxinc/WhisperKit)**
 
 VocaMac is a native macOS menu bar application that transcribes your voice to text locally on your machine. No cloud, no subscriptions, no data leaves your device. Just hold a hotkey, speak, and your words appear wherever your cursor is.
-
- [VocaLinux](https://github.com/jatinkrmalik/vocalinux) ·  **VocaMac** · 🪟 VocaWin *(coming soon)* · 🌐 [vocamac.com](https://vocamac.com)
 
 ---
 
@@ -287,4 +288,8 @@ AGPL-3.0 License - see [LICENSE](LICENSE) for details.
 
 ---
 
+<div align="center">
+  
 Made with ❤️ for the macOS community!
+
+</div>
