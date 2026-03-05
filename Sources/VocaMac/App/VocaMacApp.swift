@@ -121,83 +121,96 @@ struct VocaMacApp: App {
 // MARK: - Menu Bar Icon
 
 /// Renders the Circle Mic icon in the menu bar based on app status.
-/// Draws a custom mic-in-circle shape that matches the VocaMac branding
-/// (Logo #4 — "Circle Mic") instead of a generic SF Symbol.
+/// Creates an NSImage-based template icon that matches the VocaMac branding
+/// (Logo #4 — "Circle Mic"). Uses NSImage so it works with MenuBarExtra's label.
 struct MenuBarIcon: View {
     let appStatus: AppStatus
     let audioLevel: Float
 
     var body: some View {
-        Canvas { context, size in
-            let s = min(size.width, size.height)
-            let cx = size.width / 2
-            let cy = size.height / 2
+        Image(nsImage: makeMenuBarImage())
+            .foregroundStyle(iconColor)
+    }
 
-            // Scale factor from the 512-unit design coordinate space
+    /// Draws the Circle Mic icon into an NSImage suitable for the menu bar.
+    /// The image is set as a template so macOS handles light/dark appearance,
+    /// except when a specific status color override is applied.
+    private func makeMenuBarImage() -> NSImage {
+        let size = NSSize(width: 18, height: 18)
+        let image = NSImage(size: size, flipped: false) { rect in
+            let s = min(rect.width, rect.height)
+            let cx = rect.width / 2
+            let cy = rect.height / 2
             let scale = s / 512.0
 
+            // Use black for template rendering — macOS will tint it
+            NSColor.black.setStroke()
+            NSColor.black.setFill()
+
             // --- Circle outline (subtle) ---
-            let circleRect = CGRect(
+            let circleRect = NSRect(
                 x: cx - 140 * scale,
                 y: cy - 140 * scale,
                 width: 280 * scale,
                 height: 280 * scale
             )
-            var circlePath = Path()
-            circlePath.addEllipse(in: circleRect)
-            context.stroke(circlePath, with: .color(iconColor.opacity(0.25)), lineWidth: 1.2)
+            let circlePath = NSBezierPath(ovalIn: circleRect)
+            circlePath.lineWidth = 1.0
+            NSColor.black.withAlphaComponent(0.3).setStroke()
+            circlePath.stroke()
+
+            // Reset stroke color to full black
+            NSColor.black.setStroke()
 
             // --- Microphone capsule (rounded rect) ---
             let capsuleW = 56.0 * scale
             let capsuleH = 100.0 * scale
-            let capsuleRect = CGRect(
+            let capsuleRect = NSRect(
                 x: cx - capsuleW / 2,
-                y: cy - 88 * scale,
+                y: cy - capsuleH / 2 + 20 * scale,
                 width: capsuleW,
                 height: capsuleH
             )
-            let capsulePath = Path(roundedRect: capsuleRect, cornerRadius: 28 * scale)
-            context.fill(capsulePath, with: .color(iconColor))
+            let capsulePath = NSBezierPath(roundedRect: capsuleRect, xRadius: 28 * scale, yRadius: 28 * scale)
+            capsulePath.fill()
 
             // --- Mic cradle arc ---
-            var cradlePath = Path()
-            let cradleY = cy + 4 * scale
+            let cradleCenterY = cy - 28 * scale
             let cradleRadius = 50.0 * scale
-            cradlePath.addArc(
-                center: CGPoint(x: cx, y: cradleY),
+            let cradlePath = NSBezierPath()
+            cradlePath.appendArc(
+                withCenter: NSPoint(x: cx, y: cradleCenterY),
                 radius: cradleRadius,
-                startAngle: .degrees(0),
-                endAngle: .degrees(180),
-                clockwise: false
+                startAngle: 180,
+                endAngle: 0,
+                clockwise: true
             )
-            context.stroke(
-                cradlePath,
-                with: .color(iconColor),
-                style: StrokeStyle(lineWidth: 1.5, lineCap: .round)
-            )
+            cradlePath.lineWidth = 1.2
+            cradlePath.lineCapStyle = .round
+            cradlePath.stroke()
 
             // --- Stem ---
-            var stemPath = Path()
-            stemPath.move(to: CGPoint(x: cx, y: cradleY + cradleRadius))
-            stemPath.addLine(to: CGPoint(x: cx, y: cradleY + cradleRadius + 28 * scale))
-            context.stroke(
-                stemPath,
-                with: .color(iconColor),
-                style: StrokeStyle(lineWidth: 1.5, lineCap: .round)
-            )
+            let stemPath = NSBezierPath()
+            let stemTop = cradleCenterY - cradleRadius
+            let stemBottom = stemTop - 28 * scale
+            stemPath.move(to: NSPoint(x: cx, y: stemTop))
+            stemPath.line(to: NSPoint(x: cx, y: stemBottom))
+            stemPath.lineWidth = 1.2
+            stemPath.lineCapStyle = .round
+            stemPath.stroke()
 
             // --- Base ---
-            var basePath = Path()
-            let baseY = cradleY + cradleRadius + 28 * scale
-            basePath.move(to: CGPoint(x: cx - 22 * scale, y: baseY))
-            basePath.addLine(to: CGPoint(x: cx + 22 * scale, y: baseY))
-            context.stroke(
-                basePath,
-                with: .color(iconColor),
-                style: StrokeStyle(lineWidth: 1.5, lineCap: .round)
-            )
+            let basePath = NSBezierPath()
+            basePath.move(to: NSPoint(x: cx - 22 * scale, y: stemBottom))
+            basePath.line(to: NSPoint(x: cx + 22 * scale, y: stemBottom))
+            basePath.lineWidth = 1.2
+            basePath.lineCapStyle = .round
+            basePath.stroke()
+
+            return true
         }
-        .frame(width: 18, height: 18)
+        image.isTemplate = (appStatus == .idle)
+        return image
     }
 
     private var iconColor: Color {
