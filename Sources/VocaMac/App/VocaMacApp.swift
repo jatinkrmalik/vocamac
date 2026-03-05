@@ -120,28 +120,84 @@ struct VocaMacApp: App {
 
 // MARK: - Menu Bar Icon
 
-/// Renders the appropriate icon in the menu bar based on app status
+/// Renders the Circle Mic icon in the menu bar based on app status.
+/// Draws a custom mic-in-circle shape that matches the VocaMac branding
+/// (Logo #4 — "Circle Mic") instead of a generic SF Symbol.
 struct MenuBarIcon: View {
     let appStatus: AppStatus
     let audioLevel: Float
 
     var body: some View {
-        Image(systemName: iconName)
-            .symbolRenderingMode(.hierarchical)
-            .foregroundStyle(iconColor)
-    }
+        Canvas { context, size in
+            let s = min(size.width, size.height)
+            let cx = size.width / 2
+            let cy = size.height / 2
 
-    private var iconName: String {
-        switch appStatus {
-        case .idle:
-            return "mic"
-        case .recording:
-            return "mic.fill"
-        case .processing:
-            return "ellipsis.circle"
-        case .error:
-            return "exclamationmark.triangle"
+            // Scale factor from the 512-unit design coordinate space
+            let scale = s / 512.0
+
+            // --- Circle outline (subtle) ---
+            let circleRect = CGRect(
+                x: cx - 140 * scale,
+                y: cy - 140 * scale,
+                width: 280 * scale,
+                height: 280 * scale
+            )
+            var circlePath = Path()
+            circlePath.addEllipse(in: circleRect)
+            context.stroke(circlePath, with: .color(iconColor.opacity(0.25)), lineWidth: 1.2)
+
+            // --- Microphone capsule (rounded rect) ---
+            let capsuleW = 56.0 * scale
+            let capsuleH = 100.0 * scale
+            let capsuleRect = CGRect(
+                x: cx - capsuleW / 2,
+                y: cy - 88 * scale,
+                width: capsuleW,
+                height: capsuleH
+            )
+            let capsulePath = Path(roundedRect: capsuleRect, cornerRadius: 28 * scale)
+            context.fill(capsulePath, with: .color(iconColor))
+
+            // --- Mic cradle arc ---
+            var cradlePath = Path()
+            let cradleY = cy + 4 * scale
+            let cradleRadius = 50.0 * scale
+            cradlePath.addArc(
+                center: CGPoint(x: cx, y: cradleY),
+                radius: cradleRadius,
+                startAngle: .degrees(0),
+                endAngle: .degrees(180),
+                clockwise: false
+            )
+            context.stroke(
+                cradlePath,
+                with: .color(iconColor),
+                style: StrokeStyle(lineWidth: 1.5, lineCap: .round)
+            )
+
+            // --- Stem ---
+            var stemPath = Path()
+            stemPath.move(to: CGPoint(x: cx, y: cradleY + cradleRadius))
+            stemPath.addLine(to: CGPoint(x: cx, y: cradleY + cradleRadius + 28 * scale))
+            context.stroke(
+                stemPath,
+                with: .color(iconColor),
+                style: StrokeStyle(lineWidth: 1.5, lineCap: .round)
+            )
+
+            // --- Base ---
+            var basePath = Path()
+            let baseY = cradleY + cradleRadius + 28 * scale
+            basePath.move(to: CGPoint(x: cx - 22 * scale, y: baseY))
+            basePath.addLine(to: CGPoint(x: cx + 22 * scale, y: baseY))
+            context.stroke(
+                basePath,
+                with: .color(iconColor),
+                style: StrokeStyle(lineWidth: 1.5, lineCap: .round)
+            )
         }
+        .frame(width: 18, height: 18)
     }
 
     private var iconColor: Color {

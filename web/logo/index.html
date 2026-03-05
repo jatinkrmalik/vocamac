@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VocaMac Logo Options</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",sans-serif;background:#111;color:#fff;padding:40px}
+h1{text-align:center;font-size:36px;margin-bottom:8px;font-weight:700;letter-spacing:-0.02em}
+.subtitle{text-align:center;color:#888;margin-bottom:48px;font-size:16px}
+.logo-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:32px;max-width:1100px;margin:0 auto}
+.logo-option{border:1px solid rgba(255,255,255,0.1);border-radius:16px;overflow:hidden}
+.logo-option:hover{border-color:rgba(255,255,255,0.2)}
+.logo-header{padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;gap:10px}
+.logo-num{background:rgba(59,130,246,0.15);color:#3B82F6;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0}
+.logo-name{font-size:15px;font-weight:600}
+.logo-desc{font-size:12px;color:#888;margin-top:2px}
+.previews{display:grid;grid-template-columns:repeat(3,1fr);gap:0}
+.preview{padding:32px;display:flex;flex-direction:column;align-items:center;gap:12px}
+.preview-label{font-size:10px;text-transform:uppercase;letter-spacing:0.08em;font-weight:600}
+.preview--dark{background:#1a1a1a}
+.preview--dark .preview-label{color:#666}
+.preview--light{background:#f5f5f7}
+.preview--light .preview-label{color:#999}
+.preview--menubar{background:#2c2c2e;position:relative}
+.preview--menubar .preview-label{color:#666}
+.menubar-mock{display:flex;align-items:center;gap:8px;background:#1a1a1a;border-radius:6px;padding:4px 12px;font-size:12px;color:#999}
+.menubar-mock .menubar-time{margin-left:8px}
+.logo-svg{width:80px;height:80px}
+.preview--menubar .logo-svg{width:20px;height:20px}
+</style>
+</head>
+<body>
+<h1>VocaMac Logo Options</h1>
+<p class="subtitle">Pick a number. Each shown in Dark Mode, Light Mode, and macOS Menu Bar.</p>
+<div class="logo-grid" id="grid"></div>
+<script>
+const logos = [
+{name:"Classic Mic",desc:"Clean microphone with stand. Minimal, iconic.",
+svg:(bg,fg)=>`<svg viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="16" y="16" width="480" height="480" rx="112" fill="${bg}"/><rect x="222" y="130" width="68" height="126" rx="34" fill="${fg}"/><path d="M192 248C192 296 220 328 256 328C292 328 320 296 320 248" fill="none" stroke="${fg}" stroke-width="12" stroke-linecap="round"/><line x1="256" y1="328" x2="256" y2="368" stroke="${fg}" stroke-width="12" stroke-linecap="round"/><line x1="224" y1="368" x2="288" y2="368" stroke="${fg}" stroke-width="12" stroke-linecap="round"/></svg>`},
+
+{name:"Capsule Only",desc:"Just the mic capsule — ultra minimal, Apple SF Symbol style.",
+svg:(bg,fg)=>`<svg viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="16" y="16" width="480" height="480" rx="112" fill="${bg}"/><rect x="208" y="128" width="96" height="168" rx="48" fill="${fg}"/><path d="M176 264C176 318 212 356 256 356C300 356 336 318 336 264" fill="none" stroke="${fg}" stroke-width="14" stroke-linecap="round"/><line x1="256" y1="356" x2="256" y2="392" stroke="${fg}" stroke-width="14" stroke-linecap="round"/></svg>`},
+
+{name:"Rounded Waves",desc:"Mic with two subtle sound arcs. Recognizable at small sizes.",
+svg:(bg,fg)=>`<svg viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="16" y="16" width="480" height="480" rx="112" fill="${bg}"/><rect x="224" y="148" width="64" height="116" rx="32" fill="${fg}"/><path d="M196 256C196 300 224 324 256 324C288 324 316 300 316 256" fill="none" stroke="${fg}" stroke-width="11" stroke-linecap="round"/><line x1="256" y1="324" x2="256" y2="358" stroke="${fg}" stroke-width="11" stroke-linecap="round"/><line x1="226" y1="358" x2="286" y2="358" stroke="${fg}" stroke-width="11" stroke-linecap="round"/><path d="M168 210C158 240 158 272 168 302" fill="none" stroke="${fg}" stroke-width="8" stroke-linecap="round" opacity="0.4"/><path d="M344 210C354 240 354 272 344 302" fill="none" stroke="${fg}" stroke-width="8" stroke-linecap="round" opacity="0.4"/></svg>`},
+
+{name:"Circle Mic",desc:"Microphone inside a circle. Badge-like, works as favicon.",
+svg:(bg,fg)=>`<svg viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="16" y="16" width="480" height="480" rx="112" fill="${bg}"/><circle cx="256" cy="256" r="140" fill="none" stroke="${fg}" stroke-width="10" opacity="0.2"/><rect x="228" y="168" width="56" height="100" rx="28" fill="${fg}"/><path d="M206 260C206 290 228 312 256 312C284 312 306 290 306 260" fill="none" stroke="${fg}" stroke-width="10" stroke-linecap="round"/><line x1="256" y1="312" x2="256" y2="340" stroke="${fg}" stroke-width="10" stroke-linecap="round"/><line x1="234" y1="340" x2="278" y2="340" stroke="${fg}" stroke-width="10" stroke-linecap="round"/></svg>`},
+
+{name:"Gradient Glow",desc:"Mic with soft gradient fill and glow effect.",
+svg:(bg,fg)=>`<svg viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="g5" x1="0.5" y1="0" x2="0.5" y2="1"><stop offset="0%" stop-color="#7DD3FC"/><stop offset="100%" stop-color="#0284C7"/></linearGradient></defs><rect x="16" y="16" width="480" height="480" rx="112" fill="${bg}"/><rect x="218" y="136" width="76" height="132" rx="38" fill="url(#g5)"/><path d="M188 256C188 308 218 336 256 336C294 336 324 308 324 256" fill="none" stroke="url(#g5)" stroke-width="12" stroke-linecap="round"/><line x1="256" y1="336" x2="256" y2="374" stroke="url(#g5)" stroke-width="12" stroke-linecap="round"/><line x1="222" y1="374" x2="290" y2="374" stroke="url(#g5)" stroke-width="12" stroke-linecap="round"/></svg>`},
+
+{name:"V + Mic",desc:"Letter V subtly formed by the mic stand. Branding baked in.",
+svg:(bg,fg)=>`<svg viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="16" y="16" width="480" height="480" rx="112" fill="${bg}"/><rect x="224" y="120" width="64" height="116" rx="32" fill="${fg}"/><path d="M196 248C196 296 224 324 256 324C288 324 316 296 316 248" fill="none" stroke="${fg}" stroke-width="11" stroke-linecap="round"/><line x1="176" y1="140" x2="256" y2="380" stroke="${fg}" stroke-width="12" stroke-linecap="round" opacity="0.15"/><line x1="336" y1="140" x2="256" y2="380" stroke="${fg}" stroke-width="12" stroke-linecap="round" opacity="0.15"/><line x1="256" y1="324" x2="256" y2="380" stroke="${fg}" stroke-width="11" stroke-linecap="round"/></svg>`},
+
+{name:"Outline Mic",desc:"Fully outlined mic — light and airy, modern feel.",
+svg:(bg,fg)=>`<svg viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="16" y="16" width="480" height="480" rx="112" fill="${bg}"/><rect x="216" y="132" width="80" height="140" rx="40" fill="none" stroke="${fg}" stroke-width="12"/><path d="M184 256C184 310 216 344 256 344C296 344 328 310 328 256" fill="none" stroke="${fg}" stroke-width="12" stroke-linecap="round"/><line x1="256" y1="344" x2="256" y2="384" stroke="${fg}" stroke-width="12" stroke-linecap="round"/><line x1="220" y1="384" x2="292" y2="384" stroke="${fg}" stroke-width="12" stroke-linecap="round"/></svg>`},
+
+{name:"Dot Mic",desc:"Mic with a recording dot — suggests active/live status.",
+svg:(bg,fg)=>`<svg viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="16" y="16" width="480" height="480" rx="112" fill="${bg}"/><rect x="222" y="148" width="68" height="118" rx="34" fill="${fg}"/><path d="M192 256C192 302 222 330 256 330C290 330 320 302 320 256" fill="none" stroke="${fg}" stroke-width="11" stroke-linecap="round"/><line x1="256" y1="330" x2="256" y2="366" stroke="${fg}" stroke-width="11" stroke-linecap="round"/><line x1="224" y1="366" x2="288" y2="366" stroke="${fg}" stroke-width="11" stroke-linecap="round"/><circle cx="340" cy="148" r="24" fill="#FF3B30"/></svg>`},
+
+{name:"Waveform Mic",desc:"Mic sitting on an audio waveform. Technical, developer-friendly.",
+svg:(bg,fg)=>`<svg viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="16" y="16" width="480" height="480" rx="112" fill="${bg}"/><rect x="224" y="112" width="64" height="112" rx="32" fill="${fg}"/><path d="M196 220C196 260 224 284 256 284C288 284 316 260 316 220" fill="none" stroke="${fg}" stroke-width="11" stroke-linecap="round"/><line x1="256" y1="284" x2="256" y2="312" stroke="${fg}" stroke-width="11" stroke-linecap="round"/><line x1="120" y1="380" x2="120" y2="360" stroke="${fg}" stroke-width="8" stroke-linecap="round" opacity="0.3"/><line x1="156" y1="390" x2="156" y2="340" stroke="${fg}" stroke-width="8" stroke-linecap="round" opacity="0.4"/><line x1="192" y1="395" x2="192" y2="330" stroke="${fg}" stroke-width="8" stroke-linecap="round" opacity="0.5"/><line x1="228" y1="398" x2="228" y2="320" stroke="${fg}" stroke-width="8" stroke-linecap="round" opacity="0.7"/><line x1="256" y1="400" x2="256" y2="312" stroke="${fg}" stroke-width="8" stroke-linecap="round"/><line x1="284" y1="398" x2="284" y2="320" stroke="${fg}" stroke-width="8" stroke-linecap="round" opacity="0.7"/><line x1="320" y1="395" x2="320" y2="330" stroke="${fg}" stroke-width="8" stroke-linecap="round" opacity="0.5"/><line x1="356" y1="390" x2="356" y2="340" stroke="${fg}" stroke-width="8" stroke-linecap="round" opacity="0.4"/><line x1="392" y1="380" x2="392" y2="360" stroke="${fg}" stroke-width="8" stroke-linecap="round" opacity="0.3"/></svg>`},
+
+{name:"Shield Mic",desc:"Mic inside a shield — emphasizes privacy and security.",
+svg:(bg,fg)=>`<svg viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="16" y="16" width="480" height="480" rx="112" fill="${bg}"/><path d="M256 96L136 160V272C136 368 196 424 256 440C316 424 376 368 376 272V160L256 96Z" fill="none" stroke="${fg}" stroke-width="10" opacity="0.2"/><rect x="228" y="168" width="56" height="100" rx="28" fill="${fg}"/><path d="M206 260C206 290 228 312 256 312C284 312 306 290 306 260" fill="none" stroke="${fg}" stroke-width="10" stroke-linecap="round"/><line x1="256" y1="312" x2="256" y2="344" stroke="${fg}" stroke-width="10" stroke-linecap="round"/><line x1="234" y1="344" x2="278" y2="344" stroke="${fg}" stroke-width="10" stroke-linecap="round"/></svg>`}
+];
+
+const grid = document.getElementById('grid');
+logos.forEach((logo, i) => {
+    const n = i + 1;
+    const darkSvg = logo.svg('#1A1A1C','#E5E5EA');
+    const lightSvg = logo.svg('#F5F5F7','#1D1D1F');
+    const barSvg = logo.svg('transparent','#CCCCCC');
+    const encode = svg => 'data:image/svg+xml,' + encodeURIComponent(svg);
+    grid.innerHTML += `
+    <div class="logo-option">
+        <div class="logo-header">
+            <div class="logo-num">${n}</div>
+            <div><div class="logo-name">${logo.name}</div><div class="logo-desc">${logo.desc}</div></div>
+        </div>
+        <div class="previews">
+            <div class="preview preview--dark">
+                <span class="preview-label">Dark Mode</span>
+                <img class="logo-svg" src="${encode(darkSvg)}" alt="Logo ${n} dark">
+            </div>
+            <div class="preview preview--light">
+                <span class="preview-label">Light Mode</span>
+                <img class="logo-svg" src="${encode(lightSvg)}" alt="Logo ${n} light">
+            </div>
+            <div class="preview preview--menubar">
+                <span class="preview-label">Menu Bar</span>
+                <div class="menubar-mock">
+                    <img class="logo-svg" src="${encode(barSvg)}" alt="Logo ${n} menubar">
+                    <span class="menubar-time">Tue 4 Mar</span>
+                </div>
+            </div>
+        </div>
+    </div>`;
+});
+</script>
+</body>
+</html>

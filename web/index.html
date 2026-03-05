@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VocaMac — Local Voice-to-Text for macOS</title>
+    <meta name="description" content="100% local, privacy-first voice dictation for macOS. Powered by WhisperKit. No cloud, no subscriptions, no data leaves your Mac.">
+    <meta name="keywords" content="voice to text, speech recognition, macOS, dictation, whisper, local, privacy, open source">
+    <meta property="og:title" content="VocaMac — Local Voice-to-Text for macOS">
+    <meta property="og:description" content="100% local, privacy-first voice dictation for macOS. Hold a hotkey, speak, text appears at your cursor.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://vocamac.com">
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <!-- Prevent flash of wrong theme -->
+    <script>
+        (function(){var t=localStorage.getItem('vocamac-theme')||(window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark');document.documentElement.setAttribute('data-theme',t);})();
+    </script>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container navbar__container">
+            <a href="/" class="navbar__logo">
+                <img src="logo.svg" alt="VocaMac" class="navbar__logo-img">
+                <span>VocaMac</span>
+                <span class="badge badge--alpha">ALPHA</span>
+            </a>
+            <ul class="navbar__menu">
+                <li><a href="#features" class="navbar__link">Features</a></li>
+                <li><a href="#privacy" class="navbar__link">Privacy</a></li>
+                <li><a href="#install" class="navbar__link">Install</a></li>
+                <li><a href="#faq" class="navbar__link">FAQ</a></li>
+            </ul>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode">
+                    <span class="theme-icon-dark">☀️</span>
+                    <span class="theme-icon-light">🌙</span>
+                </button>
+                <a href="https://github.com/jatinkrmalik/vocamac" class="navbar__cta" target="_blank" rel="noopener">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="vertical-align: -2px; margin-right: 6px;"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+                    View Source
+                </a>
+            </div>
+            <button class="navbar__toggle" aria-label="Menu">
+                <span></span><span></span><span></span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <section class="hero">
+        <div class="container hero__container">
+            <div class="hero__content">
+                <div class="hero__badges">
+                    <span class="badge badge--alpha">ALPHA RELEASE</span>
+                    <span class="badge badge--outline">v0.1.0</span>
+                </div>
+                <h1 class="hero__headline">
+                    Voice Dictation for Mac,<br>
+                    <span class="text-gradient">Done Right.</span>
+                </h1>
+                <p class="hero__subtext">
+                    100% local voice-to-text for macOS. Hold a hotkey, speak, and your words appear wherever your cursor is. No cloud. No subscriptions. No data leaves your Mac.
+                </p>
+                <div class="hero__actions">
+                    <a href="#install" class="button button--primary">
+                        Install Now — It's Free
+                    </a>
+                    <a href="https://github.com/jatinkrmalik/vocamac" class="button button--glass" target="_blank" rel="noopener">
+                        View on GitHub
+                    </a>
+                </div>
+                <div class="hero__stats">
+                    <div class="hero__stat">
+                        <span class="hero__stat-icon">🔒</span>
+                        <span>100% Offline</span>
+                    </div>
+                    <div class="hero__stat">
+                        <span class="hero__stat-icon">🛡️</span>
+                        <span>Privacy First</span>
+                    </div>
+                    <div class="hero__stat">
+                        <span class="hero__stat-icon">📖</span>
+                        <span>Open Source (MIT)</span>
+                    </div>
+                    <div class="hero__stat">
+                        <span class="hero__stat-icon">⚡</span>
+                        <span>Apple Silicon Native</span>
+                    </div>
+                </div>
+            </div>
+            <div class="hero__visual">
+                <div class="mockup">
+                    <div class="mockup__menubar">
+                        <div class="mockup__menubar-left">
+                            <span class="mockup__apple"></span>
+                            <span class="mockup__menubar-item">Finder</span>
+                            <span class="mockup__menubar-item">File</span>
+                            <span class="mockup__menubar-item">Edit</span>
+                        </div>
+                        <div class="mockup__menubar-right">
+                            <span class="mockup__menubar-icon mockup__mic-icon">🎙️</span>
+                            <span class="mockup__menubar-item">Tue 4 Mar</span>
+                        </div>
+                    </div>
+                    <div class="mockup__popover">
+                        <div class="mockup__header">
+                            <div class="mockup__header-left">
+                                <img src="logo.svg" alt="VocaMac" class="mockup__app-logo">
+                                <div>
+                                    <div class="mockup__app-name">VocaMac <span class="badge badge--alpha" style="font-size: 9px; padding: 1px 5px;">ALPHA</span></div>
+                                    <div class="mockup__model">Model: Tiny (Fastest)</div>
+                                </div>
+                            </div>
+                            <div class="mockup__status-dot mockup__status-dot--ready"></div>
+                        </div>
+                        <div class="mockup__divider"></div>
+                        <div class="mockup__status-row">
+                            <span class="mockup__status-text mockup__status-text--ready">Ready</span>
+                            <span class="mockup__hint">Hold Right Option (⌥)</span>
+                        </div>
+                        <div class="mockup__divider"></div>
+                        <div class="mockup__transcription">
+                            <div class="mockup__transcription-label">Last Transcription</div>
+                            <div class="mockup__transcription-text">Hey Siri, just kidding. VocaMac does it all locally.</div>
+                            <div class="mockup__transcription-meta">2.1s audio • 0.8s to transcribe • en</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- How It Works -->
+    <section class="how-it-works" id="how-it-works">
+        <div class="container">
+            <div class="section-header">
+                <span class="badge badge--outline">Simple</span>
+                <h2>Three Steps. That's It.</h2>
+                <p class="text-secondary">No setup wizards. No account creation. No cloud configuration.</p>
+            </div>
+            <div class="steps">
+                <div class="step">
+                    <div class="step__number">1</div>
+                    <div class="step__icon">⌥</div>
+                    <h3>Hold Right Option</h3>
+                    <p>Press and hold your hotkey. The menu bar icon turns red — you're recording.</p>
+                </div>
+                <div class="step">
+                    <div class="step__number">2</div>
+                    <div class="step__icon">🎤</div>
+                    <h3>Speak</h3>
+                    <p>Say whatever you want. Your audio is processed entirely on your Mac.</p>
+                </div>
+                <div class="step">
+                    <div class="step__number">3</div>
+                    <div class="step__icon">✨</div>
+                    <h3>Release</h3>
+                    <p>Text appears at your cursor — in any app. Browser, Slack, VS Code, anywhere.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features -->
+    <section class="features" id="features">
+        <div class="container">
+            <div class="section-header">
+                <span class="badge badge--outline">Features</span>
+                <h2>Everything You Need,<br>Nothing You Don't</h2>
+                <p class="text-secondary">Built for developers and power users who value privacy and speed.</p>
+            </div>
+            <div class="features__grid">
+                <div class="feature-card">
+                    <div class="feature-card__icon">⌨️</div>
+                    <h3>System-Wide Text Injection</h3>
+                    <p>Transcribed text appears wherever your cursor is. Browsers, Slack, VS Code, spreadsheets, terminals — everywhere.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-card__icon">🎯</div>
+                    <h3>Push-to-Talk</h3>
+                    <p>Hold a hotkey to record. Release to transcribe. Simple, predictable, no surprises.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-card__icon">👆</div>
+                    <h3>Double-Tap Toggle</h3>
+                    <p>Prefer toggle mode? Double-tap to start, double-tap to stop. Your choice.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-card__icon">🧠</div>
+                    <h3>Smart Model Selection</h3>
+                    <p>Auto-detects your hardware — Apple Silicon, Intel, RAM — and recommends the optimal Whisper model.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-card__icon">⚡</div>
+                    <h3>Apple Silicon Native</h3>
+                    <p>CoreML + Metal + Neural Engine acceleration via WhisperKit. Blazing fast on M1/M2/M3/M4.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-card__icon">⚙️</div>
+                    <h3>Fully Configurable</h3>
+                    <p>Choose hotkeys, models, languages, silence detection. Settings window with model management.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-card__icon">🌍</div>
+                    <h3>99+ Languages</h3>
+                    <p>Auto-detect or specify. English, Spanish, French, German, Chinese, Japanese, and many more.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-card__icon">📊</div>
+                    <h3>Visual Feedback</h3>
+                    <p>Menu bar icon changes color. Audio level indicator shows input. You always know what's happening.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Privacy -->
+    <section class="privacy" id="privacy">
+        <div class="container">
+            <div class="privacy__content">
+                <div class="section-header section-header--left">
+                    <span class="badge badge--outline">Privacy</span>
+                    <h2>Your Voice Stays<br>on Your Mac.</h2>
+                    <p class="text-secondary" style="max-width: 500px;">
+                        Period. No cloud. No servers. No analytics. No telemetry. Not even an internet connection required after installation.
+                    </p>
+                </div>
+                <div class="privacy__points">
+                    <div class="privacy__point">
+                        <div class="privacy__point-icon">🔒</div>
+                        <div>
+                            <h4>Zero Network Calls</h4>
+                            <p>Audio is processed 100% on-device using WhisperKit's CoreML engine. Nothing is ever transmitted.</p>
+                        </div>
+                    </div>
+                    <div class="privacy__point">
+                        <div class="privacy__point-icon">🗑️</div>
+                        <div>
+                            <h4>No Audio Storage</h4>
+                            <p>Audio buffers are discarded immediately after transcription. Nothing is saved to disk. Ever.</p>
+                        </div>
+                    </div>
+                    <div class="privacy__point">
+                        <div class="privacy__point-icon">📖</div>
+                        <div>
+                            <h4>Fully Open Source</h4>
+                            <p>Every line of code is public on GitHub. Audit it yourself. MIT licensed. No hidden anything.</p>
+                        </div>
+                    </div>
+                    <div class="privacy__point">
+                        <div class="privacy__point-icon">📡</div>
+                        <div>
+                            <h4>No Telemetry</h4>
+                            <p>No analytics. No crash reporting. No usage tracking. We literally cannot see what you do.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="privacy__comparison">
+                <h3>How we compare</h3>
+                <div class="comparison-table">
+                    <div class="comparison-row comparison-row--header">
+                        <div></div>
+                        <div>VocaMac</div>
+                        <div>Apple Dictation</div>
+                        <div>Others</div>
+                    </div>
+                    <div class="comparison-row">
+                        <div>100% Offline</div>
+                        <div class="check">✓</div>
+                        <div class="cross">✗</div>
+                        <div class="cross">✗</div>
+                    </div>
+                    <div class="comparison-row">
+                        <div>Open Source</div>
+                        <div class="check">✓</div>
+                        <div class="cross">✗</div>
+                        <div class="cross">✗</div>
+                    </div>
+                    <div class="comparison-row">
+                        <div>No Account Required</div>
+                        <div class="check">✓</div>
+                        <div class="cross">✗</div>
+                        <div class="cross">✗</div>
+                    </div>
+                    <div class="comparison-row">
+                        <div>Free Forever</div>
+                        <div class="check">✓</div>
+                        <div class="check">✓</div>
+                        <div class="cross">✗</div>
+                    </div>
+                    <div class="comparison-row">
+                        <div>Works in All Apps</div>
+                        <div class="check">✓</div>
+                        <div class="check">✓</div>
+                        <div class="partial">~</div>
+                    </div>
+                    <div class="comparison-row">
+                        <div>Custom Models</div>
+                        <div class="check">✓</div>
+                        <div class="cross">✗</div>
+                        <div class="partial">~</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Models -->
+    <section class="models">
+        <div class="container">
+            <div class="section-header">
+                <span class="badge badge--outline">Models</span>
+                <h2>Choose Your Model</h2>
+                <p class="text-secondary">From lightning-fast to studio-quality. VocaMac recommends the best one for your Mac.</p>
+            </div>
+            <div class="models__grid">
+                <div class="model-card">
+                    <div class="model-card__name">Tiny</div>
+                    <div class="model-card__speed">⚡⚡⚡⚡⚡</div>
+                    <div class="model-card__quality">Good quality</div>
+                    <div class="model-card__detail">~39M params • ~0.4 GB</div>
+                    <div class="model-card__best">Best for quick notes</div>
+                </div>
+                <div class="model-card">
+                    <div class="model-card__name">Base</div>
+                    <div class="model-card__speed">⚡⚡⚡⚡</div>
+                    <div class="model-card__quality">Better quality</div>
+                    <div class="model-card__detail">~74M params • ~0.8 GB</div>
+                    <div class="model-card__best">Best for 8 GB Macs</div>
+                </div>
+                <div class="model-card model-card--recommended">
+                    <span class="badge badge--primary">Recommended</span>
+                    <div class="model-card__name">Small</div>
+                    <div class="model-card__speed">⚡⚡⚡</div>
+                    <div class="model-card__quality">Great quality</div>
+                    <div class="model-card__detail">~244M params • ~1.5 GB</div>
+                    <div class="model-card__best">Best for 16 GB+ Apple Silicon</div>
+                </div>
+                <div class="model-card">
+                    <div class="model-card__name">Large v3</div>
+                    <div class="model-card__speed">⚡</div>
+                    <div class="model-card__quality">Best quality</div>
+                    <div class="model-card__detail">~1550M params • ~4.8 GB</div>
+                    <div class="model-card__best">Best for maximum accuracy</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Install -->
+    <section class="install" id="install">
+        <div class="container">
+            <div class="section-header">
+                <span class="badge badge--alpha">ALPHA</span>
+                <h2>Get Started in Minutes</h2>
+                <p class="text-secondary">Build from source. We're in alpha — early adopters welcome.</p>
+            </div>
+            <div class="install__card">
+                <div class="install__steps">
+                    <div class="install__step">
+                        <div class="install__step-num">1</div>
+                        <div>
+                            <h4>Clone & Build</h4>
+                            <div class="code-block">
+                                <code>git clone https://github.com/jatinkrmalik/vocamac.git<br>cd vocamac<br>./scripts/install.sh</code>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="install__step">
+                        <div class="install__step-num">2</div>
+                        <div>
+                            <h4>Grant Permissions</h4>
+                            <p class="text-secondary">System Settings → Privacy & Security → grant <strong>Accessibility</strong>, <strong>Input Monitoring</strong>, and <strong>Microphone</strong> to Terminal.</p>
+                        </div>
+                    </div>
+                    <div class="install__step">
+                        <div class="install__step-num">3</div>
+                        <div>
+                            <h4>Launch & Dictate</h4>
+                            <div class="code-block">
+                                <code>vocamac &</code>
+                            </div>
+                            <p class="text-secondary" style="margin-top: 8px;">Hold <strong>Right Option (⌥)</strong> → speak → release. Text appears at your cursor.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="install__requirements">
+                    <h4>Requirements</h4>
+                    <ul>
+                        <li>macOS 13 (Ventura) or later</li>
+                        <li>Xcode 15+ or Swift 5.9+ toolchain</li>
+                        <li>8 GB RAM (16 GB+ recommended)</li>
+                        <li>Microphone</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Voca Family -->
+    <section class="family">
+        <div class="container">
+            <div class="section-header">
+                <span class="badge badge--outline">Ecosystem</span>
+                <h2>The Voca Family</h2>
+                <p class="text-secondary">Voice dictation, done right — on every platform.</p>
+            </div>
+            <div class="family__grid">
+                <a href="https://vocalinux.com" class="family-card" target="_blank" rel="noopener">
+                    <div class="family-card__icon">🐧</div>
+                    <div class="family-card__name">VocaLinux</div>
+                    <div class="family-card__status badge badge--outline">Beta</div>
+                    <p>Voice dictation for Linux. X11 & Wayland. whisper.cpp powered.</p>
+                    <span class="family-card__link">vocalinux.com →</span>
+                </a>
+                <div class="family-card family-card--active">
+                    <div class="family-card__icon">🍎</div>
+                    <div class="family-card__name">VocaMac</div>
+                    <div class="family-card__status badge badge--alpha">Alpha</div>
+                    <p>Native macOS menu bar app. WhisperKit + CoreML. You are here.</p>
+                    <span class="family-card__link">vocamac.com</span>
+                </div>
+                <div class="family-card family-card--soon">
+                    <div class="family-card__icon">🪟</div>
+                    <div class="family-card__name">VocaWin</div>
+                    <div class="family-card__status badge badge--outline">Coming Soon</div>
+                    <p>Voice dictation for Windows. Native system tray app. Planned.</p>
+                    <span class="family-card__link">vocawin.com</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="faq" id="faq">
+        <div class="container">
+            <div class="section-header">
+                <span class="badge badge--outline">FAQ</span>
+                <h2>Questions & Answers</h2>
+            </div>
+            <div class="faq__list">
+                <details class="faq__item">
+                    <summary>Is VocaMac really 100% offline?</summary>
+                    <p>Yes. All speech recognition happens locally on your Mac using WhisperKit's CoreML engine. Your voice data never leaves your computer. The only network call is a one-time model download from HuggingFace during setup.</p>
+                </details>
+                <details class="faq__item">
+                    <summary>Which Macs are supported?</summary>
+                    <p>VocaMac works on any Mac running macOS 13 (Ventura) or later. It runs on both Apple Silicon (M1/M2/M3/M4) and Intel Macs, though Apple Silicon provides significantly better performance thanks to CoreML and Neural Engine acceleration.</p>
+                </details>
+                <details class="faq__item">
+                    <summary>How does it inject text into other apps?</summary>
+                    <p>VocaMac uses a clipboard-based approach: it saves your clipboard, writes the transcription, simulates Cmd+V to paste, then restores your clipboard. This works in virtually every macOS application.</p>
+                </details>
+                <details class="faq__item">
+                    <summary>Why does it need Accessibility permission?</summary>
+                    <p>Accessibility permission is required for two things: (1) listening for the global hotkey (Right Option) regardless of which app is focused, and (2) simulating the Cmd+V keystroke to paste text. Without it, hotkeys and text injection won't work.</p>
+                </details>
+                <details class="faq__item">
+                    <summary>Can I change the hotkey?</summary>
+                    <p>Yes! Open Settings from the menu bar and choose from Right Option, Right Command, Fn, or any function key. You can also switch between push-to-talk and double-tap toggle modes.</p>
+                </details>
+                <details class="faq__item">
+                    <summary>How does this compare to Apple's built-in dictation?</summary>
+                    <p>Apple's dictation sends audio to Apple's servers for processing (for most languages). VocaMac processes everything locally — your audio never leaves your Mac. You also get model selection, configurable hotkeys, and open-source transparency.</p>
+                </details>
+                <details class="faq__item">
+                    <summary>Is VocaMac free?</summary>
+                    <p>Yes, completely free and open source under the MIT license. No premium tiers, no subscriptions, no tracking — just free software.</p>
+                </details>
+                <details class="faq__item">
+                    <summary>What's the difference between WhisperKit and whisper.cpp?</summary>
+                    <p>Both use the same OpenAI Whisper models, so transcription quality is identical. WhisperKit is a pure Swift framework optimized for Apple platforms — it uses CoreML and Neural Engine for hardware acceleration, whereas whisper.cpp uses Metal. VocaLinux uses whisper.cpp; VocaMac uses WhisperKit.</p>
+                </details>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="cta">
+        <div class="container">
+            <div class="cta__content">
+                <span class="badge badge--alpha">ALPHA</span>
+                <h2>Ready to Ditch the Cloud?</h2>
+                <p class="text-secondary">Join the early adopters building the future of private, local voice dictation on macOS.</p>
+                <div class="cta__actions">
+                    <a href="#install" class="button button--primary">Get Started</a>
+                    <a href="https://github.com/jatinkrmalik/vocamac" class="button button--glass" target="_blank" rel="noopener">Star on GitHub</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container footer__container">
+            <div class="footer__left">
+                <img src="logo.svg" alt="VocaMac" class="footer__logo-img">
+                <span class="footer__brand">VocaMac</span>
+                <span class="badge badge--alpha" style="font-size: 9px;">ALPHA</span>
+            </div>
+            <div class="footer__links">
+                <a href="https://github.com/jatinkrmalik/vocamac" target="_blank" rel="noopener">GitHub</a>
+                <a href="https://vocalinux.com" target="_blank" rel="noopener">VocaLinux</a>
+                <a href="https://vocawin.com" target="_blank" rel="noopener">VocaWin</a>
+            </div>
+            <div class="footer__right">
+                Made with ❤️ by <a href="https://github.com/jatinkrmalik" target="_blank" rel="noopener">Jatin Kumar Malik</a>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // ========== Theme Toggle ==========
+        (function() {
+            const root = document.documentElement;
+
+            // Determine initial theme: saved preference > system preference > dark
+            function getPreferredTheme() {
+                const saved = localStorage.getItem('vocamac-theme');
+                if (saved) return saved;
+                return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+            }
+
+            function setTheme(theme) {
+                root.setAttribute('data-theme', theme);
+                localStorage.setItem('vocamac-theme', theme);
+            }
+
+            // Apply initial theme immediately (no flash)
+            setTheme(getPreferredTheme());
+
+            // Toggle button
+            document.querySelector('.theme-toggle')?.addEventListener('click', function() {
+                const current = root.getAttribute('data-theme') || 'dark';
+                setTheme(current === 'dark' ? 'light' : 'dark');
+            });
+
+            // Listen for system theme changes (if no manual preference saved)
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('vocamac-theme')) {
+                    setTheme(e.matches ? 'light' : 'dark');
+                }
+            });
+        })();
+
+        // ========== Mobile Menu ==========
+        document.querySelector('.navbar__toggle')?.addEventListener('click', function() {
+            document.querySelector('.navbar__menu')?.classList.toggle('navbar__menu--open');
+        });
+
+        // ========== Smooth Scroll ==========
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function(e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+                document.querySelector('.navbar__menu')?.classList.remove('navbar__menu--open');
+            });
+        });
+
+        // ========== Scroll Animations ==========
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                }
+            });
+        }, { threshold: 0.1 });
+
+        document.querySelectorAll('.feature-card, .step, .privacy__point, .model-card, .family-card, .faq__item, .install__step').forEach(el => {
+            observer.observe(el);
+        });
+    </script>
+</body>
+</html>
