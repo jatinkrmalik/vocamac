@@ -50,16 +50,9 @@ struct MenuBarView: View {
                 .foregroundStyle(.blue)
 
             VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 6) {
-                    Text("VocaMac")
-                        .font(.title3)
-                        .fontWeight(.semibold)
-
-                    // Status indicator dot — next to title
-                    Circle()
-                        .fill(statusColor)
-                        .frame(width: 10, height: 10)
-                }
+                Text("VocaMac")
+                    .font(.title3)
+                    .fontWeight(.semibold)
 
                 if let model = appState.currentModel {
                     Text("Model: \(model.size.displayName)")
@@ -91,6 +84,10 @@ struct MenuBarView: View {
     private var statusSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
+                Circle()
+                    .fill(statusColor)
+                    .frame(width: 10, height: 10)
+
                 Text(statusText)
                     .font(.body)
                     .fontWeight(.medium)
