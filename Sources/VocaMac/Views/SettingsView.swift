@@ -29,7 +29,7 @@ struct SettingsView: View {
                     Label("About", systemImage: "info.circle")
                 }
         }
-        .frame(width: 560, height: 480)
+        .frame(width: 560, height: 520)
     }
 }
 
@@ -630,8 +630,9 @@ struct AboutTab: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
 
-            Text("Version 0.1.0 (MVP)")
+            Text("Version 0.1.0 (Alpha)")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
 
