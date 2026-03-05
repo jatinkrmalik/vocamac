@@ -150,10 +150,15 @@ struct MenuBarIcon: View {
         }
 
         if appStatus == .idle {
-            // Template mode: macOS handles light/dark menu bar tinting
-            let image = baseImage.copy() as! NSImage
-            image.isTemplate = true
-            return image
+            // Use VocaMac brand blue (#007AFF) for the idle state
+            let tinted = NSImage(size: baseImage.size, flipped: false) { rect in
+                baseImage.draw(in: rect)
+                NSColor(red: 0, green: 0.478, blue: 1.0, alpha: 1.0).set()
+                rect.fill(using: .sourceAtop)
+                return true
+            }
+            tinted.isTemplate = false
+            return tinted
         }
 
         // For active states, tint the icon with the status color
