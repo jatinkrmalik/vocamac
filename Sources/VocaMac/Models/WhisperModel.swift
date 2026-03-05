@@ -110,6 +110,7 @@ struct WhisperModelInfo: Identifiable {
     /// Human-readable status description
     var statusDescription: String {
         if isActive { return "Active" }
+        if isLoading { return "Loading..." }
         if let progress = downloadProgress {
             return "Downloading (\(Int(progress * 100))%)"
         }
@@ -120,6 +121,7 @@ struct WhisperModelInfo: Identifiable {
     /// SF Symbol name for the status icon
     var statusIconName: String {
         if isActive { return "checkmark.circle.fill" }
+        if isLoading { return "arrow.trianglehead.2.clockwise" }
         if downloadProgress != nil { return "arrow.down.circle" }
         if isDownloaded { return "checkmark.circle" }
         return "arrow.down.to.line"
