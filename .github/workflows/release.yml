@@ -1,0 +1,90 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build & Release
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Update version in build script
+        run: |
+          sed -i '' "s/CFBundleVersion.*/<key>CFBundleVersion<\/key>/" scripts/build.sh || true
+          echo "Building version: ${{ steps.version.outputs.VERSION }}"
+
+      - name: Build release app bundle
+        run: ./scripts/build.sh release
+
+      - name: Verify code signature
+        run: codesign -v --deep --strict VocaMac.app
+
+      - name: Run tests
+        run: swift test
+
+      - name: Create DMG
+        run: |
+          mkdir -p dmg-staging
+          cp -R VocaMac.app dmg-staging/
+          ln -s /Applications dmg-staging/Applications
+
+          hdiutil create -volname "VocaMac" \
+            -srcfolder dmg-staging \
+            -ov -format UDZO \
+            "VocaMac-${{ steps.version.outputs.VERSION }}-arm64.dmg"
+
+          echo "DMG created:"
+          ls -lh VocaMac-*.dmg
+
+      - name: Create ZIP archive
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent VocaMac.app \
+            "VocaMac-${{ steps.version.outputs.VERSION }}-arm64.zip"
+
+          echo "ZIP created:"
+          ls -lh VocaMac-*.zip
+
+      - name: Generate checksums
+        run: |
+          shasum -a 256 VocaMac-*.dmg VocaMac-*.zip > checksums.txt
+          cat checksums.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          draft: true
+          files: |
+            VocaMac-*.dmg
+            VocaMac-*.zip
+            checksums.txt
+          body: |
+            ## VocaMac ${{ steps.version.outputs.VERSION }}
+
+            ### Installation
+
+            1. Download `VocaMac-${{ steps.version.outputs.VERSION }}-arm64.dmg`
+            2. Open the DMG and drag VocaMac to Applications
+            3. Open VocaMac from Applications
+            4. Grant Microphone, Accessibility, and Input Monitoring permissions when prompted
+
+            ### Checksums (SHA-256)
+            See `checksums.txt` for verification.
+
+            ### Requirements
+            - macOS 13 (Ventura) or later
+            - Apple Silicon (arm64)

@@ -6,17 +6,40 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-test:
     name: Build & Test
     runs-on: macos-15
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build
+      - name: Cache SPM dependencies
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: spm-${{ runner.os }}-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            spm-${{ runner.os }}-
+
+      - name: Build (Debug)
         run: swift build
 
       - name: Test
         run: swift test
+
+      - name: Build (Release)
+        run: swift build -c release
+
+      - name: Verify app bundle
+        run: |
+          ./scripts/build.sh release
+          test -d VocaMac.app || exit 1
+          codesign -v VocaMac.app
+          echo "App bundle verified"
