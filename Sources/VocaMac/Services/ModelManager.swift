@@ -126,11 +126,23 @@ final class ModelManager {
             config.prewarm = false
             config.load = false  // Don't load into memory, just download
 
-            // Report progress
+            // Report initial progress
             onProgress(0.1)
 
-            let _ = try await WhisperKit(config)
+            // Simulate progress while downloading, since WhisperKit doesn't expose granular progress
+            let progressTask = Task {
+                var currentProgress = 0.1
+                while currentProgress < 0.95 {
+                    try? await Task.sleep(nanoseconds: 500_000_000)  // 0.5 second intervals
+                    currentProgress += Double.random(in: 0.05...0.15)
+                    onProgress(min(currentProgress, 0.95))
+                }
+            }
 
+            let _ = try await WhisperKit(config)
+            
+            // Cancel progress simulation and report completion
+            progressTask.cancel()
             onProgress(1.0)
             print("[ModelManager] Model '\(whisperKitModelName(for: size))' downloaded successfully")
         } catch {

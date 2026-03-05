@@ -112,6 +112,9 @@ struct WhisperModelInfo: Identifiable {
     /// Download progress (0.0 to 1.0), nil when not downloading
     var downloadProgress: Double?
 
+    /// Whether this model is currently being loaded into memory
+    var isLoading: Bool = false
+
     var id: String { size.id }
 
     /// Human-readable status description

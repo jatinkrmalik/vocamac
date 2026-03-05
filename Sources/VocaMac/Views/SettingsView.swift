@@ -220,6 +220,7 @@ struct PermissionRow: View {
 
 struct ModelSettingsTab: View {
     @EnvironmentObject var appState: AppState
+    @StateObject private var processMonitor = ProcessMonitor()
 
     var body: some View {
         ScrollView {
@@ -237,6 +238,7 @@ struct ModelSettingsTab: View {
                                 SystemInfoPill(icon: "memorychip", label: "RAM", value: "\(capabilities.physicalMemoryGB) GB")
                                 SystemInfoPill(icon: "bolt.fill", label: "Metal", value: capabilities.supportsMetalAcceleration ? "Yes" : "No")
                             }
+                            .frame(maxWidth: .infinity, alignment: .leading)
 
                             if let recommended = appState.deviceRecommendedModel {
                                 HStack {
@@ -260,6 +262,44 @@ struct ModelSettingsTab: View {
                         }
                         .padding(4)
                     }
+                }
+
+                // Resource usage
+                GroupBox {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Label("Resource Usage", systemImage: "gauge.with.dots.needle.bottom.50percent")
+                            .font(.headline)
+                            .padding(.bottom, 4)
+
+                        HStack(spacing: 24) {
+                            SystemInfoPill(
+                                icon: "cpu",
+                                label: "CPU",
+                                value: String(format: "%.1f%%", processMonitor.cpuUsage)
+                            )
+                            SystemInfoPill(
+                                icon: "memorychip",
+                                label: "Memory",
+                                value: processMonitor.memoryMB >= 1024
+                                    ? String(format: "%.1f GB", processMonitor.memoryMB / 1024)
+                                    : String(format: "%.0f MB", processMonitor.memoryMB)
+                            )
+                            SystemInfoPill(
+                                icon: "chart.line.uptrend.xyaxis",
+                                label: "Peak",
+                                value: processMonitor.memoryPeakMB >= 1024
+                                    ? String(format: "%.1f GB", processMonitor.memoryPeakMB / 1024)
+                                    : String(format: "%.0f MB", processMonitor.memoryPeakMB)
+                            )
+                            SystemInfoPill(
+                                icon: "arrow.triangle.branch",
+                                label: "Threads",
+                                value: "\(processMonitor.threadCount)"
+                            )
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .padding(4)
                 }
 
                 // Currently active model
@@ -336,6 +376,7 @@ struct SystemInfoPill: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
         }
+        .frame(maxWidth: .infinity)
     }
 }
 
@@ -394,13 +435,22 @@ struct ModelRow: View {
 
             Spacer()
 
-            // Download progress
+            // Download progress or loading indicator
             if let progress = model.downloadProgress {
                 VStack(spacing: 2) {
                     ProgressView(value: progress)
                         .frame(width: 60)
                         .controlSize(.small)
                     Text("\(Int(progress * 100))%")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            } else if model.isLoading {
+                VStack(spacing: 2) {
+                    ProgressView()
+                        .frame(width: 60)
+                        .controlSize(.small)
+                    Text("Loading...")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
@@ -415,13 +465,16 @@ struct ModelRow: View {
                 Text("Too Large")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            } else if model.isLoading || model.downloadProgress != nil {
+                // Show nothing - progress indicator handles the feedback
+                EmptyView()
             } else if model.isDownloaded {
                 Button("Load") {
                     Task { await appState.loadModel(model.size) }
                 }
                 .controlSize(.small)
                 .buttonStyle(.borderedProminent)
-            } else if model.downloadProgress == nil {
+            } else {
                 Button("Download & Load") {
                     Task {
                         await appState.downloadModel(model.size)

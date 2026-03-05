@@ -288,6 +288,11 @@ final class AppState: ObservableObject {
             modelName = nil  // Let WhisperKit auto-select
         }
 
+        // Mark the model as loading
+        if let size = size, let idx = availableModels.firstIndex(where: { $0.size == size }) {
+            availableModels[idx].isLoading = true
+        }
+
         do {
             // If model is downloaded locally, use the local folder
             let folder = size.flatMap { modelManager.modelFolder(for: $0) }
@@ -304,11 +309,16 @@ final class AppState: ObservableObject {
                     ? availableModels[i].size == size
                     : loadedName.contains(availableModels[i].size.rawValue)
                 availableModels[i].isActive = matches
+                availableModels[i].isLoading = false
                 if matches {
                     currentModel = availableModels[i]
                 }
             }
         } catch {
+            // Clear loading state on error
+            if let size = size, let idx = availableModels.firstIndex(where: { $0.size == size }) {
+                availableModels[idx].isLoading = false
+            }
             errorMessage = "Failed to load model: \(error.localizedDescription)"
         }
     }
@@ -327,12 +337,22 @@ final class AppState: ObservableObject {
                 }
             }
 
-            availableModels[index].isDownloaded = true
-            availableModels[index].downloadProgress = nil
-            availableModels[index].filePath = modelManager.modelFolder(for: size)
+            // Refresh all model statuses to ensure previously downloaded models are preserved
+            refreshModelStatuses()
         } catch {
             availableModels[index].downloadProgress = nil
             errorMessage = "Download failed: \(error.localizedDescription)"
+        }
+    }
+
+    /// Refresh the download status of all models
+    /// This ensures that all previously downloaded models are detected and marked correctly
+    private func refreshModelStatuses() {
+        for i in availableModels.indices {
+            let size = availableModels[i].size
+            availableModels[i].isDownloaded = modelManager.isModelDownloaded(size)
+            availableModels[i].downloadProgress = nil
+            availableModels[i].filePath = modelManager.modelFolder(for: size)
         }
     }
 
