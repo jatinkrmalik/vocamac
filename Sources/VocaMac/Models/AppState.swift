@@ -102,6 +102,7 @@ final class AppState: ObservableObject {
     @AppStorage("vocamac.launchAtLogin") var launchAtLogin: Bool = false
     @AppStorage("vocamac.preserveClipboard") var preserveClipboard: Bool = true
     @AppStorage("vocamac.soundEffectsEnabled") var soundEffectsEnabled: Bool = true
+    @AppStorage("vocamac.showCursorIndicator") var showCursorIndicator: Bool = true
 
     // MARK: - Services
 
@@ -111,6 +112,7 @@ final class AppState: ObservableObject {
     let hotKeyManager = HotKeyManager()
     let modelManager = ModelManager()
     let soundManager = SoundManager()
+    let cursorOverlay = CursorOverlayManager()
 
     // MARK: - Private
 
@@ -152,6 +154,7 @@ final class AppState: ObservableObject {
         audioEngine.onAudioLevel = { [weak self] level in
             Task { @MainActor in
                 self?.audioLevel = level
+                self?.cursorOverlay.updateAudioLevel(level)
             }
         }
 
@@ -232,6 +235,11 @@ final class AppState: ObservableObject {
             soundManager.playStartSound()
         }
 
+        // Show cursor indicator
+        if showCursorIndicator {
+            cursorOverlay.show()
+        }
+
         audioEngine.startRecording(
             silenceThreshold: Float(silenceThreshold),
             silenceDuration: silenceDuration,
@@ -251,7 +259,12 @@ final class AppState: ObservableObject {
             soundManager.playStopSound()
         }
 
+        // Transition cursor indicator to processing state (red -> purple)
+        // Keeps the overlay visible so the user knows text is on its way
+        cursorOverlay.transitionToProcessing()
+
         guard !audioData.isEmpty else {
+            cursorOverlay.hide()
             appStatus = .idle
             return
         }
@@ -275,8 +288,10 @@ final class AppState: ObservableObject {
                 )
             }
 
+            cursorOverlay.hide()
             appStatus = .idle
         } catch {
+            cursorOverlay.hide()
             errorMessage = "Transcription failed: \(error.localizedDescription)"
             appStatus = .error
 

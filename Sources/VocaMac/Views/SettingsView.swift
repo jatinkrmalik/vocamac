@@ -131,6 +131,8 @@ struct GeneralSettingsTab: View {
             Section("Behavior") {
                 Toggle("Preserve clipboard after text injection", isOn: $appState.preserveClipboard)
 
+            Toggle("Show mic indicator near cursor while recording", isOn: $appState.showCursorIndicator)
+
                 Text("When enabled, your clipboard contents are restored after injecting text.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
