@@ -104,35 +104,58 @@ Same accuracy, dramatically better Apple platform integration.
 ## 📋 Requirements
 
 - **macOS 13 (Ventura)** or later
-- **Xcode 15+** or Swift 5.9+ (for building)
-- **Microphone permission** - For audio capture
-- **Accessibility permission** - For global hotkeys and text injection
+- **Apple Silicon** (M1/M2/M3/M4)
+- **Xcode 15+** or Swift 5.9+ (only for building from source)
+
+### Permissions
+
+VocaMac requires three macOS permissions:
+
+| Permission | Why |
+|---|---|
+| **Microphone** | Capture your voice for transcription |
+| **Accessibility** | Global hotkeys and text injection into apps |
+| **Input Monitoring** | Detect hotkey presses system-wide |
+
+> **Note:** After granting Input Monitoring, a restart of VocaMac is required for it to take effect.
 
 ---
 
 ## 🚀 Quick Start
 
-### Build from Source
+### Option 1: Download DMG (Recommended)
+
+1. **Download** the latest `VocaMac-x.x.x-arm64.dmg` from the [Releases page](https://github.com/jatinkrmalik/vocamac/releases)
+2. **Open** the DMG and drag VocaMac to Applications
+3. **Remove quarantine** (required because VocaMac is not yet notarized with Apple):
+   ```bash
+   xattr -cr /Applications/VocaMac.app
+   ```
+4. **Open** VocaMac from Applications (right-click → Open on first launch)
+5. **Grant permissions** — Microphone, Accessibility, and Input Monitoring when prompted
+
+### Option 2: Build from Source
 
 ```bash
 # Clone the repository
 git clone https://github.com/jatinkrmalik/vocamac.git
 cd vocamac
 
-# Build (first build downloads WhisperKit dependency - ~1 min)
-swift build -c release
+# Build the app bundle
+./scripts/build.sh
 
-# Run VocaMac
-swift run -c release VocaMac
+# Launch VocaMac
+open VocaMac.app
 ```
+
+> **Permissions note:** When running from terminal, macOS assigns permissions to your **terminal app** (Terminal, iTerm2, etc.) rather than VocaMac itself. Grant Microphone, Accessibility, and Input Monitoring to your terminal app instead.
 
 ### First Launch
 
 1. **VocaMac appears in your menu bar** (microphone icon, no Dock icon)
-2. **Grant Microphone permission** when prompted
-3. **Grant Accessibility permission** - VocaMac will guide you to System Settings → Privacy & Security → Accessibility
-4. **First model download** - WhisperKit automatically downloads the recommended model for your device (~40-500MB depending on hardware)
-5. **Start dictating** - Hold the **Right Option** key, speak, and release. Your words appear at the cursor!
+2. **Grant permissions** — Microphone, Accessibility, and Input Monitoring (see [Permissions](#permissions) above)
+3. **First model download** — WhisperKit automatically downloads the recommended model for your device (~40–500 MB depending on hardware)
+4. **Start dictating** — Hold the **Right Option** key, speak, and release. Your words appear at the cursor!
 
 ---
 
