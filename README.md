@@ -148,6 +148,19 @@ cd vocamac
 open VocaMac.app
 ```
 
+**Or use the install script** for a CLI-based workflow:
+
+```bash
+# Build + install `vocamac` command to ~/.local/bin
+./scripts/install.sh
+
+# Launch in background
+vocamac &
+
+# Rebuild anytime after pulling updates
+vocamac-build
+```
+
 > **Permissions note:** When running from terminal, macOS assigns permissions to your **terminal app** (Terminal, iTerm2, etc.) rather than VocaMac itself. Grant Microphone, Accessibility, and Input Monitoring to your terminal app instead.
 
 ### First Launch
