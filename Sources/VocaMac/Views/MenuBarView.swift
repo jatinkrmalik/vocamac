@@ -97,7 +97,7 @@ struct MenuBarView: View {
             }
 
             // Permissions Warning
-            if appState.micPermission != .granted || appState.accessibilityPermission != .granted {
+            if appState.micPermission != .granted || appState.accessibilityPermission != .granted || appState.inputMonitoringPermission != .granted {
                 Divider()
                 permissionsSection
             }
@@ -261,6 +261,11 @@ struct MenuBarView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.orange)
+
+                Text("Required to capture your voice for transcription.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             if appState.accessibilityPermission != .granted {
@@ -276,6 +281,23 @@ struct MenuBarView: View {
                 Text("Required for global hotkeys and text injection. Opens System Settings.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if appState.inputMonitoringPermission != .granted {
+                Button {
+                    appState.requestInputMonitoringPermission()
+                } label: {
+                    Label("Grant Input Monitoring", systemImage: "keyboard")
+                        .font(.callout)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.orange)
+
+                Text("Required to detect hotkey presses system-wide. Enable VocaMac in the list.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }

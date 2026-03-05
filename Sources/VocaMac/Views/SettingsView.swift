@@ -159,11 +159,9 @@ struct GeneralSettingsTab: View {
                 PermissionRow(
                     name: "Input Monitoring",
                     icon: "keyboard",
-                    status: appState.accessibilityPermission,  // Shares status with Accessibility
+                    status: appState.inputMonitoringPermission,
                     action: {
-                        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent") {
-                            NSWorkspace.shared.open(url)
-                        }
+                        appState.requestInputMonitoringPermission()
                     },
                     actionLabel: "Open Settings"
                 )
@@ -628,9 +626,10 @@ struct AboutTab: View {
                 .font(.largeTitle)
                 .fontWeight(.bold)
 
-            Text("Local voice-to-text for macOS")
+            Text("Your voice, your Mac, your privacy.\nOpen-source dictation powered by AI.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
 
             Text("Version 0.1.0 (MVP)")
                 .font(.caption)

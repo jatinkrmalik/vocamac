@@ -60,6 +60,12 @@ find ".build/arm64-apple-macosx/${CONFIG}" -maxdepth 1 -name "*.bundle" | while 
     cp -rf "$bundle" "${APP_DIR}/Contents/Resources/"
 done
 
+# Copy app icon
+if [ -f "Sources/VocaMac/Resources/AppIcon.icns" ]; then
+    cp -f "Sources/VocaMac/Resources/AppIcon.icns" "${APP_DIR}/Contents/Resources/AppIcon.icns"
+    echo "📎 App icon copied"
+fi
+
 # Create/update Info.plist
 cat > "${APP_DIR}/Contents/Info.plist" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -84,6 +90,8 @@ cat > "${APP_DIR}/Contents/Info.plist" << EOF
     <string>13.0</string>
     <key>LSUIElement</key>
     <true/>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>NSMicrophoneUsageDescription</key>
     <string>VocaMac needs microphone access to capture your voice for transcription.</string>
     <key>NSPrincipalClass</key>

@@ -83,6 +83,9 @@ final class AppState: ObservableObject {
     /// Accessibility permission status
     @Published var accessibilityPermission: PermissionStatus = .notDetermined
 
+    /// Input Monitoring permission status
+    @Published var inputMonitoringPermission: PermissionStatus = .notDetermined
+
     /// Detected system capabilities
     @Published var systemCapabilities: SystemCapabilities?
 
@@ -198,6 +201,39 @@ final class AppState: ObservableObject {
         // Check accessibility permission
         let accessibilityGranted = HotKeyManager.checkAccessibilityPermission(prompt: false)
         accessibilityPermission = accessibilityGranted ? .granted : .denied
+
+        // Check input monitoring permission
+        // If we can successfully create an event tap (even briefly), Input Monitoring is granted.
+        // CGPreflightListenEventAccess() is available on macOS 15+, so we use a tap test as fallback.
+        let inputMonitoringGranted = checkInputMonitoringPermission()
+        inputMonitoringPermission = inputMonitoringGranted ? .granted : .denied
+    }
+
+    /// Check Input Monitoring permission.
+    /// If the HotKeyManager has an active event tap, we check if macOS has disabled it
+    /// (which happens when the user revokes Input Monitoring permission).
+    /// Otherwise, we try to create a temporary tap to test.
+    private func checkInputMonitoringPermission() -> Bool {
+        // If HotKeyManager has an active tap, check if it's still enabled
+        // macOS disables existing taps when Input Monitoring is revoked
+        if hotKeyManager.isListening, let tap = hotKeyManager.activeEventTap {
+            return CGEvent.tapIsEnabled(tap: tap)
+        }
+
+        // No active tap — try creating a temporary one to test permission
+        let tap = CGEvent.tapCreate(
+            tap: .cgSessionEventTap,
+            place: .headInsertEventTap,
+            options: .listenOnly,
+            eventsOfInterest: CGEventMask(1 << CGEventType.keyDown.rawValue),
+            callback: { _, _, event, _ in Unmanaged.passRetained(event) },
+            userInfo: nil
+        )
+        if let tap = tap {
+            CFMachPortInvalidate(tap)
+            return true
+        }
+        return false
     }
 
     func requestMicrophonePermission() {
@@ -211,6 +247,32 @@ final class AppState: ObservableObject {
     func requestAccessibilityPermission() {
         let _ = HotKeyManager.checkAccessibilityPermission(prompt: true)
         // User must manually enable in System Settings; re-check after delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+            self?.checkPermissions()
+        }
+    }
+
+    func requestInputMonitoringPermission() {
+        // Attempting to create an event tap triggers macOS to auto-add
+        // the app to the Input Monitoring list in System Settings.
+        let tap = CGEvent.tapCreate(
+            tap: .cgSessionEventTap,
+            place: .headInsertEventTap,
+            options: .listenOnly,
+            eventsOfInterest: CGEventMask(1 << CGEventType.keyDown.rawValue),
+            callback: { _, _, event, _ in Unmanaged.passRetained(event) },
+            userInfo: nil
+        )
+        if let tap = tap {
+            CFMachPortInvalidate(tap)
+        }
+
+        // Open Input Monitoring settings pane
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent") {
+            NSWorkspace.shared.open(url)
+        }
+
+        // Re-check after user has time to toggle
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
             self?.checkPermissions()
         }
