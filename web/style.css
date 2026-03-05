@@ -201,9 +201,9 @@ h4 { font-size: 16px; font-weight: 600; }
     font-weight: 600;
 }
 .navbar__icon { font-size: 22px; }
-.navbar__logo-img { width: 28px; height: 28px; border-radius: 6px; }
-.footer__logo-img { width: 22px; height: 22px; border-radius: 5px; }
-.mockup__app-logo { width: 32px; height: 32px; border-radius: 7px; }
+.navbar__logo-img { width: auto; height: 24px; }
+.footer__logo-img { width: auto; height: 20px; }
+.mockup__app-logo { width: auto; height: 28px; }
 .navbar__menu {
     display: flex;
     gap: 36px;
@@ -333,10 +333,10 @@ h4 { font-size: 16px; font-weight: 600; }
     color: var(--text-secondary);
 }
 .mockup__menubar-left, .mockup__menubar-right { display: flex; align-items: center; gap: 12px; }
-.mockup__apple::before { content: ""; font-size: 14px; }
+.mockup__apple { opacity: 0.8; }
 .mockup__menubar-item { font-size: 12px; }
 .mockup__menubar-icon { font-size: 14px; }
-.mockup__mic-icon { filter: drop-shadow(0 0 4px rgba(59, 130, 246, 0.5)); }
+.mockup__mic-icon { width: auto; height: 14px; filter: drop-shadow(0 0 4px rgba(59, 130, 246, 0.5)); }
 .mockup__popover {
     padding: 16px;
     display: flex;
@@ -584,13 +584,18 @@ section { padding: 100px 0; }
 }
 .family-card.visible { opacity: 1; transform: translateY(0); }
 .family-card:hover { border-color: var(--border-hover); background: var(--card-hover-bg); }
-.family-card__icon { font-size: 36px; }
+.family-card__icon { font-size: 36px; display: flex; align-items: center; justify-content: center; min-height: 44px; }
 .family-card__name { font-size: 20px; font-weight: 700; }
 .family-card p { color: var(--text-secondary); font-size: 14px; }
 .family-card__link { color: var(--accent); font-size: 13px; font-weight: 500; margin-top: 4px; }
-.family-card--active { border-color: rgba(59, 130, 246, 0.3); background: rgba(59, 130, 246, 0.05); }
-.family-card--soon { opacity: 0.6; }
-.family-card--soon.visible { opacity: 0.6; }
+.family-card--linux { border-color: rgba(16, 185, 129, 0.3); background: rgba(16, 185, 129, 0.06); }
+.family-card--linux:hover { border-color: rgba(16, 185, 129, 0.5); background: rgba(16, 185, 129, 0.1); }
+.family-card--active { border-color: rgba(160, 160, 170, 0.3); background: rgba(160, 160, 170, 0.06); }
+.family-card--active:hover { border-color: rgba(160, 160, 170, 0.5); background: rgba(160, 160, 170, 0.1); }
+.family-card--windows { border-color: rgba(0, 173, 239, 0.3); background: rgba(0, 173, 239, 0.06); }
+.family-card--windows:hover { border-color: rgba(0, 173, 239, 0.5); background: rgba(0, 173, 239, 0.1); }
+.family-card--soon { opacity: 0.7; }
+.family-card--soon.visible { opacity: 0.7; }
 
 /* ========== FAQ ========== */
 .faq__list { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 8px; }
