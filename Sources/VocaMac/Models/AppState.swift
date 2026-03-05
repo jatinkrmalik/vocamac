@@ -101,6 +101,7 @@ final class AppState: ObservableObject {
     @AppStorage("vocamac.selectedLanguage") var selectedLanguage: String = "auto"
     @AppStorage("vocamac.launchAtLogin") var launchAtLogin: Bool = false
     @AppStorage("vocamac.preserveClipboard") var preserveClipboard: Bool = true
+    @AppStorage("vocamac.soundEffectsEnabled") var soundEffectsEnabled: Bool = true
 
     // MARK: - Services
 
@@ -109,6 +110,7 @@ final class AppState: ObservableObject {
     let textInjector = TextInjector()
     let hotKeyManager = HotKeyManager()
     let modelManager = ModelManager()
+    let soundManager = SoundManager()
 
     // MARK: - Private
 
@@ -225,6 +227,11 @@ final class AppState: ObservableObject {
         isRecording = true
         errorMessage = nil
 
+        // Play start sound
+        if soundEffectsEnabled {
+            soundManager.playStartSound()
+        }
+
         audioEngine.startRecording(
             silenceThreshold: Float(silenceThreshold),
             silenceDuration: silenceDuration,
@@ -238,6 +245,11 @@ final class AppState: ObservableObject {
         let audioData = audioEngine.stopRecording()
         isRecording = false
         audioLevel = 0.0
+
+        // Play stop sound
+        if soundEffectsEnabled {
+            soundManager.playStopSound()
+        }
 
         guard !audioData.isEmpty else {
             appStatus = .idle
