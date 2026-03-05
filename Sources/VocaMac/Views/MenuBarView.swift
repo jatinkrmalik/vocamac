@@ -11,7 +11,7 @@ struct MenuBarView: View {
     @ObservedObject var settingsManager: SettingsWindowManager
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 14) {
             // Header
             headerSection
 
@@ -37,8 +37,8 @@ struct MenuBarView: View {
             // Quick Actions
             actionsSection
         }
-        .padding(16)
-        .frame(width: 320)
+        .padding(20)
+        .frame(width: 380)
     }
 
     // MARK: - Header
@@ -46,24 +46,25 @@ struct MenuBarView: View {
     private var headerSection: some View {
         HStack {
             Image(systemName: "mic.fill")
-                .font(.title2)
+                .font(.title)
                 .foregroundStyle(.blue)
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text("VocaMac")
-                    .font(.headline)
+                    .font(.title3)
+                    .fontWeight(.semibold)
 
                 if let model = appState.currentModel {
                     Text("Model: \(model.size.displayName)")
-                        .font(.caption)
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
                 } else if appState.whisperService.isModelLoaded {
                     Text("Model: \(appState.whisperService.loadedModelName ?? "Loaded")")
-                        .font(.caption)
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
                 } else {
                     Text("Loading model...")
-                        .font(.caption)
+                        .font(.subheadline)
                         .foregroundStyle(.orange)
                 }
             }
@@ -73,30 +74,31 @@ struct MenuBarView: View {
             // Status indicator dot
             Circle()
                 .fill(statusColor)
-                .frame(width: 8, height: 8)
+                .frame(width: 10, height: 10)
         }
     }
 
     // MARK: - Status
 
     private var statusSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text(statusText)
-                    .font(.subheadline)
+                    .font(.body)
+                    .fontWeight(.medium)
                     .foregroundStyle(statusColor)
 
                 Spacer()
 
                 Text(activationModeHint)
-                    .font(.caption2)
+                    .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
             // Audio level indicator (visible during recording)
             if appState.appStatus == .recording {
                 AudioLevelView(level: appState.audioLevel)
-                    .frame(height: 4)
+                    .frame(height: 6)
             }
 
             // Processing indicator
@@ -111,10 +113,10 @@ struct MenuBarView: View {
     // MARK: - Transcription
 
     private func transcriptionSection(_ result: VocaTranscription) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text("Last Transcription")
-                    .font(.caption)
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
 
                 Spacer()
@@ -124,19 +126,19 @@ struct MenuBarView: View {
                     NSPasteboard.general.setString(result.text, forType: .string)
                 } label: {
                     Image(systemName: "doc.on.doc")
-                        .font(.caption)
+                        .font(.subheadline)
                 }
                 .buttonStyle(.plain)
                 .help("Copy to clipboard")
             }
 
             Text(result.text)
-                .font(.callout)
+                .font(.body)
                 .lineLimit(4)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(8)
+                .padding(10)
                 .background(Color.secondary.opacity(0.1))
-                .cornerRadius(6)
+                .cornerRadius(8)
 
             HStack {
                 Text("\(String(format: "%.1f", result.audioLengthSeconds))s audio")
@@ -145,7 +147,7 @@ struct MenuBarView: View {
                 Text("•")
                 Text(result.detectedLanguage)
             }
-            .font(.caption2)
+            .font(.caption)
             .foregroundStyle(.secondary)
         }
     }
@@ -153,9 +155,9 @@ struct MenuBarView: View {
     // MARK: - Permissions
 
     private var permissionsSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             Text("Permissions Required")
-                .font(.caption)
+                .font(.subheadline)
                 .foregroundStyle(.orange)
 
             if appState.micPermission != .granted {
@@ -163,7 +165,7 @@ struct MenuBarView: View {
                     appState.requestMicrophonePermission()
                 } label: {
                     Label("Grant Microphone Access", systemImage: "mic.badge.xmark")
-                        .font(.caption)
+                        .font(.callout)
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.orange)
@@ -174,13 +176,13 @@ struct MenuBarView: View {
                     appState.requestAccessibilityPermission()
                 } label: {
                     Label("Grant Accessibility Access", systemImage: "lock.shield")
-                        .font(.caption)
+                        .font(.callout)
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.orange)
 
                 Text("Required for global hotkeys and text injection. Opens System Settings.")
-                    .font(.caption2)
+                    .font(.caption)
                     .foregroundStyle(.secondary)
             }
         }
@@ -189,7 +191,7 @@ struct MenuBarView: View {
     // MARK: - Actions
 
     private var actionsSection: some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 6) {
             Button {
                 settingsManager.open(appState: appState)
             } label: {
@@ -200,10 +202,10 @@ struct MenuBarView: View {
                     Text("⌘,")
                         .foregroundStyle(.secondary)
                 }
-                .font(.callout)
+                .font(.body)
             }
             .buttonStyle(.plain)
-            .padding(.vertical, 2)
+            .padding(.vertical, 4)
 
             Divider()
 
@@ -217,10 +219,10 @@ struct MenuBarView: View {
                     Text("⌘Q")
                         .foregroundStyle(.secondary)
                 }
-                .font(.callout)
+                .font(.body)
             }
             .buttonStyle(.plain)
-            .padding(.vertical, 2)
+            .padding(.vertical, 4)
         }
     }
 
