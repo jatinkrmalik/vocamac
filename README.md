@@ -4,6 +4,8 @@
 
 <h1 align="center">VocaMac</h1>
 
+<p align="center"><strong>Your voice, your Mac, your privacy. Open-source dictation powered by AI.</strong></p>
+
 <div align="center">
   
 [![Build & Test](https://github.com/jatinkrmalik/vocamac/actions/workflows/ci.yml/badge.svg)](https://github.com/jatinkrmalik/vocamac/actions/workflows/ci.yml)
@@ -24,9 +26,47 @@
 
 </div>
 
-**Opensource Private Local voice-to-text transcription app for macOS - powered by [WhisperKit](https://github.com/argmaxinc/WhisperKit)**
+Speak. It types. 100% offline, open-source voice-to-text for macOS - powered by [WhisperKit](https://github.com/argmaxinc/WhisperKit). No cloud, no subscriptions, no data leaves your device. Just hold a hotkey, speak, and your words appear wherever your cursor is.
 
-VocaMac is a native macOS menu bar application that transcribes your voice to text locally on your machine. No cloud, no subscriptions, no data leaves your device. Just hold a hotkey, speak, and your words appear wherever your cursor is.
+---
+
+## 📸 Screenshots
+
+<p align="center">
+  <img src="docs/screenshots/popover-panel.png" alt="VocaMac Popover" width="400">
+  <br>
+  <em>Menu bar popover with status and controls</em>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/menu-bar-idle.png" alt="Menu Bar - Idle" width="250">
+  &nbsp;&nbsp;
+  <img src="docs/screenshots/menu-bar-recording.png" alt="Menu Bar - Recording" width="250">
+  <br>
+  <em>Menu bar icon: idle (left) and recording (right)</em>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/settings-general.png" alt="Settings - General" width="400">
+  &nbsp;&nbsp;
+  <img src="docs/screenshots/settings-models.png" alt="Settings - Models" width="400">
+  <br>
+  <em>Settings: General tab (left) and Models tab with resource monitoring (right)</em>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/settings-audio.png" alt="Settings - Audio" width="400">
+  &nbsp;&nbsp;
+  <img src="docs/screenshots/settings-about.png" alt="Settings - About" width="400">
+  <br>
+  <em>Settings: Audio tab (left) and About tab (right)</em>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/cursor-indicator.png" alt="Cursor Indicator" width="400">
+  <br>
+  <em>Floating mic indicator near text cursor during recording</em>
+</p>
 
 ---
 
