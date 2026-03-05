@@ -35,7 +35,8 @@ final class ModelManager {
     /// HuggingFace repository for WhisperKit CoreML models
     private let modelRepo = "argmaxinc/whisperkit-coreml"
 
-    /// Local base directory for downloaded models
+    /// Local base directory passed to WhisperKit's downloadBase config.
+    /// WhisperKit creates its own subdirectory structure under this path.
     private var downloadBase: URL {
         let appSupport = FileManager.default.urls(
             for: .applicationSupportDirectory,
@@ -44,6 +45,14 @@ final class ModelManager {
         return appSupport
             .appendingPathComponent("VocaMac")
             .appendingPathComponent("models")
+    }
+
+    /// Actual directory where WhisperKit stores downloaded model files.
+    /// WhisperKit nests models under: downloadBase/models/<repo>/
+    private var modelStorageBase: URL {
+        downloadBase
+            .appendingPathComponent("models")
+            .appendingPathComponent(modelRepo)
     }
 
     // MARK: - Model Discovery
@@ -72,14 +81,14 @@ final class ModelManager {
     /// Check if a model is downloaded locally
     func isModelDownloaded(_ size: ModelSize) -> Bool {
         let modelName = whisperKitModelName(for: size)
-        let modelDir = downloadBase.appendingPathComponent(modelName)
+        let modelDir = modelStorageBase.appendingPathComponent(modelName)
         return FileManager.default.fileExists(atPath: modelDir.path)
     }
 
     /// Get the local folder path for a downloaded model
     func modelFolder(for size: ModelSize) -> URL? {
         let modelName = whisperKitModelName(for: size)
-        let modelDir = downloadBase.appendingPathComponent(modelName)
+        let modelDir = modelStorageBase.appendingPathComponent(modelName)
         if FileManager.default.fileExists(atPath: modelDir.path) {
             return modelDir
         }
@@ -174,7 +183,7 @@ final class ModelManager {
     /// Delete a downloaded model's local files
     func deleteModel(_ size: ModelSize) throws {
         let modelName = whisperKitModelName(for: size)
-        let modelDir = downloadBase.appendingPathComponent(modelName)
+        let modelDir = modelStorageBase.appendingPathComponent(modelName)
 
         if FileManager.default.fileExists(atPath: modelDir.path) {
             try FileManager.default.removeItem(at: modelDir)
@@ -187,10 +196,10 @@ final class ModelManager {
     /// Get total disk space used by downloaded models
     func totalDiskUsage() -> Int64 {
         let fm = FileManager.default
-        guard fm.fileExists(atPath: downloadBase.path) else { return 0 }
+        guard fm.fileExists(atPath: modelStorageBase.path) else { return 0 }
 
         var totalSize: Int64 = 0
-        if let enumerator = fm.enumerator(at: downloadBase, includingPropertiesForKeys: [.fileSizeKey]) {
+        if let enumerator = fm.enumerator(at: modelStorageBase, includingPropertiesForKeys: [.fileSizeKey]) {
             for case let fileURL as URL in enumerator {
                 if let attrs = try? fileURL.resourceValues(forKeys: [.fileSizeKey]),
                    let size = attrs.fileSize {
