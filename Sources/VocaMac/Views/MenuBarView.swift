@@ -292,7 +292,7 @@ struct MenuBarView: View {
                 .buttonStyle(.plain)
                 .foregroundStyle(.orange)
 
-                Text("Required to detect hotkey presses system-wide. Click +, then add VocaMac.")
+                Text("Required to detect hotkey presses system-wide. Enable VocaMac in the list.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
