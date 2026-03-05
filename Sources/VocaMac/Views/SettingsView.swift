@@ -626,9 +626,10 @@ struct AboutTab: View {
                 .font(.largeTitle)
                 .fontWeight(.bold)
 
-            Text("Local voice-to-text for macOS")
+            Text("Your voice, your Mac, your privacy.\nOpen-source dictation powered by AI.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
 
             Text("Version 0.1.0 (MVP)")
                 .font(.caption)
