@@ -6,12 +6,82 @@
 
 import SwiftUI
 
+// MARK: - Process Monitor
+
+/// Polls the current process for CPU and memory usage every 5 seconds.
+final class ProcessMonitor: ObservableObject {
+    @Published var cpuUsage: Double = 0       // percentage (0–100+)
+    @Published var memoryMB: Double = 0       // resident memory in MB
+    @Published var memoryPeakMB: Double = 0   // peak memory seen
+    @Published var threadCount: Int = 0       // active thread count
+
+    private var timer: Timer?
+
+    init() {
+        refresh()
+        timer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in
+            self?.refresh()
+        }
+    }
+
+    deinit { timer?.invalidate() }
+
+    func refresh() {
+        // --- Memory via mach_task_basic_info ---
+        var taskInfo = mach_task_basic_info()
+        var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size) / 4
+        let kr = withUnsafeMutablePointer(to: &taskInfo) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                task_info(mach_task_self_, task_flavor_t(MACH_TASK_BASIC_INFO), $0, &count)
+            }
+        }
+        if kr == KERN_SUCCESS {
+            let mb = Double(taskInfo.resident_size) / (1024 * 1024)
+            DispatchQueue.main.async {
+                self.memoryMB = mb
+                self.memoryPeakMB = max(self.memoryPeakMB, mb)
+            }
+        }
+
+        // --- CPU via task_threads + thread_basic_info ---
+        var threadList: thread_act_array_t?
+        var threadCount: mach_msg_type_number_t = 0
+        let threadKr = task_threads(mach_task_self_, &threadList, &threadCount)
+        guard threadKr == KERN_SUCCESS, let threads = threadList else { return }
+
+        var totalCPU: Double = 0
+        for i in 0..<Int(threadCount) {
+            var threadInfo = thread_basic_info()
+            var infoCount = mach_msg_type_number_t(MemoryLayout<thread_basic_info_data_t>.size / MemoryLayout<natural_t>.size)
+            let infoKr = withUnsafeMutablePointer(to: &threadInfo) {
+                $0.withMemoryRebound(to: integer_t.self, capacity: Int(infoCount)) {
+                    thread_info(threads[i], thread_flavor_t(THREAD_BASIC_INFO), $0, &infoCount)
+                }
+            }
+            if infoKr == KERN_SUCCESS && threadInfo.flags != TH_FLAGS_IDLE {
+                totalCPU += Double(threadInfo.cpu_usage) / Double(TH_USAGE_SCALE) * 100
+            }
+        }
+
+        let count2 = Int(threadCount)
+        // Deallocate the thread list
+        let size = vm_size_t(MemoryLayout<thread_t>.stride * Int(threadCount))
+        vm_deallocate(mach_task_self_, vm_address_t(bitPattern: threads), size)
+
+        DispatchQueue.main.async {
+            self.cpuUsage = totalCPU
+            self.threadCount = count2
+        }
+    }
+}
+
 struct MenuBarView: View {
     @EnvironmentObject var appState: AppState
     @ObservedObject var settingsManager: SettingsWindowManager
+    @StateObject private var processMonitor = ProcessMonitor()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 14) {
             // Header
             headerSection
 
@@ -37,8 +107,8 @@ struct MenuBarView: View {
             // Quick Actions
             actionsSection
         }
-        .padding(16)
-        .frame(width: 320)
+        .padding(20)
+        .frame(width: 380)
     }
 
     // MARK: - Header
@@ -46,57 +116,81 @@ struct MenuBarView: View {
     private var headerSection: some View {
         HStack {
             Image(systemName: "mic.fill")
-                .font(.title2)
+                .font(.title)
                 .foregroundStyle(.blue)
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text("VocaMac")
-                    .font(.headline)
+                    .font(.title3)
+                    .fontWeight(.semibold)
 
                 if let model = appState.currentModel {
                     Text("Model: \(model.size.displayName)")
-                        .font(.caption)
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
                 } else if appState.whisperService.isModelLoaded {
                     Text("Model: \(appState.whisperService.loadedModelName ?? "Loaded")")
-                        .font(.caption)
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
                 } else {
                     Text("Loading model...")
-                        .font(.caption)
+                        .font(.subheadline)
                         .foregroundStyle(.orange)
                 }
             }
 
             Spacer()
 
-            // Status indicator dot
-            Circle()
-                .fill(statusColor)
-                .frame(width: 8, height: 8)
+            // CPU & RAM usage display
+            HStack(spacing: 10) {
+                ResourceBadge(
+                    icon: "cpu",
+                    value: String(format: "%.0f%%", processMonitor.cpuUsage),
+                    details: [
+                        ("CPU Usage", String(format: "%.1f%%", processMonitor.cpuUsage)),
+                        ("Threads", "\(processMonitor.threadCount)"),
+                        ("Cores", "\(ProcessInfo.processInfo.activeProcessorCount)"),
+                    ]
+                )
+
+                ResourceBadge(
+                    icon: "memorychip",
+                    value: formattedMemory(processMonitor.memoryMB),
+                    details: [
+                        ("Resident", String(format: "%.1f MB", processMonitor.memoryMB)),
+                        ("Peak", String(format: "%.1f MB", processMonitor.memoryPeakMB)),
+                        ("System", "\(ProcessInfo.processInfo.physicalMemory / (1024 * 1024 * 1024)) GB"),
+                    ]
+                )
+            }
         }
     }
 
     // MARK: - Status
 
     private var statusSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
+                Circle()
+                    .fill(statusColor)
+                    .frame(width: 10, height: 10)
+
                 Text(statusText)
-                    .font(.subheadline)
+                    .font(.body)
+                    .fontWeight(.medium)
                     .foregroundStyle(statusColor)
 
                 Spacer()
 
                 Text(activationModeHint)
-                    .font(.caption2)
+                    .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
             // Audio level indicator (visible during recording)
             if appState.appStatus == .recording {
                 AudioLevelView(level: appState.audioLevel)
-                    .frame(height: 4)
+                    .frame(height: 6)
             }
 
             // Processing indicator
@@ -111,10 +205,10 @@ struct MenuBarView: View {
     // MARK: - Transcription
 
     private func transcriptionSection(_ result: VocaTranscription) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text("Last Transcription")
-                    .font(.caption)
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
 
                 Spacer()
@@ -124,19 +218,19 @@ struct MenuBarView: View {
                     NSPasteboard.general.setString(result.text, forType: .string)
                 } label: {
                     Image(systemName: "doc.on.doc")
-                        .font(.caption)
+                        .font(.subheadline)
                 }
                 .buttonStyle(.plain)
                 .help("Copy to clipboard")
             }
 
             Text(result.text)
-                .font(.callout)
+                .font(.body)
                 .lineLimit(4)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(8)
+                .padding(10)
                 .background(Color.secondary.opacity(0.1))
-                .cornerRadius(6)
+                .cornerRadius(8)
 
             HStack {
                 Text("\(String(format: "%.1f", result.audioLengthSeconds))s audio")
@@ -145,7 +239,7 @@ struct MenuBarView: View {
                 Text("•")
                 Text(result.detectedLanguage)
             }
-            .font(.caption2)
+            .font(.caption)
             .foregroundStyle(.secondary)
         }
     }
@@ -153,9 +247,9 @@ struct MenuBarView: View {
     // MARK: - Permissions
 
     private var permissionsSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             Text("Permissions Required")
-                .font(.caption)
+                .font(.subheadline)
                 .foregroundStyle(.orange)
 
             if appState.micPermission != .granted {
@@ -163,7 +257,7 @@ struct MenuBarView: View {
                     appState.requestMicrophonePermission()
                 } label: {
                     Label("Grant Microphone Access", systemImage: "mic.badge.xmark")
-                        .font(.caption)
+                        .font(.callout)
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.orange)
@@ -174,13 +268,13 @@ struct MenuBarView: View {
                     appState.requestAccessibilityPermission()
                 } label: {
                     Label("Grant Accessibility Access", systemImage: "lock.shield")
-                        .font(.caption)
+                        .font(.callout)
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.orange)
 
                 Text("Required for global hotkeys and text injection. Opens System Settings.")
-                    .font(.caption2)
+                    .font(.caption)
                     .foregroundStyle(.secondary)
             }
         }
@@ -189,7 +283,7 @@ struct MenuBarView: View {
     // MARK: - Actions
 
     private var actionsSection: some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 2) {
             Button {
                 settingsManager.open(appState: appState)
             } label: {
@@ -200,12 +294,17 @@ struct MenuBarView: View {
                     Text("⌘,")
                         .foregroundStyle(.secondary)
                 }
-                .font(.callout)
+                .font(.body)
+                .padding(.vertical, 6)
+                .padding(.horizontal, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.primary.opacity(0.0001))
+                )
             }
-            .buttonStyle(.plain)
-            .padding(.vertical, 2)
-
-            Divider()
+            .buttonStyle(MenuRowButtonStyle())
 
             Button {
                 NSApplication.shared.terminate(nil)
@@ -217,11 +316,19 @@ struct MenuBarView: View {
                     Text("⌘Q")
                         .foregroundStyle(.secondary)
                 }
-                .font(.callout)
+                .font(.body)
+                .padding(.vertical, 6)
+                .padding(.horizontal, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.primary.opacity(0.0001))
+                )
             }
-            .buttonStyle(.plain)
-            .padding(.vertical, 2)
+            .buttonStyle(MenuRowButtonStyle())
         }
+        .padding(.horizontal, -8)
     }
 
     // MARK: - Helpers
@@ -251,6 +358,94 @@ struct MenuBarView: View {
             return "Hold \(keyName)"
         case .doubleTapToggle:
             return "Double-tap \(keyName)"
+        }
+    }
+
+    /// Formats memory in MB to a compact human-readable string
+    private func formattedMemory(_ mb: Double) -> String {
+        if mb >= 1024 {
+            return String(format: "%.1f GB", mb / 1024)
+        }
+        return String(format: "%.0f MB", mb)
+    }
+}
+
+// MARK: - Menu Row Button Style
+
+/// A button style that highlights on hover, matching native macOS menu behavior.
+struct MenuRowButtonStyle: ButtonStyle {
+    @State private var isHovered = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(isHovered ? Color.primary.opacity(0.1) : Color.clear)
+            )
+            .onHover { hovering in
+                isHovered = hovering
+            }
+    }
+}
+
+// MARK: - Resource Badge
+
+/// A compact CPU/RAM badge that shows a detail popover on hover.
+struct ResourceBadge: View {
+    let icon: String
+    let value: String
+    let details: [(String, String)]
+
+    @State private var isHovered = false
+
+    var body: some View {
+        HStack(spacing: 3) {
+            Image(systemName: icon)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 3)
+        .background(
+            RoundedRectangle(cornerRadius: 5)
+                .fill(isHovered ? Color.primary.opacity(0.08) : Color.clear)
+        )
+        .onHover { hovering in
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isHovered = hovering
+            }
+        }
+        .popover(isPresented: $isHovered, arrowEdge: .bottom) {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 4) {
+                    Image(systemName: icon)
+                        .font(.subheadline)
+                        .foregroundStyle(.blue)
+                    Text(value)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                }
+
+                Divider()
+
+                ForEach(details, id: \.0) { label, val in
+                    HStack {
+                        Text(label)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text(val)
+                            .font(.caption)
+                            .monospacedDigit()
+                    }
+                }
+            }
+            .padding(10)
+            .frame(width: 160)
         }
     }
 }
