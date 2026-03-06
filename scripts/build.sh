@@ -92,6 +92,8 @@ cat > "${APP_DIR}/Contents/Info.plist" << EOF
     <true/>
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
+    <key>CFBundleIconName</key>
+    <string>AppIcon</string>
     <key>NSMicrophoneUsageDescription</key>
     <string>VocaMac needs microphone access to capture your voice for transcription.</string>
     <key>NSPrincipalClass</key>
