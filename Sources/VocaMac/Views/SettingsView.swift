@@ -144,27 +144,28 @@ struct GeneralSettingsTab: View {
                     name: "Microphone",
                     icon: "mic.fill",
                     status: appState.micPermission,
-                    action: { appState.requestMicrophonePermission() },
-                    actionLabel: "Grant"
+                    action: { appState.requestMicrophonePermission() }
                 )
 
                 PermissionRow(
                     name: "Accessibility",
                     icon: "accessibility",
                     status: appState.accessibilityPermission,
-                    action: { appState.requestAccessibilityPermission() },
-                    actionLabel: "Open Settings"
+                    action: { appState.requestAccessibilityPermission() }
                 )
 
                 PermissionRow(
                     name: "Input Monitoring",
                     icon: "keyboard",
                     status: appState.inputMonitoringPermission,
-                    action: {
-                        appState.requestInputMonitoringPermission()
-                    },
-                    actionLabel: "Open Settings"
+                    action: { appState.requestInputMonitoringPermission() }
                 )
+
+                if appState.micPermission == .denied || appState.accessibilityPermission == .denied || appState.inputMonitoringPermission == .denied {
+                    Text("Denied permissions must be enabled manually in System Settings → Privacy & Security.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
 
                 Button("Re-check Permissions") {
                     appState.checkPermissions()
@@ -184,7 +185,6 @@ struct PermissionRow: View {
     let icon: String
     let status: PermissionStatus
     let action: () -> Void
-    let actionLabel: String
 
     var body: some View {
         HStack {
@@ -196,23 +196,35 @@ struct PermissionRow: View {
                 .frame(width: 16)
             Text(name)
             Spacer()
-            if status == .granted {
+            switch status {
+            case .granted:
                 Text("Granted")
                     .font(.caption)
                     .foregroundStyle(.green)
-            } else {
-                Button(actionLabel) { action() }
+            case .notDetermined:
+                Button("Grant") { action() }
+                    .controlSize(.small)
+            case .denied:
+                Button("Open Settings") { action() }
                     .controlSize(.small)
             }
         }
     }
 
     private var statusIcon: String {
-        status == .granted ? "checkmark.circle.fill" : "xmark.circle.fill"
+        switch status {
+        case .granted: return "checkmark.circle.fill"
+        case .notDetermined: return "questionmark.circle.fill"
+        case .denied: return "xmark.circle.fill"
+        }
     }
 
     private var statusColor: Color {
-        status == .granted ? .green : .red
+        switch status {
+        case .granted: return .green
+        case .notDetermined: return .orange
+        case .denied: return .red
+        }
     }
 }
 

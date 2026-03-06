@@ -191,12 +191,8 @@ final class AppState: ObservableObject {
     // MARK: - Permission Handling
 
     func checkPermissions() {
-        // Check microphone permission
-        audioEngine.checkPermission { [weak self] granted in
-            Task { @MainActor in
-                self?.micPermission = granted ? .granted : .denied
-            }
-        }
+        // Check microphone permission (tri-state: notDetermined, granted, denied)
+        micPermission = audioEngine.checkPermissionStatus()
 
         // Check accessibility permission
         let accessibilityGranted = HotKeyManager.checkAccessibilityPermission(prompt: false)
@@ -210,19 +206,22 @@ final class AppState: ObservableObject {
     }
 
     /// Check Input Monitoring permission.
-    /// If the HotKeyManager has an active event tap, we check if macOS has disabled it
-    /// (which happens when the user revokes Input Monitoring permission).
-    /// Otherwise, we try to create a temporary tap to test.
+    /// Uses multiple strategies since no single approach is 100% reliable:
+    /// 1. If HotKeyManager created a tap, check if macOS has disabled it (revocation)
+    /// 2. If HotKeyManager failed to create a tap, permission is likely denied
+    /// 3. Try creating a fresh .cghidEventTap (same type HotKeyManager uses)
     private func checkInputMonitoringPermission() -> Bool {
-        // If HotKeyManager has an active tap, check if it's still enabled
-        // macOS disables existing taps when Input Monitoring is revoked
+        // Strategy 1: If HotKeyManager has an active tap, check if macOS disabled it.
+        // macOS disables existing taps when Input Monitoring is revoked.
         if hotKeyManager.isListening, let tap = hotKeyManager.activeEventTap {
             return CGEvent.tapIsEnabled(tap: tap)
         }
 
-        // No active tap — try creating a temporary one to test permission
+        // Strategy 2: Try creating a fresh .cghidEventTap — the same type
+        // HotKeyManager uses. This is more accurate than .cgSessionEventTap
+        // which may inherit Terminal's permissions when launched from CLI.
         let tap = CGEvent.tapCreate(
-            tap: .cgSessionEventTap,
+            tap: .cghidEventTap,
             place: .headInsertEventTap,
             options: .listenOnly,
             eventsOfInterest: CGEventMask(1 << CGEventType.keyDown.rawValue),
@@ -237,10 +236,29 @@ final class AppState: ObservableObject {
     }
 
     func requestMicrophonePermission() {
+        if micPermission == .denied {
+            // Already denied — re-requesting won't show the prompt again.
+            // Open System Settings so the user can manually enable it.
+            openMicrophoneSettings()
+            return
+        }
+
+        // First time or notDetermined — trigger the system permission prompt
         audioEngine.requestPermission { [weak self] granted in
             Task { @MainActor in
                 self?.micPermission = granted ? .granted : .denied
             }
+        }
+    }
+
+    /// Open the Microphone privacy pane in System Settings
+    func openMicrophoneSettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone") {
+            NSWorkspace.shared.open(url)
+        }
+        // Re-check after user has time to toggle
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+            self?.checkPermissions()
         }
     }
 
@@ -255,8 +273,9 @@ final class AppState: ObservableObject {
     func requestInputMonitoringPermission() {
         // Attempting to create an event tap triggers macOS to auto-add
         // the app to the Input Monitoring list in System Settings.
+        // Use .cghidEventTap (same as HotKeyManager) for consistent behavior.
         let tap = CGEvent.tapCreate(
-            tap: .cgSessionEventTap,
+            tap: .cghidEventTap,
             place: .headInsertEventTap,
             options: .listenOnly,
             eventsOfInterest: CGEventMask(1 << CGEventType.keyDown.rawValue),
@@ -469,8 +488,14 @@ final class AppState: ObservableObject {
 
         // 2. Check/request permissions
         checkPermissions()
-        NSLog("[AppState] Mic permission: %@ | Accessibility: %@",
-              micPermission.rawValue, accessibilityPermission.rawValue)
+        NSLog("[AppState] Mic permission: %@ | Accessibility: %@ | Input Monitoring: %@",
+              micPermission.rawValue, accessibilityPermission.rawValue, inputMonitoringPermission.rawValue)
+
+        // Auto-prompt for microphone permission on first launch
+        if micPermission == .notDetermined {
+            NSLog("[AppState] Mic permission not determined — requesting...")
+            requestMicrophonePermission()
+        }
 
         // 3. Load model — let WhisperKit auto-select and download the best model
         NSLog("[AppState] Loading WhisperKit model (auto-select)...")
