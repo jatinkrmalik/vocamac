@@ -37,9 +37,13 @@ jobs:
       - name: Build (Release)
         run: swift build -c release
 
+      - name: Initialize Xcode tools
+        run: sudo xcodebuild -runFirstLaunch
+
       - name: Verify app bundle
         run: |
           ./scripts/build.sh release
           test -d VocaMac.app || exit 1
           codesign -v VocaMac.app
+          test -f VocaMac.app/Contents/Resources/Assets.car || echo "⚠️ Assets.car missing"
           echo "App bundle verified"

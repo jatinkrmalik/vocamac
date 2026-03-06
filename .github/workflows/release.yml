@@ -27,6 +27,9 @@ jobs:
           sed -i '' "s/CFBundleVersion.*/<key>CFBundleVersion<\/key>/" scripts/build.sh || true
           echo "Building version: ${{ steps.version.outputs.VERSION }}"
 
+      - name: Initialize Xcode tools
+        run: sudo xcodebuild -runFirstLaunch
+
       - name: Build release app bundle
         run: ./scripts/build.sh release
 
