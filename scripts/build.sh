@@ -60,10 +60,51 @@ find ".build/arm64-apple-macosx/${CONFIG}" -maxdepth 1 -name "*.bundle" | while 
     cp -rf "$bundle" "${APP_DIR}/Contents/Resources/"
 done
 
-# Copy app icon
+# Copy app icon and compile Asset Catalog
 if [ -f "Sources/VocaMac/Resources/AppIcon.icns" ]; then
     cp -f "Sources/VocaMac/Resources/AppIcon.icns" "${APP_DIR}/Contents/Resources/AppIcon.icns"
-    echo "📎 App icon copied"
+
+    # Extract PNGs from .icns and compile an Asset Catalog (Assets.car)
+    # Modern macOS requires Assets.car for icons to render in Finder
+    ICONSET_DIR="/tmp/vocamac-icon-build.iconset"
+    XCASSETS_DIR="/tmp/vocamac-icon-build.xcassets"
+    rm -rf "$ICONSET_DIR" "$XCASSETS_DIR"
+
+    iconutil --convert iconset "Sources/VocaMac/Resources/AppIcon.icns" -o "$ICONSET_DIR" 2>/dev/null
+    if [ -d "$ICONSET_DIR" ]; then
+        mkdir -p "${XCASSETS_DIR}/AppIcon.appiconset"
+        cp "$ICONSET_DIR"/*.png "${XCASSETS_DIR}/AppIcon.appiconset/"
+        cat > "${XCASSETS_DIR}/AppIcon.appiconset/Contents.json" << 'ICONJSON'
+{
+  "images": [
+    {"filename":"icon_16x16.png","idiom":"mac","scale":"1x","size":"16x16"},
+    {"filename":"icon_16x16@2x.png","idiom":"mac","scale":"2x","size":"16x16"},
+    {"filename":"icon_32x32.png","idiom":"mac","scale":"1x","size":"32x32"},
+    {"filename":"icon_32x32@2x.png","idiom":"mac","scale":"2x","size":"32x32"},
+    {"filename":"icon_128x128.png","idiom":"mac","scale":"1x","size":"128x128"},
+    {"filename":"icon_128x128@2x.png","idiom":"mac","scale":"2x","size":"128x128"},
+    {"filename":"icon_256x256.png","idiom":"mac","scale":"1x","size":"256x256"},
+    {"filename":"icon_256x256@2x.png","idiom":"mac","scale":"2x","size":"256x256"},
+    {"filename":"icon_512x512.png","idiom":"mac","scale":"1x","size":"512x512"},
+    {"filename":"icon_512x512@2x.png","idiom":"mac","scale":"2x","size":"512x512"}
+  ],
+  "info": {"author":"xcode","version":1}
+}
+ICONJSON
+        # Compile Asset Catalog — produces Assets.car which modern macOS needs
+        xcrun actool "$XCASSETS_DIR" \
+            --compile "${APP_DIR}/Contents/Resources" \
+            --platform macosx \
+            --minimum-deployment-target 13.0 \
+            --app-icon AppIcon \
+            --output-partial-info-plist /tmp/vocamac-icon-partial.plist 2>/dev/null && \
+            echo "📎 App icon compiled (Assets.car)" || \
+            echo "📎 App icon copied (.icns only — actool unavailable)"
+
+        rm -rf "$ICONSET_DIR" "$XCASSETS_DIR" /tmp/vocamac-icon-partial.plist 2>/dev/null
+    else
+        echo "📎 App icon copied (.icns only)"
+    fi
 fi
 
 # Create/update Info.plist
