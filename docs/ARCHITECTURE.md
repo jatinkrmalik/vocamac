@@ -448,17 +448,23 @@ Package.swift
 ### 7.2 Build Commands
 
 ```bash
-# Debug build
+# Build + install to /Applications (recommended)
+make install
+
+# Build .app bundle in repo root (fast dev iteration)
+make build
+
+# Install CLI commands to ~/.local/bin
+make install-cli
+
+# Run tests
+make test
+
+# Debug build (SPM only, no .app bundle)
 swift build
 
-# Release build (optimized)
+# Release build (SPM only, no .app bundle)
 swift build -c release
-
-# Run
-swift run VocaMac
-
-# Create app bundle (requires additional scripting)
-./scripts/build.sh
 ```
 
 ### 7.3 Distribution Strategy (MVP)
