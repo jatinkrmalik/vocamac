@@ -500,6 +500,7 @@ section { padding: 100px 0; }
 }
 .model-card.visible { opacity: 1; transform: translateY(0); }
 .model-card:hover {
+    cursor: pointer;
     border-color: var(--border-hover);
     background: var(--card-hover-bg);
 }
