@@ -98,19 +98,19 @@
                 <li><a href="#install" class="navbar__link">Install</a></li>
                 <li><a href="#faq" class="navbar__link">FAQ</a></li>
             </ul>
-            <div style="display: flex; align-items: center; gap: 8px;">
+            <div class="navbar__actions">
                 <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode">
                     <span class="theme-icon-dark">☀️</span>
                     <span class="theme-icon-light">🌙</span>
                 </button>
                 <a href="https://github.com/jatinkrmalik/vocamac" class="navbar__cta" target="_blank" rel="noopener">
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="vertical-align: -2px; margin-right: 6px;"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-                    View Source
+                    <span class="navbar__cta-text">View Source</span>
                 </a>
+                <button class="navbar__toggle" aria-label="Menu">
+                    <span></span><span></span><span></span>
+                </button>
             </div>
-            <button class="navbar__toggle" aria-label="Menu">
-                <span></span><span></span><span></span>
-            </button>
         </div>
     </nav>
 
@@ -120,10 +120,11 @@
             <div class="hero__content">
                 <div class="hero__badges">
                     <span class="badge badge--alpha">ALPHA RELEASE</span>
-                    <span class="badge badge--outline">v0.1.0</span>
+                    <span class="badge badge--outline" id="version-badge">v0.1.1</span>
                 </div>
                 <h1 class="hero__headline">
-                    Your Voice, Your Mac,<br>
+                    Your Voice,<br>
+                    Your Mac,<br>
                     <span class="text-gradient">Your Privacy.</span>
                 </h1>
                 <p class="hero__subtext">
@@ -189,7 +190,7 @@
                         <div class="mockup__divider"></div>
                         <div class="mockup__transcription">
                             <div class="mockup__transcription-label">Last Transcription</div>
-                            <div class="mockup__transcription-text">Hey Siri, just kidding. VocaMac does it all locally.</div>
+                            <div class="mockup__transcription-text">Hey Siri, just kidding.<br>VocaMac does it all locally.</div>
                             <div class="mockup__transcription-meta">2.1s audio • 0.8s to transcribe • en</div>
                         </div>
                     </div>
@@ -422,34 +423,55 @@
             <div class="section-header">
                 <span class="badge badge--alpha">ALPHA</span>
                 <h2>Get Started in Minutes</h2>
-                <p class="text-secondary">Build from source. We're in alpha — early adopters welcome.</p>
+                <p class="text-secondary">Download the DMG or build from source. We're in alpha — early adopters welcome.</p>
             </div>
-            <div class="install__card">
+
+            <!-- Install Options Tabs -->
+            <div class="install__tabs" role="tablist">
+                <button class="install__tab install__tab--active" role="tab" aria-selected="true" onclick="switchInstallTab('dmg', this)">📦 Download DMG</button>
+                <button class="install__tab" role="tab" aria-selected="false" onclick="switchInstallTab('source', this)">🛠️ Build from Source</button>
+            </div>
+
+            <!-- DMG Option -->
+            <div class="install__card" id="install-dmg">
                 <div class="install__steps">
-                    <div class="install__step">
+                    <div class="install__step visible">
                         <div class="install__step-num">1</div>
                         <div>
-                            <h4>Clone & Build</h4>
-                            <div class="code-block">
-                                <code>git clone https://github.com/jatinkrmalik/vocamac.git<br>cd vocamac<br>./scripts/install.sh</code>
-                            </div>
+                            <h4>Download</h4>
+                            <p class="text-secondary">Grab the latest DMG from GitHub Releases.</p>
+                            <a href="https://github.com/jatinkrmalik/vocamac/releases/latest" class="button button--primary install__download-btn" target="_blank" rel="noopener">
+                                Download Latest Release →
+                            </a>
                         </div>
                     </div>
-                    <div class="install__step">
+                    <div class="install__step visible">
                         <div class="install__step-num">2</div>
                         <div>
-                            <h4>Grant Permissions</h4>
-                            <p class="text-secondary">System Settings → Privacy & Security → grant <strong>Accessibility</strong>, <strong>Input Monitoring</strong>, and <strong>Microphone</strong> to Terminal.</p>
+                            <h4>Install &amp; Remove Quarantine</h4>
+                            <p class="text-secondary">Open the DMG, drag VocaMac to Applications, then remove the quarantine flag (required until we get code signing):</p>
+                            <div class="code-block">
+                                <div class="code-block__titlebar">
+                                    <div class="code-block__dots">
+                                        <span class="code-block__dot code-block__dot--red"></span>
+                                        <span class="code-block__dot code-block__dot--yellow"></span>
+                                        <span class="code-block__dot code-block__dot--green"></span>
+                                    </div>
+                                    <span class="code-block__title">Terminal</span>
+                                    <button class="code-block__copy" onclick="copyCode(this)">📋 Copy</button>
+                                </div>
+                                <div class="code-block__body">
+                                    <code><span class="prompt">$ </span>sudo xattr -cr /Applications/VocaMac.app</code>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <div class="install__step">
+                    <div class="install__step visible">
                         <div class="install__step-num">3</div>
                         <div>
-                            <h4>Launch & Dictate</h4>
-                            <div class="code-block">
-                                <code>vocamac &</code>
-                            </div>
-                            <p class="text-secondary" style="margin-top: 8px;">Hold <strong>Right Option (⌥)</strong> → speak → release. Text appears at your cursor.</p>
+                            <h4>Grant Permissions &amp; Dictate</h4>
+                            <p class="text-secondary">Open VocaMac and grant <strong>Microphone</strong>, <strong>Accessibility</strong>, and <strong>Input Monitoring</strong> permissions when prompted. Restart the app after granting Input Monitoring.</p>
+                            <p class="text-secondary" style="margin-top: 8px;">Hold <strong>Right Option (⌥)</strong> → speak → release. Text appears at your cursor. ✨</p>
                         </div>
                     </div>
                 </div>
@@ -457,7 +479,54 @@
                     <h4>Requirements</h4>
                     <ul>
                         <li>macOS 13 (Ventura) or later</li>
-                        <li>Xcode 15+ or Swift 5.9+ toolchain</li>
+                        <li>Apple Silicon (M1/M2/M3/M4)</li>
+                        <li>8 GB RAM (16 GB+ recommended)</li>
+                        <li>Microphone</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Source Option (hidden by default) -->
+            <div class="install__card" id="install-source" style="display: none;">
+                <div class="install__steps">
+                    <div class="install__step visible">
+                        <div class="install__step-num">1</div>
+                        <div>
+                            <h4>Clone &amp; Install</h4>
+                            <div class="code-block">
+                                <div class="code-block__titlebar">
+                                    <div class="code-block__dots">
+                                        <span class="code-block__dot code-block__dot--red"></span>
+                                        <span class="code-block__dot code-block__dot--yellow"></span>
+                                        <span class="code-block__dot code-block__dot--green"></span>
+                                    </div>
+                                    <span class="code-block__title">Terminal</span>
+                                    <button class="code-block__copy" onclick="copyCode(this)">📋 Copy</button>
+                                </div>
+                                <div class="code-block__body">
+                                    <code><span class="prompt">$ </span>git clone https://github.com/jatinkrmalik/vocamac.git
+<span class="prompt">$ </span>cd vocamac
+<span class="prompt">$ </span>make install</code>
+                                </div>
+                            </div>
+                            <p class="text-secondary" style="margin-top: 8px;">Builds VocaMac, installs to <strong>/Applications</strong>, and launches it. That's it.</p>
+                        </div>
+                    </div>
+                    <div class="install__step visible">
+                        <div class="install__step-num">2</div>
+                        <div>
+                            <h4>Grant Permissions &amp; Dictate</h4>
+                            <p class="text-secondary">Grant <strong>Microphone</strong>, <strong>Accessibility</strong>, and <strong>Input Monitoring</strong> permissions when prompted. Restart the app after granting Input Monitoring.</p>
+                            <p class="text-secondary" style="margin-top: 8px;">Hold <strong>Right Option (⌥)</strong> → speak → release. Text appears at your cursor. ✨</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="install__requirements">
+                    <h4>Requirements</h4>
+                    <ul>
+                        <li>macOS 13 (Ventura) or later</li>
+                        <li>Apple Silicon (M1/M2/M3/M4)</li>
+                        <li>Xcode 15+ or Swift 5.9+</li>
                         <li>8 GB RAM (16 GB+ recommended)</li>
                         <li>Microphone</li>
                     </ul>
@@ -579,7 +648,7 @@
                 <a href="https://vocawin.com" target="_blank" rel="noopener">VocaWin</a>
             </div>
             <div class="footer__right">
-                Made with ❤️ by <a href="https://github.com/jatinkrmalik" target="_blank" rel="noopener">Jatin Kumar Malik</a>
+                Made with ❤️ by <a href="https://x.com/intent/user?screen_name=jatinkrmalik" target="_blank" rel="noopener">Jatin Kumar Malik</a>
             </div>
         </div>
     </footer>
@@ -644,9 +713,51 @@
             });
         }, { threshold: 0.1 });
 
-        document.querySelectorAll('.feature-card, .step, .privacy__point, .model-card, .family-card, .faq__item, .install__step').forEach(el => {
+        document.querySelectorAll('.feature-card, .step, .privacy__point, .model-card, .family-card, .faq__item').forEach(el => {
             observer.observe(el);
         });
+
+        // ========== Fetch Latest Version ==========
+        fetch('https://api.github.com/repos/jatinkrmalik/vocamac/releases/latest')
+            .then(r => r.json())
+            .then(data => {
+                if (data.tag_name) {
+                    document.getElementById('version-badge').textContent = data.tag_name;
+                }
+            })
+            .catch(() => {}); // Silently fall back to hardcoded version
+
+        // ========== Copy Code ==========
+        function copyCode(btn) {
+            const codeBlock = btn.closest('.code-block');
+            const code = codeBlock.querySelector('code').textContent
+                .replace(/^\$ /gm, '')  // Remove prompt symbols
+                .trim();
+            navigator.clipboard.writeText(code).then(() => {
+                btn.innerHTML = '✅ Copied!';
+                btn.classList.add('code-block__copy--copied');
+                setTimeout(() => {
+                    btn.innerHTML = '📋 Copy';
+                    btn.classList.remove('code-block__copy--copied');
+                }, 2000);
+            });
+        }
+
+        // ========== Install Tabs ==========
+        function switchInstallTab(tab, btn) {
+            // Hide all panels
+            document.getElementById('install-dmg').style.display = 'none';
+            document.getElementById('install-source').style.display = 'none';
+            // Show selected panel
+            document.getElementById('install-' + tab).style.display = 'grid';
+            // Toggle active tab
+            document.querySelectorAll('.install__tab').forEach(t => {
+                t.classList.remove('install__tab--active');
+                t.setAttribute('aria-selected', 'false');
+            });
+            btn.classList.add('install__tab--active');
+            btn.setAttribute('aria-selected', 'true');
+        }
     </script>
 </body>
 </html>
