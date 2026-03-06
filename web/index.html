@@ -120,7 +120,7 @@
             <div class="hero__content">
                 <div class="hero__badges">
                     <span class="badge badge--alpha">ALPHA RELEASE</span>
-                    <span class="badge badge--outline">v0.1.1</span>
+                    <span class="badge badge--outline" id="version-badge">v0.1.1</span>
                 </div>
                 <h1 class="hero__headline">
                     Your Voice,<br>
@@ -716,6 +716,16 @@
         document.querySelectorAll('.feature-card, .step, .privacy__point, .model-card, .family-card, .faq__item').forEach(el => {
             observer.observe(el);
         });
+
+        // ========== Fetch Latest Version ==========
+        fetch('https://api.github.com/repos/jatinkrmalik/vocamac/releases/latest')
+            .then(r => r.json())
+            .then(data => {
+                if (data.tag_name) {
+                    document.getElementById('version-badge').textContent = data.tag_name;
+                }
+            })
+            .catch(() => {}); // Silently fall back to hardcoded version
 
         // ========== Copy Code ==========
         function copyCode(btn) {
