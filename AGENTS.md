@@ -48,7 +48,8 @@ VocaMac/
 │   └── Resources/        # Bundled resources (.gitkeep placeholder)
 ├── Tests/VocaMacTests/   # Unit tests
 ├── web/                  # Static website (HTML/CSS/JS, deployed to GitHub Pages)
-├── scripts/              # build.sh, install.sh
+├── Makefile              # make build, install, test, clean
+├── scripts/              # build.sh, install.sh, uninstall.sh
 ├── docs/                 # ARCHITECTURE.md, DATA_MODEL.md, PRD.md
 ├── Package.swift         # SPM manifest
 └── VocaMac.entitlements  # App sandbox entitlements
@@ -59,20 +60,28 @@ VocaMac/
 ## Build & Run
 
 ```bash
-# Build (debug)
-swift build
+# Build + install to /Applications (recommended)
+make install
 
-# Build (release)
-swift build -c release
+# Build .app bundle in repo root (fast dev iteration)
+make build
+
+# Install CLI commands to ~/.local/bin
+make install-cli
 
 # Run tests
-swift test
+make test
 
-# Build app bundle (creates VocaMac.app)
-./scripts/build.sh
+# Clean build artifacts
+make clean
+```
 
-# Install via script
-./scripts/install.sh
+Or use the scripts directly:
+
+```bash
+./scripts/build.sh              # Build .app bundle (dev)
+./scripts/install.sh            # Build + install to /Applications
+./scripts/install.sh --cli      # Install CLI commands
 ```
 
 The project builds on **macOS only** (requires AppKit, CoreML, AVFoundation). CI runs on `macos-15`.

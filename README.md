@@ -134,34 +134,29 @@ VocaMac requires three macOS permissions:
 4. **Open** VocaMac from Applications (right-click → Open on first launch)
 5. **Grant permissions** — Microphone, Accessibility, and Input Monitoring when prompted
 
-### Option 2: Build from Source
+### Option 2: Build from Source (Recommended)
 
 ```bash
-# Clone the repository
 git clone https://github.com/jatinkrmalik/vocamac.git
 cd vocamac
-
-# Build the app bundle
-./scripts/build.sh
-
-# Launch VocaMac
-open VocaMac.app
+make install
 ```
 
-**Or use the install script** for a CLI-based workflow:
+This builds VocaMac, installs it to `/Applications`, and launches it. Permissions are granted directly to VocaMac — just like the DMG method.
+
+### Option 3: CLI Commands (For Developers)
 
 ```bash
-# Build + install `vocamac` command to ~/.local/bin
-./scripts/install.sh
-
-# Launch in background
-vocamac &
-
-# Rebuild anytime after pulling updates
-vocamac-build
+git clone https://github.com/jatinkrmalik/vocamac.git
+cd vocamac
+make install-cli
 ```
 
-> **Permissions note:** When running from terminal, macOS assigns permissions to your **terminal app** (Terminal, iTerm2, etc.) rather than VocaMac itself. Grant Microphone, Accessibility, and Input Monitoring to your terminal app instead.
+This installs two commands to `~/.local/bin`:
+- `vocamac &` — Launch VocaMac in background
+- `vocamac-build` — Rebuild from source after pulling updates
+
+> **Permissions note:** In CLI mode, macOS assigns permissions to your **terminal app** (Terminal, iTerm2, etc.) rather than VocaMac itself. Grant Microphone, Accessibility, and Input Monitoring to your terminal app instead.
 
 ### First Launch
 
@@ -291,9 +286,10 @@ VocaMac/
 │       └── Resources/
 ├── Tests/
 │   └── VocaMacTests/
+├── Makefile                        # make build, install, test, clean
 ├── scripts/
-│   ├── build.sh                    # Build .app bundle
-│   ├── install.sh                  # Install to ~/.local/bin
+│   ├── build.sh                    # Build .app bundle (dev)
+│   ├── install.sh                  # Install to /Applications or CLI
 │   └── uninstall.sh                # Full uninstall & cleanup
 ├── web/                            # Marketing website (vocamac.com)
 ├── docs/
@@ -306,23 +302,13 @@ VocaMac/
 ### Build Commands
 
 ```bash
-# Debug build
-swift build
-
-# Release build (optimized)
-swift build -c release
-
-# Run
-swift run VocaMac
-
-# Run tests (requires Xcode)
-swift test
-
-# Build .app bundle
-./scripts/build.sh
-
-# Install launcher scripts to ~/.local/bin
-./scripts/install.sh
+make install        # Build + install to /Applications (recommended)
+make install-cli    # Install CLI commands to ~/.local/bin
+make build          # Build .app bundle in repo root (dev iteration)
+make test           # Run tests
+make run            # Launch the locally built .app
+make clean          # Remove build artifacts
+make help           # Show all commands
 ```
 
 ### Uninstall
