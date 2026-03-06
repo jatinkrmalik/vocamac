@@ -428,6 +428,7 @@ section { padding: 100px 0; }
 }
 .feature-card.visible { opacity: 1; transform: translateY(0); }
 .feature-card:hover {
+    cursor: pointer;
     border-color: var(--border-hover);
     background: var(--card-hover-bg);
     transform: translateY(-2px);
