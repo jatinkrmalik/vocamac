@@ -304,7 +304,7 @@ h4 { font-size: 16px; font-weight: 600; }
 .hero__badges { display: flex; gap: 8px; }
 .hero__subtext { font-size: 18px; color: var(--text-secondary); line-height: 1.7; max-width: 520px; }
 .hero__actions { display: flex; gap: 12px; flex-wrap: wrap; }
-.hero__stats { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 8px; }
+.hero__stats { display: flex; gap: 12px 20px; flex-wrap: wrap; margin-top: 8px; justify-content: flex-start; }
 .hero__stat {
     display: flex;
     align-items: center;
@@ -783,7 +783,7 @@ section { padding: 100px 0; }
     .hero__container { grid-template-columns: 1fr; text-align: center; }
     .hero__content { align-items: center; }
     .hero__subtext { max-width: 100%; }
-    .hero__stats { justify-content: center; }
+    .hero__stats { justify-content: center; gap: 8px 16px; }
     .privacy__content { grid-template-columns: 1fr; }
     .section-header--left { text-align: center; align-items: center; }
     .install__card { grid-template-columns: 1fr; }
