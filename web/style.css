@@ -794,7 +794,9 @@ section { padding: 100px 0; }
     section { padding: 64px 0; }
     .navbar__menu { display: none; position: absolute; top: 100%; left: 0; right: 0; background: var(--navbar-bg); backdrop-filter: blur(20px); flex-direction: column; padding: 20px; gap: 16px; border-bottom: 1px solid var(--border-color); }
     .navbar__menu--open { display: flex; }
-    .navbar__cta { display: none; }
+    .navbar__cta { padding: 8px; min-width: unset; }
+    .navbar__cta-text { display: none; }
+    .navbar__cta svg { margin-right: 0 !important; }
     .navbar__toggle { display: flex; }
     .steps { grid-template-columns: 1fr; gap: 32px; }
     .features__grid { grid-template-columns: 1fr; }
