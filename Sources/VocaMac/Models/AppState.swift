@@ -191,12 +191,8 @@ final class AppState: ObservableObject {
     // MARK: - Permission Handling
 
     func checkPermissions() {
-        // Check microphone permission
-        audioEngine.checkPermission { [weak self] granted in
-            Task { @MainActor in
-                self?.micPermission = granted ? .granted : .denied
-            }
-        }
+        // Check microphone permission (tri-state: notDetermined, granted, denied)
+        micPermission = audioEngine.checkPermissionStatus()
 
         // Check accessibility permission
         let accessibilityGranted = HotKeyManager.checkAccessibilityPermission(prompt: false)
@@ -237,10 +233,29 @@ final class AppState: ObservableObject {
     }
 
     func requestMicrophonePermission() {
+        if micPermission == .denied {
+            // Already denied — re-requesting won't show the prompt again.
+            // Open System Settings so the user can manually enable it.
+            openMicrophoneSettings()
+            return
+        }
+
+        // First time or notDetermined — trigger the system permission prompt
         audioEngine.requestPermission { [weak self] granted in
             Task { @MainActor in
                 self?.micPermission = granted ? .granted : .denied
             }
+        }
+    }
+
+    /// Open the Microphone privacy pane in System Settings
+    func openMicrophoneSettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone") {
+            NSWorkspace.shared.open(url)
+        }
+        // Re-check after user has time to toggle
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+            self?.checkPermissions()
         }
     }
 
@@ -469,8 +484,14 @@ final class AppState: ObservableObject {
 
         // 2. Check/request permissions
         checkPermissions()
-        NSLog("[AppState] Mic permission: %@ | Accessibility: %@",
-              micPermission.rawValue, accessibilityPermission.rawValue)
+        NSLog("[AppState] Mic permission: %@ | Accessibility: %@ | Input Monitoring: %@",
+              micPermission.rawValue, accessibilityPermission.rawValue, inputMonitoringPermission.rawValue)
+
+        // Auto-prompt for microphone permission on first launch
+        if micPermission == .notDetermined {
+            NSLog("[AppState] Mic permission not determined — requesting...")
+            requestMicrophonePermission()
+        }
 
         // 3. Load model — let WhisperKit auto-select and download the best model
         NSLog("[AppState] Loading WhisperKit model (auto-select)...")

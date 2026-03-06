@@ -48,17 +48,17 @@ final class AudioEngine {
 
     // MARK: - Permission Handling
 
-    /// Check current microphone permission status
-    func checkPermission(completion: @escaping (Bool) -> Void) {
+    /// Check current microphone permission status (tri-state)
+    func checkPermissionStatus() -> PermissionStatus {
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
         case .authorized:
-            completion(true)
+            return .granted
         case .notDetermined:
-            completion(false)
+            return .notDetermined
         case .denied, .restricted:
-            completion(false)
+            return .denied
         @unknown default:
-            completion(false)
+            return .denied
         }
     }
 

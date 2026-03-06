@@ -253,30 +253,28 @@ struct MenuBarView: View {
                 .foregroundStyle(.orange)
 
             if appState.micPermission != .granted {
-                Button {
-                    appState.requestMicrophonePermission()
-                } label: {
-                    Label("Grant Microphone Access", systemImage: "mic.badge.xmark")
-                        .font(.callout)
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.orange)
+                permissionButton(
+                    label: appState.micPermission == .denied ? "Open Microphone Settings" : "Grant Microphone Access",
+                    icon: "mic.badge.xmark",
+                    isDenied: appState.micPermission == .denied,
+                    action: { appState.requestMicrophonePermission() }
+                )
 
-                Text("Required to capture your voice for transcription.")
+                Text(appState.micPermission == .denied
+                     ? "Denied. Enable in System Settings → Privacy & Security → Microphone."
+                     : "Required to capture your voice for transcription.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
             if appState.accessibilityPermission != .granted {
-                Button {
-                    appState.requestAccessibilityPermission()
-                } label: {
-                    Label("Grant Accessibility Access", systemImage: "lock.shield")
-                        .font(.callout)
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.orange)
+                permissionButton(
+                    label: "Grant Accessibility Access",
+                    icon: "lock.shield",
+                    isDenied: appState.accessibilityPermission == .denied,
+                    action: { appState.requestAccessibilityPermission() }
+                )
 
                 Text("Required for global hotkeys and text injection. Opens System Settings.")
                     .font(.caption)
@@ -285,14 +283,12 @@ struct MenuBarView: View {
             }
 
             if appState.inputMonitoringPermission != .granted {
-                Button {
-                    appState.requestInputMonitoringPermission()
-                } label: {
-                    Label("Grant Input Monitoring", systemImage: "keyboard")
-                        .font(.callout)
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.orange)
+                permissionButton(
+                    label: "Grant Input Monitoring",
+                    icon: "keyboard",
+                    isDenied: appState.inputMonitoringPermission == .denied,
+                    action: { appState.requestInputMonitoringPermission() }
+                )
 
                 Text("Required to detect hotkey presses system-wide. Enable VocaMac in the list.")
                     .font(.caption)
@@ -300,6 +296,18 @@ struct MenuBarView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+    }
+
+    /// Reusable permission button that shows different styling for denied vs not determined
+    private func permissionButton(label: String, icon: String, isDenied: Bool, action: @escaping () -> Void) -> some View {
+        Button {
+            action()
+        } label: {
+            Label(label, systemImage: icon)
+                .font(.callout)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(isDenied ? .red : .orange)
     }
 
     // MARK: - Actions
