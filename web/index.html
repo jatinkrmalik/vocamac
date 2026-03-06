@@ -3,15 +3,81 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VocaMac — Local Voice-to-Text for macOS</title>
-    <meta name="description" content="100% local, privacy-first voice dictation for macOS. Powered by WhisperKit. No cloud, no subscriptions, no data leaves your Mac.">
-    <meta name="keywords" content="voice to text, speech recognition, macOS, dictation, whisper, local, privacy, open source">
-    <meta property="og:title" content="VocaMac — Local Voice-to-Text for macOS">
-    <meta property="og:description" content="100% local, privacy-first voice dictation for macOS. Hold a hotkey, speak, text appears at your cursor.">
+
+    <!-- Primary Meta Tags -->
+    <title>VocaMac — 100% Local Voice-to-Text for macOS | Privacy-First Dictation</title>
+    <meta name="title" content="VocaMac — 100% Local Voice-to-Text for macOS | Privacy-First Dictation">
+    <meta name="description" content="Free, open-source voice dictation for macOS. Hold a hotkey, speak, and text appears at your cursor. 100% offline, powered by WhisperKit. No cloud, no subscriptions, your data never leaves your Mac.">
+    <meta name="keywords" content="voice to text, speech to text, speech recognition, macOS, dictation software, whisper, whisperkit, local dictation, offline voice recognition, privacy, open source, mac app, voice typing, transcription">
+    <meta name="author" content="Jatin Kumar Malik">
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+    <link rel="canonical" href="https://vocamac.com/">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+    <meta name="theme-color" content="#1a1a2e">
+
+    <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://vocamac.com">
+    <meta property="og:url" content="https://vocamac.com/">
+    <meta property="og:title" content="VocaMac — 100% Local Voice-to-Text for macOS">
+    <meta property="og:description" content="Free, open-source voice dictation for macOS. Hold a hotkey, speak, and text appears at your cursor. 100% offline, powered by WhisperKit. No cloud, no subscriptions.">
+    <meta property="og:image" content="https://vocamac.com/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="VocaMac - Local Voice-to-Text for macOS">
+    <meta property="og:site_name" content="VocaMac">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://vocamac.com/">
+    <meta name="twitter:title" content="VocaMac — 100% Local Voice-to-Text for macOS">
+    <meta name="twitter:description" content="Free, open-source voice dictation for macOS. Hold a hotkey, speak, and text appears at your cursor. 100% offline, powered by WhisperKit.">
+    <meta name="twitter:image" content="https://vocamac.com/og-image.png">
+    <meta name="twitter:image:alt" content="VocaMac - Local Voice-to-Text for macOS">
+    <meta name="twitter:creator" content="@jatinkrmalik">
+
+    <!-- JSON-LD Structured Data -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "VocaMac",
+        "description": "100% local, privacy-first voice dictation for macOS. Hold a hotkey, speak, and text appears at your cursor. Powered by WhisperKit with CoreML acceleration.",
+        "url": "https://vocamac.com",
+        "applicationCategory": "UtilitiesApplication",
+        "operatingSystem": "macOS 13.0 or later",
+        "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD"
+        },
+        "author": {
+            "@type": "Person",
+            "name": "Jatin Kumar Malik",
+            "url": "https://github.com/jatinkrmalik"
+        },
+        "license": "https://opensource.org/licenses/MIT",
+        "isAccessibleForFree": true,
+        "featureList": [
+            "100% offline voice recognition",
+            "System-wide text injection",
+            "Push-to-talk and toggle modes",
+            "99+ language support",
+            "Apple Silicon native (CoreML + Neural Engine)",
+            "Multiple Whisper model sizes",
+            "Open source (MIT license)"
+        ],
+        "screenshot": "https://vocamac.com/og-image.png",
+        "softwareVersion": "0.1.0",
+        "softwareRequirements": "macOS 13 (Ventura) or later, Xcode 15+ or Swift 5.9+ toolchain, 8 GB RAM minimum"
+    }
+    </script>
+
     <link rel="stylesheet" href="style.css">
-    <link rel="icon" href="favicon.png" type="image/png">
     <!-- Prevent flash of wrong theme -->
     <script>
         (function(){var t=localStorage.getItem('vocamac-theme')||(window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark');document.documentElement.setAttribute('data-theme',t);})();
