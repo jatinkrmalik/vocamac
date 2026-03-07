@@ -164,7 +164,7 @@ final class WhisperService: @unchecked Sendable {
             let modelUsed = modelSizeFromName(loadedModelName ?? "tiny")
 
             print("[WhisperService] Transcription completed in \(String(format: "%.2f", elapsed))s")
-            print("[WhisperService] Result: \(fullText.prefix(100))...")
+            print("[WhisperService] Transcribed \(fullText.count) characters")
 
             return VocaTranscription(
                 text: fullText,
