@@ -61,7 +61,7 @@ final class TextInjector {
         // Set transcribed text to clipboard
         pasteboard.clearContents()
         pasteboard.setString(text, forType: .string)
-        NSLog("[TextInjector] Set clipboard: '%@'", String(text.prefix(80)))
+        NSLog("[TextInjector] Set clipboard with %ld characters", text.count)
 
         // Delay to let clipboard settle, then simulate Cmd+V
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [self] in
