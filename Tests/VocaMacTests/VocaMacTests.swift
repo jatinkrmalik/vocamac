@@ -417,13 +417,12 @@ final class OnboardingStepTests: XCTestCase {
 
     func testOnboardingStepOrdering() {
         let steps = OnboardingStep.allCases
-        XCTAssertEqual(steps.count, 6)
+        XCTAssertEqual(steps.count, 5)
         XCTAssertEqual(steps[0], .welcome)
         XCTAssertEqual(steps[1], .permissions)
-        XCTAssertEqual(steps[2], .modelSelection)
-        XCTAssertEqual(steps[3], .hotkeyConfig)
-        XCTAssertEqual(steps[4], .quickTest)
-        XCTAssertEqual(steps[5], .complete)
+        XCTAssertEqual(steps[2], .hotkeyConfig)
+        XCTAssertEqual(steps[3], .quickTest)
+        XCTAssertEqual(steps[4], .complete)
     }
 
     func testOnboardingStepTitles() {
@@ -434,7 +433,7 @@ final class OnboardingStepTests: XCTestCase {
 
     func testOnboardingStepNumbers() {
         for (index, step) in OnboardingStep.allCases.enumerated() {
-            XCTAssertEqual(step.stepNumber, "Step \(index + 1) of 6")
+            XCTAssertEqual(step.stepNumber, "Step \(index + 1) of \(OnboardingStep.allCases.count)")
         }
     }
 
