@@ -410,3 +410,76 @@ final class WhisperServiceTranslationTests: XCTestCase {
         XCTAssertNotNil(service)
     }
 }
+
+// MARK: - OnboardingStep Tests
+
+final class OnboardingStepTests: XCTestCase {
+
+    func testOnboardingStepOrdering() {
+        let steps = OnboardingStep.allCases
+        XCTAssertEqual(steps.count, 6)
+        XCTAssertEqual(steps[0], .welcome)
+        XCTAssertEqual(steps[1], .permissions)
+        XCTAssertEqual(steps[2], .modelSelection)
+        XCTAssertEqual(steps[3], .hotkeyConfig)
+        XCTAssertEqual(steps[4], .quickTest)
+        XCTAssertEqual(steps[5], .complete)
+    }
+
+    func testOnboardingStepTitles() {
+        for step in OnboardingStep.allCases {
+            XCTAssertFalse(step.title.isEmpty)
+        }
+    }
+
+    func testOnboardingStepNumbers() {
+        for (index, step) in OnboardingStep.allCases.enumerated() {
+            XCTAssertEqual(step.stepNumber, "Step \(index + 1) of 6")
+        }
+    }
+
+    func testOnboardingStepIdentifiable() {
+        let steps = OnboardingStep.allCases
+        let ids = steps.map { $0.id }
+        let uniqueIds = Set(ids)
+        XCTAssertEqual(ids.count, uniqueIds.count)
+    }
+}
+
+// MARK: - AppState Onboarding Tests
+
+final class AppStateOnboardingTests: XCTestCase {
+
+    override func setUp() {
+        super.setUp()
+        // Clean up any persisted state before each test
+        UserDefaults.standard.removeObject(forKey: "vocamac.hasCompletedOnboarding")
+    }
+
+    @MainActor
+    func testOnboardingFlagInitiallyFalse() {
+        let appState = AppState()
+        XCTAssertFalse(appState.hasCompletedOnboarding)
+    }
+
+    @MainActor
+    func testCompleteOnboardingSetsFlagTrue() {
+        let appState = AppState()
+        XCTAssertFalse(appState.hasCompletedOnboarding)
+        
+        appState.completeOnboarding()
+        
+        XCTAssertTrue(appState.hasCompletedOnboarding)
+    }
+
+    @MainActor
+    func testOnboardingFlagPersistence() {
+        // Set the flag
+        UserDefaults.standard.set(true, forKey: "vocamac.hasCompletedOnboarding")
+        
+        let appState = AppState()
+        
+        // Verify it was loaded from UserDefaults
+        XCTAssertTrue(appState.hasCompletedOnboarding)
+    }
+}

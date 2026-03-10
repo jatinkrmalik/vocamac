@@ -94,6 +94,7 @@ final class AppState: ObservableObject {
 
     // MARK: - User Settings (persisted via UserDefaults)
 
+    @AppStorage("vocamac.hasCompletedOnboarding") var hasCompletedOnboarding: Bool = false
     @AppStorage("vocamac.activationMode") var activationMode: ActivationMode = .pushToTalk
     @AppStorage("vocamac.hotKeyCode") var hotKeyCode: Int = 61  // Right Option
     @AppStorage("vocamac.doubleTapThreshold") var doubleTapThreshold: Double = 0.4
@@ -521,5 +522,9 @@ final class AppState: ObservableObject {
         }
 
         NSLog("[AppState] Startup complete!")
+    }
+    func completeOnboarding() {
+        hasCompletedOnboarding = true
+        NSLog("[AppState] Onboarding completed!")
     }
 }

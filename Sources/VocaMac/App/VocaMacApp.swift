@@ -56,10 +56,80 @@ final class SettingsWindowManager: ObservableObject {
     }
 }
 
+/// Manages the onboarding window
+final class OnboardingWindowManager: ObservableObject {
+    private var onboardingWindow: NSWindow?
+    var onCompletion: (() -> Void)?
+
+    func open(appState: AppState) {
+        // If window already exists, just bring it to front
+        if let window = onboardingWindow, window.isVisible {
+            window.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+
+        // Create the onboarding view
+        let onboardingView = OnboardingView()
+            .environmentObject(appState)
+
+        // Create a new window
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 600, height: 550),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "Welcome to VocaMac"
+        window.contentView = NSHostingView(rootView: onboardingView)
+        window.center()
+        window.isReleasedWhenClosed = false
+        window.makeKeyAndOrderFront(nil)
+
+        self.onboardingWindow = window
+
+        // Show in dock
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+
+        // Watch for window close
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification,
+            object: window,
+            queue: .main
+        ) { [weak self] _ in
+            self?.onboardingWindow = nil
+            // Hide from dock when onboarding closes
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                NSApp.setActivationPolicy(.accessory)
+            }
+        }
+
+        // Monitor app state for onboarding completion on main thread
+        DispatchQueue.main.async {
+            self.monitorOnboardingCompletion(appState: appState)
+        }
+    }
+
+    private func monitorOnboardingCompletion(appState: AppState) {
+        Task {
+            while self.onboardingWindow?.isVisible == true {
+                await MainActor.run {
+                    if appState.hasCompletedOnboarding {
+                        self.onboardingWindow?.close()
+                    }
+                }
+                try? await Task.sleep(nanoseconds: 100_000_000)  // Check every 100ms
+            }
+        }
+    }
+}
+
 @main
 struct VocaMacApp: App {
     @StateObject private var appState = AppState()
     @StateObject private var settingsManager = SettingsWindowManager()
+    @StateObject private var onboardingManager = OnboardingWindowManager()
 
     var body: some Scene {
         // Menu bar presence — the primary UI for VocaMac
