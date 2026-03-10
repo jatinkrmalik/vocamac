@@ -314,3 +314,61 @@ final class TextInjectorTests: XCTestCase {
         injector.inject(text: "", preserveClipboard: false)
     }
 }
+
+// MARK: - SoundManager Tests
+
+final class SoundManagerTests: XCTestCase {
+
+    var soundManager: SoundManager!
+
+    override func setUp() {
+        super.setUp()
+        soundManager = SoundManager()
+    }
+
+    func testPlayStartSoundSync() {
+        // Test that synchronous play doesn't crash
+        soundManager.playStartSound()
+        // If we get here without crashing, the test passes
+        XCTAssertTrue(true)
+    }
+
+    func testPlayStopSoundSync() {
+        // Test that synchronous play doesn't crash
+        soundManager.playStopSound()
+        // If we get here without crashing, the test passes
+        XCTAssertTrue(true)
+    }
+
+    func testPlayStartSoundAsync() async {
+        // Test that async play completes without hanging
+        let startTime = Date()
+        await soundManager.playStartSoundAsync()
+        let elapsed = Date().timeIntervalSince(startTime)
+
+        // Should complete in reasonable time (under 2 seconds even with timeout)
+        XCTAssertLessThan(elapsed, 2.0)
+    }
+
+    func testPlayStopSoundAsync() async {
+        // Test that async play completes without hanging
+        let startTime = Date()
+        await soundManager.playStopSoundAsync()
+        let elapsed = Date().timeIntervalSince(startTime)
+
+        // Should complete in reasonable time (under 2 seconds even with timeout)
+        XCTAssertLessThan(elapsed, 2.0)
+    }
+
+    func testVolumeControl() {
+        soundManager.volume = 0.0
+        XCTAssertEqual(soundManager.volume, 0.0)
+
+        soundManager.volume = 0.5
+        XCTAssertEqual(soundManager.volume, 0.5)
+
+        soundManager.volume = 1.0
+        XCTAssertEqual(soundManager.volume, 1.0)
+    }
+}
+

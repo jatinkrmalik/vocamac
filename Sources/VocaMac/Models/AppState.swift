@@ -311,14 +311,15 @@ final class AppState: ObservableObject {
         isRecording = true
         errorMessage = nil
 
-        // Play start sound
-        if soundEffectsEnabled {
-            soundManager.playStartSound()
-        }
-
         // Show cursor indicator
         if showCursorIndicator {
             cursorOverlay.show()
+        }
+
+        // Play start sound and wait for completion before starting mic
+        // This prevents the sound from being captured into the audio buffer
+        if soundEffectsEnabled {
+            await soundManager.playStartSoundAsync()
         }
 
         audioEngine.startRecording(
