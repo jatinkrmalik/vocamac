@@ -465,7 +465,7 @@ struct ModelSelectionCard: View {
                     HStack(spacing: 8) {
                         ProgressView()
                             .controlSize(.small)
-                        Text("Loading model…")
+                        Text(modelInfo.loadingStatus)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }

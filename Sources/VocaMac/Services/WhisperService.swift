@@ -59,7 +59,11 @@ final class WhisperService: @unchecked Sendable {
     /// - Parameters:
     ///   - modelName: The model variant to load (e.g., "openai_whisper-tiny"), or nil for auto-select
     ///   - modelFolder: Optional local folder containing pre-downloaded models
-    func loadModel(name modelName: String? = nil, folder modelFolder: URL? = nil) async throws {
+    func loadModel(
+        name modelName: String? = nil,
+        folder modelFolder: URL? = nil,
+        onPhaseChange: ((String) -> Void)? = nil
+    ) async throws {
         // Unload any existing model
         unloadModel()
 
@@ -68,6 +72,7 @@ final class WhisperService: @unchecked Sendable {
         let startTime = CFAbsoluteTimeGetCurrent()
 
         do {
+            onPhaseChange?("Configuring…")
             let config = WhisperKitConfig()
 
             // Set model if specified, otherwise WhisperKit auto-selects
@@ -100,7 +105,10 @@ final class WhisperService: @unchecked Sendable {
                 config.download = false
             }
 
+            onPhaseChange?("Loading model…")
             let kit = try await WhisperKit(config)
+
+            onPhaseChange?("Compiling neural engine…")
             self.whisperKit = kit
             self.loadedModelName = modelName ?? kit.modelVariant.description
 

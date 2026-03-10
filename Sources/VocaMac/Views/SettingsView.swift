@@ -443,7 +443,7 @@ struct ModelRow: View {
                     ProgressView()
                         .frame(width: 60)
                         .controlSize(.small)
-                    Text("Loading...")
+                    Text(model.loadingStatus)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }

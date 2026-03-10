@@ -105,12 +105,15 @@ struct WhisperModelInfo: Identifiable {
     /// Whether this model is currently being loaded into memory
     var isLoading: Bool = false
 
+    /// Descriptive loading phase (e.g., "Preparing…", "Compiling…")
+    var loadingStatus: String = "Loading…"
+
     var id: String { size.id }
 
     /// Human-readable status description
     var statusDescription: String {
         if isActive { return "Active" }
-        if isLoading { return "Loading..." }
+        if isLoading { return loadingStatus }
         if let progress = downloadProgress {
             return "Downloading (\(Int(progress * 100))%)"
         }
