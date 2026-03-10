@@ -53,15 +53,6 @@ struct OnboardingView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Spacer()
-                    if currentStep != .complete {
-                        Button(action: skipOnboarding) {
-                            Text("Skip setup")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        .buttonStyle(.plain)
-                        .help("Skip setup and don't show again. You can re-run it from Settings or Menu Bar → Setup Wizard.")
-                    }
                     HStack(spacing: 4) {
                         ForEach(OnboardingStep.allCases, id: \.self) { step in
                             Circle()
@@ -97,6 +88,29 @@ struct OnboardingView: View {
 
                 // Navigation buttons
                 HStack(spacing: 12) {
+                    if currentStep == .welcome {
+                        Button(action: skipOnboarding) {
+                            Text("Skip Setup")
+                                .font(.body)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                                .background(Color.gray.opacity(0.2))
+                                .foregroundStyle(.primary)
+                                .cornerRadius(8)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Skip setup and don't show again. You can re-run it from Menu Bar → Setup Wizard.")
+                    } else if currentStep != .complete {
+                        Button(action: skipOnboarding) {
+                            Text("Skip")
+                                .font(.body)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.secondary)
+                        .help("Skip setup and don't show again.")
+                    }
                     if currentStep != .welcome {
                         Button(action: goToPreviousStep) {
                             Text("Back")
