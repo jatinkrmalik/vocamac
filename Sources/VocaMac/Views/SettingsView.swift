@@ -698,6 +698,7 @@ struct AboutTab: View {
 
 struct DebugTab: View {
     @EnvironmentObject var appState: AppState
+    @State private var logEntryCount: Int = VocaLogger.logEntryCount
 
     var body: some View {
         Form {
@@ -753,7 +754,7 @@ struct DebugTab: View {
                 }
 
                 LabeledContent("Log Entries") {
-                    Text("\(VocaLogger.logEntryCount)")
+                    Text("\(logEntryCount)")
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
                 }
@@ -773,10 +774,12 @@ struct DebugTab: View {
 
                     Spacer()
 
-                    Button(role: .destructive, action: {
+                    Button(action: {
                         VocaLogger.clearLogs()
+                        logEntryCount = VocaLogger.logEntryCount
                     }) {
                         Label("Clear", systemImage: "trash")
+                            .foregroundStyle(.red)
                     }
                     .help("Clear all log entries")
                 }
