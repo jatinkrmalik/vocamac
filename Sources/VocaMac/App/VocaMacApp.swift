@@ -167,6 +167,13 @@ struct VocaMacApp: App {
         ) { [self] _ in
             self.onboardingManager.open(appState: self.appState, force: true)
         }
+
+        // Show onboarding on first launch
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [self] in
+            if !self.appState.hasCompletedOnboarding {
+                self.onboardingManager.open(appState: self.appState)
+            }
+        }
     }
 
     /// Terminate any other running instances of VocaMac
