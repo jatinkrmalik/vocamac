@@ -24,7 +24,10 @@ Pre-release versions use suffixes: `v0.1.0-alpha`, `v0.1.0-beta.1`
 
 1. **Ensure all PRs are merged** into `main`
 2. **Verify CI passes** on the latest `main` commit
-3. **Update version number** in `scripts/build.sh` (both `CFBundleVersion` and `CFBundleShortVersionString`)
+3. **Update version number** in all locations:
+   - `scripts/build.sh` — both `CFBundleVersion` and `CFBundleShortVersionString` in the Info.plist template
+   - `Sources/VocaMac/Views/SettingsView.swift` — version label in the About tab
+   - `web/index.html` — `softwareVersion` in JSON-LD schema and hero version badge
 4. **Test locally**:
    ```bash
    ./scripts/build.sh release
@@ -44,15 +47,15 @@ Pre-release versions use suffixes: `v0.1.0-alpha`, `v0.1.0-beta.1`
 
 1. **Tag the release**:
    ```bash
-   git tag -a v0.1.0 -m "VocaMac v0.1.0 - Alpha Release"
-   git push origin v0.1.0
+   git tag -a v0.2.0 -m "VocaMac v0.2.0"
+   git push origin v0.2.0
    ```
 
 2. **GitHub Actions automatically**:
    - Builds the release binary
    - Creates `VocaMac.app` bundle with ad-hoc signing
-   - Packages as DMG (`VocaMac-0.1.0-arm64.dmg`)
-   - Packages as ZIP (`VocaMac-0.1.0-arm64.zip`)
+   - Packages as DMG (`VocaMac-0.2.0-arm64.dmg`)
+   - Packages as ZIP (`VocaMac-0.2.0-arm64.zip`)
    - Generates SHA-256 checksums
    - Creates a **draft** GitHub Release with all artifacts
 
@@ -132,10 +135,10 @@ If you need to create a release locally:
 mkdir -p dmg-staging
 cp -R VocaMac.app dmg-staging/
 ln -s /Applications dmg-staging/Applications
-hdiutil create -volname "VocaMac" -srcfolder dmg-staging -ov -format UDZO "VocaMac-0.1.0-arm64.dmg"
+hdiutil create -volname "VocaMac" -srcfolder dmg-staging -ov -format UDZO "VocaMac-0.2.0-arm64.dmg"
 
 # Create ZIP
-ditto -c -k --sequesterRsrc --keepParent VocaMac.app "VocaMac-0.1.0-arm64.zip"
+ditto -c -k --sequesterRsrc --keepParent VocaMac.app "VocaMac-0.2.0-arm64.zip"
 
 # Generate checksums
 shasum -a 256 VocaMac-*.dmg VocaMac-*.zip > checksums.txt
@@ -147,7 +150,7 @@ Then upload the artifacts manually to the GitHub Release page.
 
 For critical bugs in a released version:
 
-1. Create a branch from the release tag: `git checkout -b fix/critical-bug v0.1.0`
+1. Create a branch from the release tag: `git checkout -b fix/critical-bug v0.2.0`
 2. Fix the bug, commit, push
 3. Create a PR to `main`
 4. After merge, tag a patch release: `v0.1.1`
