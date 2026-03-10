@@ -731,10 +731,21 @@ struct DebugTab: View {
                         .foregroundStyle(.secondary)
                 }
 
-                Button("Re-check Permissions") {
-                    appState.checkPermissions()
+                HStack {
+                    Button("Re-check Permissions") {
+                        appState.checkPermissions()
+                    }
+                    .controlSize(.small)
+
+                    Spacer()
+
+                    Button(action: resetPermissions) {
+                        Label("Reset All Permissions", systemImage: "arrow.counterclockwise")
+                            .foregroundStyle(.red)
+                    }
+                    .controlSize(.small)
+                    .help("Reset all TCC permissions for VocaMac. The app will quit and you'll need to re-grant permissions on next launch.")
                 }
-                .controlSize(.small)
 
                 HStack(alignment: .top, spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill")
@@ -816,6 +827,32 @@ struct DebugTab: View {
     }
 
     // MARK: - Actions
+
+    private func resetPermissions() {
+        let alert = NSAlert()
+        alert.messageText = "Reset All Permissions?"
+        alert.informativeText = "This will clear all permission grants (Microphone, Accessibility, Input Monitoring) for VocaMac. The app will quit and you'll need to re-grant permissions on next launch.\n\nThis is useful when permissions appear stuck or aren't being recognized after an update."
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Reset & Quit")
+        alert.addButton(withTitle: "Cancel")
+
+        let response = alert.runModal()
+        if response == .alertFirstButtonReturn {
+            // Run tccutil to reset all TCC permissions for this app
+            let task = Process()
+            task.executableURL = URL(fileURLWithPath: "/usr/bin/tccutil")
+            task.arguments = ["reset", "All", "com.vocamac.app"]
+            try? task.run()
+            task.waitUntilExit()
+
+            VocaLogger.info(.general, "TCC permissions reset via tccutil")
+
+            // Quit the app so permissions take effect on next launch
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                NSApplication.shared.terminate(nil)
+            }
+        }
+    }
 
     private func restartApp() {
         let bundlePath = Bundle.main.bundlePath
