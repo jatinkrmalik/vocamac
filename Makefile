@@ -1,7 +1,7 @@
 # VocaMac — Makefile
 # Run `make help` for available commands.
 
-.PHONY: build install install-cli test clean run help
+.PHONY: build install install-cli dmg test clean run help
 
 ## Build .app bundle in repo root (fast, for development)
 build:
@@ -15,6 +15,10 @@ install:
 install-cli:
 	@./scripts/install.sh --cli
 
+## Build DMG for distribution
+dmg:
+	@./scripts/dist.sh
+
 ## Run tests
 test:
 	@swift test
@@ -25,6 +29,7 @@ clean:
 	@swift package clean
 	@rm -rf VocaMac.app
 	@rm -rf .build
+	@rm -rf dist
 	@echo "✅ Clean complete"
 
 ## Launch the locally built .app (build first with `make build`)
@@ -38,6 +43,7 @@ help:
 	@echo "  make build        Build .app bundle (fast, for development)"
 	@echo "  make install      Build + install to /Applications (recommended)"
 	@echo "  make install-cli  Install CLI commands to ~/.local/bin"
+	@echo "  make dmg          Build DMG for distribution (output in dist/)"
 	@echo "  make test         Run tests"
 	@echo "  make run          Launch the locally built .app"
 	@echo "  make clean        Remove build artifacts"
