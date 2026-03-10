@@ -53,6 +53,15 @@ struct OnboardingView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Spacer()
+                    if currentStep != .complete {
+                        Button(action: skipOnboarding) {
+                            Text("Skip setup")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Skip setup and don't show again. You can re-run it from Settings or Menu Bar → Setup Wizard.")
+                    }
                     HStack(spacing: 4) {
                         ForEach(OnboardingStep.allCases, id: \.self) { step in
                             Circle()
@@ -159,6 +168,10 @@ struct OnboardingView: View {
                 currentStep = prevStep
             }
         }
+    }
+
+    private func skipOnboarding() {
+        appState.completeOnboarding()
     }
 
     private func completeOnboarding() {
