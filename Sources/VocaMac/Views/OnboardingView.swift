@@ -66,22 +66,25 @@ struct OnboardingView: View {
                 .padding()
                 .borderBottom()
 
-                // Step content
-                Group {
-                    switch currentStep {
-                    case .welcome:
-                        WelcomeStep()
-                    case .permissions:
-                        PermissionsStep()
-                    case .modelSelection:
-                        ModelSelectionStep()
-                    case .hotkeyConfig:
-                        HotkeyConfigStep()
-                    case .quickTest:
-                        QuickTestStep()
-                    case .complete:
-                        CompleteStep()
+                // Step content (scrollable to handle varying content heights)
+                ScrollView {
+                    Group {
+                        switch currentStep {
+                        case .welcome:
+                            WelcomeStep()
+                        case .permissions:
+                            PermissionsStep()
+                        case .modelSelection:
+                            ModelSelectionStep()
+                        case .hotkeyConfig:
+                            HotkeyConfigStep()
+                        case .quickTest:
+                            QuickTestStep()
+                        case .complete:
+                            CompleteStep()
+                        }
                     }
+                    .frame(maxWidth: .infinity)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
