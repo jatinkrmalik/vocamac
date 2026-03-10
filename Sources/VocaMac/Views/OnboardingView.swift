@@ -461,6 +461,14 @@ struct ModelSelectionCard: View {
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
+                } else if modelInfo.isLoading {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Loading model…")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 } else if modelInfo.isDownloaded {
                     if modelInfo.isActive {
                         Label("Active", systemImage: "checkmark.circle.fill")
