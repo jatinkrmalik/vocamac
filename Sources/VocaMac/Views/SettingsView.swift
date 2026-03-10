@@ -767,8 +767,46 @@ struct DebugTab: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+
+            // Application
+            Section("Application") {
+                HStack {
+                    Button(action: restartApp) {
+                        Label("Restart VocaMac", systemImage: "arrow.trianglehead.clockwise")
+                    }
+                    .help("Quit and relaunch VocaMac")
+
+                    Spacer()
+
+                    Button(role: .destructive, action: {
+                        NSApplication.shared.terminate(nil)
+                    }) {
+                        Label("Quit VocaMac", systemImage: "power")
+                    }
+                    .help("Quit VocaMac")
+                }
+
+                Text("Restart can help resolve issues with permissions or audio devices.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
+    }
+
+    // MARK: - Actions
+
+    private func restartApp() {
+        let bundlePath = Bundle.main.bundlePath
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+        task.arguments = ["-n", bundlePath, "--args", "--restarted"]
+        try? task.run()
+
+        // Give the new instance a moment to start
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            NSApplication.shared.terminate(nil)
+        }
     }
 
     // MARK: - Debug Log Actions
