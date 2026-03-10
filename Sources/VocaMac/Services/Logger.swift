@@ -108,6 +108,14 @@ final class VocaLogger {
         VocaLogger.shared.logDirectory
     }
 
+    /// Get the approximate number of log entries in the current log file
+    static var logEntryCount: Int {
+        guard let content = try? String(contentsOf: VocaLogger.shared.logFileURL, encoding: .utf8) else {
+            return 0
+        }
+        return content.components(separatedBy: "\n").filter { !$0.isEmpty }.count
+    }
+
     /// Read the last N lines from the log file
     static func readLastLines(_ count: Int = 500) -> [String] {
         VocaLogger.shared.getLastLines(count)

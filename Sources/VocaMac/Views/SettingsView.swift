@@ -231,25 +231,6 @@ struct ModelSettingsTab: View {
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
 
-                            if let recommended = appState.deviceRecommendedModel {
-                                HStack {
-                                    Image(systemName: "sparkles")
-                                        .foregroundStyle(.blue)
-                                    Text("WhisperKit recommends: **\(recommended)**")
-                                        .font(.callout)
-                                }
-                                .padding(.top, 4)
-                            }
-
-                            // Disk usage
-                            HStack {
-                                Image(systemName: "internaldrive")
-                                    .foregroundStyle(.secondary)
-                                Text("Model storage: \(appState.modelManager.diskUsageDescription())")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            .padding(.top, 2)
                         }
                         .padding(4)
                     }
@@ -339,6 +320,23 @@ struct ModelSettingsTab: View {
                     Image(systemName: "info.circle")
                         .foregroundStyle(.secondary)
                     Text("Models are downloaded from HuggingFace and cached locally. Larger models produce better results but are slower and use more memory.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                if let recommended = appState.deviceRecommendedModel {
+                    HStack {
+                        Image(systemName: "sparkles")
+                            .foregroundStyle(.blue)
+                        Text("WhisperKit recommends: **\(recommended)**")
+                            .font(.callout)
+                    }
+                }
+
+                HStack {
+                    Image(systemName: "internaldrive")
+                        .foregroundStyle(.secondary)
+                    Text("Model storage: \(appState.modelManager.diskUsageDescription())")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -723,14 +721,27 @@ struct DebugTab: View {
 
             // Debug Logs
             Section("Debug Logs") {
-                HStack(spacing: 8) {
+                LabeledContent("Log File") {
+                    Text(VocaLogger.logFileURL().lastPathComponent)
+                        .foregroundStyle(.secondary)
+                }
+
+                LabeledContent("Log Entries") {
+                    Text("\(VocaLogger.logEntryCount)")
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                }
+
+                HStack {
                     Button(action: copyDebugLogs) {
-                        Label("Copy", systemImage: "doc.on.clipboard")
+                        Label("Copy to Clipboard", systemImage: "doc.on.clipboard")
                     }
                     .help("Copy last 500 lines of logs to clipboard")
 
+                    Spacer()
+
                     Button(action: exportDebugLogs) {
-                        Label("Export", systemImage: "arrow.down.doc")
+                        Label("Export to File…", systemImage: "square.and.arrow.up")
                     }
                     .help("Save debug logs to file and reveal in Finder")
                 }
