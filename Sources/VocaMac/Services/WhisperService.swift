@@ -113,14 +113,16 @@ final class WhisperService: @unchecked Sendable {
 
     // MARK: - Transcription
 
-    /// Transcribe audio samples
+    /// Transcribe audio data to text.
     /// - Parameters:
     ///   - audioData: Array of Float32 PCM samples at 16kHz mono
     ///   - language: ISO 639-1 language code (e.g., "en"), or nil for auto-detection
+    ///   - translate: Whether to translate to English (if true) or transcribe as-is (if false)
     /// - Returns: VocaTranscription with the transcribed text and metadata
     func transcribe(
         audioData: [Float],
-        language: String? = nil
+        language: String? = nil,
+        translate: Bool = false
     ) async throws -> VocaTranscription {
         guard let kit = whisperKit else {
             throw WhisperError.modelNotLoaded
@@ -137,7 +139,7 @@ final class WhisperService: @unchecked Sendable {
 
         // Configure decoding options — optimized for low latency dictation
         let options = DecodingOptions(
-            task: .transcribe,
+            task: translate ? .translate : .transcribe,
             language: language,
             temperature: 0.0,
             temperatureFallbackCount: 0,  // No fallback for speed

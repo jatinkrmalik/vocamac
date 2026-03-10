@@ -106,6 +106,7 @@ final class AppState: ObservableObject {
     @AppStorage("vocamac.preserveClipboard") var preserveClipboard: Bool = true
     @AppStorage("vocamac.soundEffectsEnabled") var soundEffectsEnabled: Bool = true
     @AppStorage("vocamac.showCursorIndicator") var showCursorIndicator: Bool = true
+    @AppStorage("vocamac.translationEnabled") var translationEnabled: Bool = false
 
     // MARK: - Services
 
@@ -357,7 +358,8 @@ final class AppState: ObservableObject {
             let language = selectedLanguage == "auto" ? nil : selectedLanguage
             let result = try await whisperService.transcribe(
                 audioData: audioData,
-                language: language
+                language: language,
+                translate: translationEnabled
             )
 
             lastTranscription = result

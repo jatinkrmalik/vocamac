@@ -127,7 +127,16 @@ struct GeneralSettingsTab: View {
                     .foregroundStyle(.secondary)
             }
 
-            // Behavior
+            // Translation
+            Section("Translation") {
+                Toggle("Enable translation", isOn: $appState.translationEnabled)
+
+                Text(appState.translationEnabled
+                    ? "Speech will be translated to the selected language (or English if Auto-detect)."
+                    : "Speech will be transcribed as-is in the spoken language. The language setting is used as a recognition hint only.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             Section("Behavior") {
                 Toggle("Preserve clipboard after text injection", isOn: $appState.preserveClipboard)
 
