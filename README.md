@@ -341,6 +341,14 @@ Then relaunch VocaMac. This only clears the onboarding state — all other prefe
 defaults delete com.vocamac.app
 ```
 
+**Reset permissions after updating:** When updating VocaMac to a newer version, it's recommended to reset permissions first so the new binary gets a clean grant. You can do this from **Settings → Debug → Reset All Permissions**, or manually via Terminal:
+
+```bash
+tccutil reset All com.vocamac.app
+```
+
+This clears all permission entries (Microphone, Accessibility, Input Monitoring) for VocaMac. On next launch, macOS will prompt you to re-grant them for the new version. This avoids stale permission entries that point to an old binary's CDHash.
+
 ---
 
 
@@ -384,6 +392,7 @@ This is **not a bug** — it's macOS security by design, preventing modified app
 
 | Approach | How | Permissions Persist |
 |---|---|---|
+| **Reset permissions on update** | Settings → Debug → Reset All Permissions (or `tccutil reset All com.vocamac.app`) | Recommended before each update |
 | **Re-grant manually** | System Settings → Privacy & Security after each rebuild | Per rebuild |
 | **Run from Terminal** | Grant permissions to Terminal.app once, then run `make run` or `.build/arm64-apple-macosx/release/VocaMac` | ✅ Always |
 | **Developer ID signing** | Requires Apple Developer Program ($99/year) — planned for future releases | ✅ Always |
