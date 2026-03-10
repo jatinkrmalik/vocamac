@@ -151,6 +151,15 @@ struct VocaMacApp: App {
         DispatchQueue.main.async {
             NSApp?.setActivationPolicy(.accessory)
         }
+
+        // Listen for "Show Setup Wizard" requests from Settings
+        NotificationCenter.default.addObserver(
+            forName: .showOnboarding,
+            object: nil,
+            queue: .main
+        ) { [self] _ in
+            self.onboardingManager.open(appState: self.appState)
+        }
     }
 
     /// Terminate any other running instances of VocaMac

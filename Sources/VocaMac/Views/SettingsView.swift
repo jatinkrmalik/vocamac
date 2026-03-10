@@ -6,6 +6,10 @@
 
 import SwiftUI
 
+extension Notification.Name {
+    static let showOnboarding = Notification.Name("com.vocamac.showOnboarding")
+}
+
 struct SettingsView: View {
     var body: some View {
         TabView {
@@ -660,6 +664,19 @@ struct AboutTab: View {
                 }
             }
             .font(.caption)
+
+            Divider()
+                .frame(width: 200)
+
+            Button(action: {
+                NotificationCenter.default.post(name: .showOnboarding, object: nil)
+            }) {
+                Label("Show Setup Wizard…", systemImage: "wand.and.stars")
+                    .font(.caption)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.blue)
+            .help("Re-run the first-launch setup wizard")
 
             Spacer()
 
