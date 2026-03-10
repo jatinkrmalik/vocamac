@@ -770,6 +770,15 @@ struct DebugTab: View {
                         Label("Export to File…", systemImage: "square.and.arrow.up")
                     }
                     .help("Save debug logs to file and reveal in Finder")
+
+                    Spacer()
+
+                    Button(role: .destructive, action: {
+                        VocaLogger.clearLogs()
+                    }) {
+                        Label("Clear", systemImage: "trash")
+                    }
+                    .help("Clear all log entries")
                 }
 
                 Text("Copy or export recent application logs for troubleshooting.")

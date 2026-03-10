@@ -116,6 +116,12 @@ final class VocaLogger {
         return content.components(separatedBy: "\n").filter { !$0.isEmpty }.count
     }
 
+    /// Clear all log entries from the current log file
+    static func clearLogs() {
+        try? "".write(to: VocaLogger.shared.logFileURL, atomically: true, encoding: .utf8)
+        VocaLogger.info(.general, "Logs cleared")
+    }
+
     /// Read the last N lines from the log file
     static func readLastLines(_ count: Int = 500) -> [String] {
         VocaLogger.shared.getLastLines(count)
