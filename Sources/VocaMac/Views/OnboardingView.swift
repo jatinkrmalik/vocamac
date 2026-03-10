@@ -195,6 +195,12 @@ struct WelcomeStep: View {
 struct PermissionsStep: View {
     @EnvironmentObject var appState: AppState
 
+    private var allPermissionsGranted: Bool {
+        appState.micPermission == .granted &&
+        appState.accessibilityPermission == .granted &&
+        appState.inputMonitoringPermission == .granted
+    }
+
     var body: some View {
         VStack(spacing: 16) {
             Text("VocaMac needs a few permissions to work properly.")
@@ -232,6 +238,22 @@ struct PermissionsStep: View {
 
             Spacer()
 
+            if !allPermissionsGranted {
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.yellow)
+                    Text("Some permissions are missing. VocaMac may not work correctly until all permissions are granted. You can set them later in Settings → Debug.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding()
+                .background(Color.yellow.opacity(0.05))
+                .cornerRadius(8)
+                .padding(.horizontal)
+            }
+
             HStack(spacing: 8) {
                 Image(systemName: "info.circle.fill")
                     .font(.caption)
@@ -244,7 +266,7 @@ struct PermissionsStep: View {
             .padding()
             .background(Color.blue.opacity(0.05))
             .cornerRadius(8)
-            .padding()
+            .padding(.horizontal)
 
             Spacer()
         }
