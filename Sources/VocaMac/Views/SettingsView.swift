@@ -845,6 +845,17 @@ struct DebugTab: View {
     private func repairPermissions() {
         VocaLogger.info(.general, "Repair Permissions: opening System Settings panes for user to re-grant")
 
+        // If all permissions are already granted, inform the user
+        if appState.allPermissionsGranted {
+            let alert = NSAlert()
+            alert.messageText = "All Permissions Granted"
+            alert.informativeText = "Microphone, Accessibility, and Input Monitoring permissions are all active. No repair needed."
+            alert.alertStyle = .informational
+            alert.addButton(withTitle: "OK")
+            alert.runModal()
+            return
+        }
+
         // Open both privacy panes the user typically needs to fix
         if appState.accessibilityPermission != .granted {
             if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {

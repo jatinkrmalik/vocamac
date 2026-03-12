@@ -321,7 +321,7 @@ struct PermissionsStep: View {
                 Image(systemName: "arrow.trianglehead.clockwise.icloud")
                     .font(.caption)
                     .foregroundStyle(.orange)
-                Text("**Permissions may reset after updates.** VocaMac uses ad-hoc code signing, so macOS may clear Accessibility and Input Monitoring permissions when the app is updated or reinstalled. If this happens, remove the old VocaMac entry in System Settings → Privacy & Security (using "−"), then re-add it.")
+                Text("**Permissions may reset after updates.** VocaMac uses ad-hoc code signing, so macOS may clear Accessibility and Input Monitoring permissions when the app is updated or reinstalled. If this happens, remove the old VocaMac entry in System Settings → Privacy & Security (using the minus \"-\" button), then re-add it.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
