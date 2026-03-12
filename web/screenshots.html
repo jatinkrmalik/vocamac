@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Primary Meta Tags -->
+    <title>VocaMac Screenshots - Menu Bar, Settings, and Recording UI</title>
+    <meta name="title" content="VocaMac Screenshots - Menu Bar, Settings, and Recording UI">
+    <meta name="description" content="See VocaMac in action. Screenshots of the menu bar popover, settings panels, model management, cursor indicator, and the complete voice-to-text experience on macOS.">
+    <meta name="keywords" content="VocaMac screenshots, voice to text macOS UI, dictation app interface, menu bar app, whisperkit app, speech to text screenshots">
+    <meta name="author" content="Jatin Kumar Malik">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://vocamac.com/screenshots">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+    <meta name="theme-color" content="#FFFFFF">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://vocamac.com/screenshots">
+    <meta property="og:title" content="VocaMac Screenshots - Menu Bar, Settings, and Recording UI">
+    <meta property="og:description" content="See VocaMac in action. Screenshots of the menu bar popover, settings panels, model management, cursor indicator, and the complete voice-to-text experience on macOS.">
+    <meta property="og:image" content="https://vocamac.com/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="VocaMac - Local Voice-to-Text for macOS">
+    <meta property="og:site_name" content="VocaMac">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://vocamac.com/screenshots">
+    <meta name="twitter:title" content="VocaMac Screenshots - Menu Bar, Settings, and Recording UI">
+    <meta name="twitter:description" content="See VocaMac in action. Screenshots of the menu bar, settings, model management, and the complete voice-to-text experience on macOS.">
+    <meta name="twitter:image" content="https://vocamac.com/og-image.png">
+    <meta name="twitter:image:alt" content="VocaMac - Local Voice-to-Text for macOS">
+    <meta name="twitter:creator" content="@jatinkrmalik">
+
+    <!-- JSON-LD Structured Data -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        "name": "VocaMac Screenshots",
+        "description": "Screenshots of VocaMac, the 100% local voice-to-text app for macOS. Menu bar, settings, model management, and recording UI.",
+        "url": "https://vocamac.com/screenshots",
+        "isPartOf": {
+            "@type": "WebSite",
+            "name": "VocaMac",
+            "url": "https://vocamac.com"
+        },
+        "author": {
+            "@type": "Person",
+            "name": "Jatin Kumar Malik",
+            "url": "https://github.com/jatinkrmalik"
+        }
+    }
+    </script>
+
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-8W6EJV2KP0"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-8W6EJV2KP0');
+    </script>
+    <style>
+        .screenshots-hero {
+            padding: 120px 0 40px;
+            text-align: center;
+        }
+
+        .screenshots-hero h1 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin-bottom: 12px;
+        }
+
+        .screenshots-hero p {
+            font-size: 1.1rem;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .screenshots-grid {
+            padding: 40px 0 80px;
+        }
+
+        .screenshot-section {
+            margin-bottom: 64px;
+        }
+
+        .screenshot-section h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .screenshot-section p {
+            margin-bottom: 24px;
+        }
+
+        .screenshot-group {
+            display: grid;
+            gap: 24px;
+        }
+
+        .screenshot-group--single {
+            grid-template-columns: 1fr;
+            max-width: 500px;
+        }
+
+        .screenshot-group--pair {
+            grid-template-columns: 1fr 1fr;
+        }
+
+        .screenshot-group--trio {
+            grid-template-columns: 1fr 1fr;
+        }
+
+        @media (max-width: 768px) {
+            .screenshot-group--pair,
+            .screenshot-group--trio {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .screenshot-item {
+            background: var(--color-card-bg, rgba(255, 255, 255, 0.05));
+            border: 1px solid var(--color-border, rgba(255, 255, 255, 0.1));
+            border-radius: 16px;
+            padding: 20px;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .screenshot-item:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        .screenshot-item img {
+            width: 100%;
+            height: auto;
+            border-radius: 8px;
+            display: block;
+        }
+
+        .screenshot-item figcaption {
+            margin-top: 12px;
+            font-size: 0.9rem;
+            text-align: center;
+        }
+
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 16px;
+            font-size: 0.95rem;
+            text-decoration: none;
+            color: var(--color-primary, #007AFF);
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container navbar__container">
+            <a href="/" class="navbar__logo">
+                <img src="logo.png" alt="VocaMac" class="navbar__logo-img">
+                <span>VocaMac</span>
+            </a>
+            <ul class="navbar__menu">
+                <li><a href="/#features" class="navbar__link">Features</a></li>
+                <li><a href="/#privacy" class="navbar__link">Privacy</a></li>
+                <li><a href="/#install" class="navbar__link">Install</a></li>
+                <li><a href="screenshots.html" class="navbar__link">Screenshots</a></li>
+                <li><a href="/#faq" class="navbar__link">FAQ</a></li>
+            </ul>
+            <div class="navbar__actions">
+                <a href="https://github.com/jatinkrmalik/vocamac" class="navbar__cta" target="_blank" rel="noopener">
+                    <span class="navbar__cta-text">View Source</span>
+                </a>
+                <button class="navbar__toggle" aria-label="Menu">
+                    <span></span><span></span><span></span>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <main>
+    <!-- Screenshots Hero -->
+    <section class="screenshots-hero">
+        <div class="container">
+            <a href="/" class="back-link">← Back to Home</a>
+            <h1>Screenshots</h1>
+            <p class="text-secondary">See VocaMac in action. From the menu bar to settings to the recording indicator.</p>
+        </div>
+    </section>
+
+    <!-- Screenshots Grid -->
+    <section class="screenshots-grid">
+        <div class="container">
+
+            <!-- Menu Bar -->
+            <div class="screenshot-section">
+                <h2>📍 Menu Bar</h2>
+                <p class="text-secondary">VocaMac lives in your menu bar. Always accessible, never in the way.</p>
+                <div class="screenshot-group screenshot-group--pair">
+                    <figure class="screenshot-item">
+                        <img src="screenshots/menu-bar-idle.png" alt="VocaMac menu bar icon in idle state" loading="lazy">
+                        <figcaption>Menu bar - Idle</figcaption>
+                    </figure>
+                    <figure class="screenshot-item">
+                        <img src="screenshots/menu-bar-recording.png" alt="VocaMac menu bar icon in recording state" loading="lazy">
+                        <figcaption>Menu bar - Recording</figcaption>
+                    </figure>
+                </div>
+            </div>
+
+            <!-- Popover Panel -->
+            <div class="screenshot-section">
+                <h2>🎙️ Popover Panel</h2>
+                <p class="text-secondary">Click the menu bar icon to see status, last transcription, and quick actions.</p>
+                <div class="screenshot-group screenshot-group--single">
+                    <figure class="screenshot-item">
+                        <img src="screenshots/popover-panel.png" alt="VocaMac popover panel showing status and last transcription" loading="lazy">
+                        <figcaption>Popover panel with status, transcription, and controls</figcaption>
+                    </figure>
+                </div>
+            </div>
+
+            <!-- Settings -->
+            <div class="screenshot-section">
+                <h2>⚙️ Settings</h2>
+                <p class="text-secondary">Fine-tune everything: hotkeys, models, audio, and more across dedicated tabs.</p>
+                <div class="screenshot-group screenshot-group--pair">
+                    <figure class="screenshot-item">
+                        <img src="screenshots/settings-general.png" alt="VocaMac Settings - General tab" loading="lazy">
+                        <figcaption>General - Activation mode, hotkey, language, and behavior</figcaption>
+                    </figure>
+                    <figure class="screenshot-item">
+                        <img src="screenshots/settings-models.png" alt="VocaMac Settings - Models tab" loading="lazy">
+                        <figcaption>Models - System info, resource usage, and model management</figcaption>
+                    </figure>
+                    <figure class="screenshot-item">
+                        <img src="screenshots/settings-audio.png" alt="VocaMac Settings - Audio tab" loading="lazy">
+                        <figcaption>Audio - Recording duration, silence detection, and input device</figcaption>
+                    </figure>
+                    <figure class="screenshot-item">
+                        <img src="screenshots/settings-about.png" alt="VocaMac Settings - About tab" loading="lazy">
+                        <figcaption>About - Version info, system details, and links</figcaption>
+                    </figure>
+                </div>
+            </div>
+
+            <!-- Cursor Indicator -->
+            <div class="screenshot-section">
+                <h2>🔴 Cursor Indicator</h2>
+                <p class="text-secondary">A floating mic indicator appears near your text cursor while recording, so you always know VocaMac is listening.</p>
+                <div class="screenshot-group screenshot-group--single">
+                    <figure class="screenshot-item">
+                        <img src="screenshots/cursor-indicator.png" alt="VocaMac cursor indicator overlay during recording" loading="lazy">
+                        <figcaption>Floating mic indicator near the text cursor during recording</figcaption>
+                    </figure>
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container footer__container">
+            <div class="footer__left">
+                <img src="logo.png" alt="VocaMac" class="footer__logo-img">
+                <span class="footer__brand">VocaMac</span>
+                <span class="badge badge--alpha" style="font-size: 9px;">ALPHA</span>
+            </div>
+            <div class="footer__links">
+                <a href="https://github.com/jatinkrmalik/vocamac" target="_blank" rel="noopener">GitHub</a>
+                <a href="screenshots.html">Screenshots</a>
+                <a href="https://vocalinux.com" target="_blank" rel="noopener">VocaLinux</a>
+                <a href="https://vocawin.com" target="_blank" rel="noopener">VocaWin</a>
+            </div>
+            <div class="footer__right">
+                Made with ❤️ by <a href="https://x.com/intent/user?screen_name=jatinkrmalik" target="_blank" rel="noopener">Jatin Kumar Malik</a>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Mobile Menu
+        document.querySelector('.navbar__toggle')?.addEventListener('click', function() {
+            document.querySelector('.navbar__menu')?.classList.toggle('navbar__menu--open');
+        });
+
+        // Scroll Animations
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                }
+            });
+        }, { threshold: 0.1 });
+        document.querySelectorAll('.screenshot-item').forEach(el => observer.observe(el));
+    </script>
+</body>
+</html>
