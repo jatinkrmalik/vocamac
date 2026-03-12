@@ -950,7 +950,7 @@ section { padding: 100px 0; }
     padding: 0 0 80px;
 }
 .feature-content .container {
-    max-width: 720px;
+    max-width: 900px;
 }
 .feature-content h2 {
     font-size: 1.6rem;
@@ -999,4 +999,31 @@ section { padding: 100px 0; }
 .feature-cta p {
     color: var(--text-secondary);
     margin-bottom: 24px;
+}
+
+/* ========== Feature Page Tables ========== */
+.feature-content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 24px 0;
+    font-size: 0.95rem;
+}
+.feature-content thead th {
+    text-align: left;
+    font-weight: 700;
+    padding: 12px 16px;
+    border-bottom: 2px solid var(--border-color);
+    color: var(--text-primary);
+}
+.feature-content tbody td {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-secondary);
+}
+.feature-content tbody tr:last-child td {
+    border-bottom: none;
+}
+.feature-content tbody td:first-child {
+    font-weight: 600;
+    color: var(--text-primary);
 }
