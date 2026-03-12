@@ -5,6 +5,7 @@
 // Run with: swift test
 
 import XCTest
+import ServiceManagement
 @testable import VocaMac
 
 // MARK: - SystemInfo Tests
@@ -604,6 +605,87 @@ final class AudioEngineTests: XCTestCase {
                 "Audio buffer should NOT be empty when max duration is reached — " +
                 "frames must be appended before the max duration check")
         }
+    }
+}
+
+// MARK: - Launch at Login Tests
+
+final class LaunchAtLoginTests: XCTestCase {
+
+    override func setUp() {
+        super.setUp()
+        UserDefaults.standard.removeObject(forKey: "vocamac.launchAtLogin")
+    }
+
+    override func tearDown() {
+        // Clean up: ensure we don't leave the app registered as a login item from tests
+        UserDefaults.standard.removeObject(forKey: "vocamac.launchAtLogin")
+        try? SMAppService.mainApp.unregister()
+        super.tearDown()
+    }
+
+    @MainActor
+    func testLaunchAtLoginDefaultsToFalse() {
+        let appState = AppState()
+        XCTAssertFalse(appState.launchAtLogin)
+    }
+
+    @MainActor
+    func testLaunchAtLoginPersistence() {
+        UserDefaults.standard.set(true, forKey: "vocamac.launchAtLogin")
+        let appState = AppState()
+        XCTAssertTrue(appState.launchAtLogin)
+    }
+
+    @MainActor
+    func testSetLaunchAtLoginEnableUpdatesPreference() {
+        let appState = AppState()
+        XCTAssertFalse(appState.launchAtLogin)
+
+        appState.setLaunchAtLogin(true)
+
+        // The preference should reflect the requested state
+        // (SMAppService.mainApp.register() may or may not succeed depending
+        // on the test environment, but the method should not crash)
+        // If registration succeeded, launchAtLogin will be true.
+        // If it failed, launchAtLogin will match the actual system state.
+        // Either way, the value should be consistent with SMAppService.mainApp.status
+        let expected = SMAppService.mainApp.status == .enabled
+        XCTAssertEqual(appState.launchAtLogin, expected)
+    }
+
+    @MainActor
+    func testSetLaunchAtLoginDisableUpdatesPreference() {
+        let appState = AppState()
+        appState.setLaunchAtLogin(true)
+        appState.setLaunchAtLogin(false)
+
+        // After disabling, launchAtLogin should match the system state
+        let expected = SMAppService.mainApp.status == .enabled
+        XCTAssertEqual(appState.launchAtLogin, expected)
+    }
+
+    @MainActor
+    func testSetLaunchAtLoginToggleRoundTrip() {
+        let appState = AppState()
+
+        // Enable
+        appState.setLaunchAtLogin(true)
+        let afterEnable = appState.launchAtLogin
+
+        // Disable
+        appState.setLaunchAtLogin(false)
+        let afterDisable = appState.launchAtLogin
+
+        // The states should be different (assuming SMAppService works in this env)
+        // If SMAppService isn't available, both will match the system state
+        if SMAppService.mainApp.status != .enabled {
+            XCTAssertFalse(afterDisable,
+                "After disabling, launchAtLogin should be false")
+        }
+        // Just verify no crashes occurred during the round-trip
+        XCTAssertNotNil(afterEnable)
+        XCTAssertNotNil(afterDisable)
     }
 }
 

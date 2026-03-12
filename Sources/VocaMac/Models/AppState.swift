@@ -7,6 +7,7 @@
 import Foundation
 import SwiftUI
 import Combine
+import ServiceManagement
 
 // MARK: - Enums
 
@@ -128,10 +129,48 @@ final class AppState: ObservableObject {
 
     init() {
         VocaLogger.info(.appState, "Initializing...")
+        syncLaunchAtLogin()
         setupServices()
         // Trigger startup automatically
         Task {
             await performStartup()
+        }
+    }
+
+    // MARK: - Launch at Login
+
+    /// Sync the persisted launchAtLogin preference with SMAppService.
+    /// Called once on init to reconcile state (e.g. if the user toggled it
+    /// in System Settings directly, or if the app was re-installed).
+    private func syncLaunchAtLogin() {
+        let currentStatus = SMAppService.mainApp.status
+        let isRegistered = currentStatus == .enabled
+
+        if launchAtLogin && !isRegistered {
+            // User wants launch-at-login but it's not registered — register now
+            setLaunchAtLogin(true)
+        } else if !launchAtLogin && isRegistered {
+            // Persisted preference says disabled but system says enabled — unregister
+            setLaunchAtLogin(false)
+        }
+    }
+
+    /// Register or unregister the app as a login item via SMAppService.
+    /// Updates the persisted `launchAtLogin` preference to match.
+    func setLaunchAtLogin(_ enabled: Bool) {
+        do {
+            if enabled {
+                try SMAppService.mainApp.register()
+                VocaLogger.info(.appState, "Registered as login item")
+            } else {
+                try SMAppService.mainApp.unregister()
+                VocaLogger.info(.appState, "Unregistered as login item")
+            }
+            launchAtLogin = enabled
+        } catch {
+            VocaLogger.error(.appState, "Failed to \(enabled ? "register" : "unregister") login item: \(error.localizedDescription)")
+            // Revert the preference to match the actual system state
+            launchAtLogin = SMAppService.mainApp.status == .enabled
         }
     }
 

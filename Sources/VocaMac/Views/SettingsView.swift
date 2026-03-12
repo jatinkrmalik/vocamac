@@ -147,9 +147,14 @@ struct GeneralSettingsTab: View {
                     .foregroundStyle(.secondary)
             }
             Section("Behavior") {
+                Toggle("Launch at Login", isOn: Binding(
+                    get: { appState.launchAtLogin },
+                    set: { appState.setLaunchAtLogin($0) }
+                ))
+
                 Toggle("Preserve clipboard after text injection", isOn: $appState.preserveClipboard)
 
-            Toggle("Show mic indicator near cursor while recording", isOn: $appState.showCursorIndicator)
+                Toggle("Show mic indicator near cursor while recording", isOn: $appState.showCursorIndicator)
 
                 Text("When enabled, your clipboard contents are restored after injecting text.")
                     .font(.caption)
