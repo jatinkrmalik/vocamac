@@ -314,6 +314,25 @@ struct MenuBarView: View {
 
     private var actionsSection: some View {
         VStack(spacing: 2) {
+            // Launch at Login toggle
+            Toggle(isOn: Binding(
+                get: { appState.launchAtLogin },
+                set: { appState.setLaunchAtLogin($0) }
+            )) {
+                HStack {
+                    Image(systemName: "sunrise")
+                    Text("Launch at Login")
+                }
+                .font(.body)
+            }
+            .toggleStyle(.switch)
+            .controlSize(.small)
+            .padding(.vertical, 6)
+            .padding(.horizontal, 8)
+
+            Divider()
+                .padding(.vertical, 4)
+
             Button {
                 settingsManager.open(appState: appState)
             } label: {
