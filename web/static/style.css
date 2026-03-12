@@ -446,10 +446,36 @@ section { padding: 100px 0; }
 }
 .feature-card.visible { opacity: 1; transform: translateY(0); }
 .feature-card:hover {
-    cursor: pointer;
     border-color: var(--border-hover);
     background: var(--card-hover-bg);
     transform: translateY(-2px);
+}
+a.feature-card {
+    cursor: pointer;
+    position: relative;
+    text-decoration: none;
+    color: inherit;
+}
+a.feature-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-sm);
+    border-color: var(--accent);
+}
+a.feature-card::after {
+    content: "Learn more →";
+    position: absolute;
+    bottom: 20px;
+    right: 24px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--accent);
+    opacity: 0;
+    transform: translateX(-8px);
+    transition: all 0.3s ease;
+}
+a.feature-card:hover::after {
+    opacity: 1;
+    transform: translateX(0);
 }
 .feature-card__icon { font-size: 28px; }
 .feature-card p { color: var(--text-secondary); font-size: 14px; line-height: 1.6; }
