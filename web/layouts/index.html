@@ -613,6 +613,18 @@
             })
             .catch(() => {});
 
+        // ========== Install Tab Switcher ==========
+        function switchInstallTab(tab, btn) {
+            document.getElementById('install-dmg').style.display = tab === 'dmg' ? 'block' : 'none';
+            document.getElementById('install-source').style.display = tab === 'source' ? 'block' : 'none';
+            document.querySelectorAll('.install__tab').forEach(t => {
+                t.classList.remove('install__tab--active');
+                t.setAttribute('aria-selected', 'false');
+            });
+            btn.classList.add('install__tab--active');
+            btn.setAttribute('aria-selected', 'true');
+        }
+
         // ========== Copy Code ==========
         function copyCode(btn) {
             const codeBlock = btn.closest('.code-block');
