@@ -319,17 +319,19 @@ final class AppState: ObservableObject {
             cursorOverlay.show()
         }
 
-        // Play start sound and wait for completion before starting mic
-        // This prevents the sound from being captured into the audio buffer
-        if soundEffectsEnabled {
-            await soundManager.playStartSoundAsync()
-        }
-
+        // Start recording immediately for instant responsiveness.
+        // The start sound is played concurrently — any brief bleed into the
+        // mic buffer is negligible and handled well by WhisperKit's noise model.
         audioEngine.startRecording(
             silenceThreshold: Float(silenceThreshold),
             silenceDuration: silenceDuration,
             maxDuration: TimeInterval(maxRecordingDuration)
         )
+
+        // Play start sound after mic is active (fire-and-forget)
+        if soundEffectsEnabled {
+            soundManager.playStartSound()
+        }
     }
 
     func stopRecordingAndTranscribe() async {
