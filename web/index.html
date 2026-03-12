@@ -60,16 +60,22 @@
             "name": "Jatin Kumar Malik",
             "url": "https://github.com/jatinkrmalik"
         },
-        "license": "https://opensource.org/licenses/MIT",
+        "license": "https://www.gnu.org/licenses/agpl-3.0",
         "isAccessibleForFree": true,
         "featureList": [
             "100% offline voice recognition",
             "System-wide text injection",
             "Push-to-talk and toggle modes",
             "99+ language support",
+            "Speech translation",
             "Apple Silicon native (CoreML + Neural Engine)",
             "Multiple Whisper model sizes",
-            "Open source (MIT license)"
+            "Silence auto-detection",
+            "Launch at Login",
+            "Clipboard preservation",
+            "Cursor indicator overlay",
+            "Guided setup wizard",
+            "Open source (AGPL-3.0 license)"
         ],
         "screenshot": "https://vocamac.com/og-image.png",
         "softwareVersion": "0.2.0",
@@ -205,7 +211,7 @@
             <div class="section-header">
                 <span class="badge badge--outline">Simple</span>
                 <h2>Three Steps. That's It.</h2>
-                <p class="text-secondary">No setup wizards. No account creation. No cloud configuration.</p>
+                <p class="text-secondary">No account creation. No cloud configuration. A guided setup wizard gets you started in minutes.</p>
             </div>
             <div class="steps">
                 <div class="step">
@@ -277,7 +283,27 @@
                 <div class="feature-card">
                     <div class="feature-card__icon">📊</div>
                     <h3>Visual Feedback</h3>
-                    <p>Menu bar icon changes color. Audio level indicator shows input. You always know what's happening.</p>
+                    <p>Menu bar icon changes color. Audio level indicator shows input. Cursor indicator near your caret while recording.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-card__icon">🌐</div>
+                    <h3>Translation</h3>
+                    <p>Speak in one language, get text in another. Built-in speech translation powered by Whisper.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-card__icon">🤫</div>
+                    <h3>Silence Detection</h3>
+                    <p>Auto-stops recording after you stop speaking. Adjustable sensitivity and duration thresholds.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-card__icon">🚀</div>
+                    <h3>Launch at Login</h3>
+                    <p>Start VocaMac automatically when you log in. Always ready when you need it.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-card__icon">📋</div>
+                    <h3>Clipboard Preservation</h3>
+                    <p>Your clipboard is saved and restored after text injection. Nothing gets overwritten.</p>
                 </div>
             </div>
         </div>
@@ -313,7 +339,7 @@
                         <div class="privacy__point-icon">📖</div>
                         <div>
                             <h4>Fully Open Source</h4>
-                            <p>Every line of code is public on GitHub. Audit it yourself. MIT licensed. No hidden anything.</p>
+                            <p>Every line of code is public on GitHub. Audit it yourself. AGPL-3.0 licensed. No hidden anything.</p>
                         </div>
                     </div>
                     <div class="privacy__point">
@@ -337,7 +363,7 @@
                     <div class="comparison-row">
                         <div>100% Offline</div>
                         <div class="check">✓</div>
-                        <div class="cross">✗</div>
+                        <div class="partial">~</div>
                         <div class="cross">✗</div>
                     </div>
                     <div class="comparison-row">
@@ -407,6 +433,13 @@
                     <div class="model-card__best">Best for 16 GB+ Apple Silicon</div>
                 </div>
                 <div class="model-card">
+                    <div class="model-card__name">Medium</div>
+                    <div class="model-card__speed">⚡⚡</div>
+                    <div class="model-card__quality">Excellent quality</div>
+                    <div class="model-card__detail">~769M params • ~2.5 GB</div>
+                    <div class="model-card__best">Best for 24 GB+ high accuracy</div>
+                </div>
+                <div class="model-card">
                     <div class="model-card__name">Large v3</div>
                     <div class="model-card__speed">⚡</div>
                     <div class="model-card__quality">Best quality</div>
@@ -470,7 +503,7 @@
                         <div class="install__step-num">3</div>
                         <div>
                             <h4>Grant Permissions &amp; Dictate</h4>
-                            <p class="text-secondary">Open VocaMac and grant <strong>Microphone</strong>, <strong>Accessibility</strong>, and <strong>Input Monitoring</strong> permissions when prompted. Restart the app after granting Input Monitoring.</p>
+                            <p class="text-secondary">Open VocaMac and grant <strong>Microphone</strong>, <strong>Accessibility</strong>, and <strong>Input Monitoring</strong> permissions when prompted. Permissions are detected automatically — no restart needed.</p>
                             <p class="text-secondary" style="margin-top: 8px;">Hold <strong>Right Option (⌥)</strong> → speak → release. Text appears at your cursor. ✨</p>
                         </div>
                     </div>
@@ -516,7 +549,7 @@
                         <div class="install__step-num">2</div>
                         <div>
                             <h4>Grant Permissions &amp; Dictate</h4>
-                            <p class="text-secondary">Grant <strong>Microphone</strong>, <strong>Accessibility</strong>, and <strong>Input Monitoring</strong> permissions when prompted. Restart the app after granting Input Monitoring.</p>
+                            <p class="text-secondary">Grant <strong>Microphone</strong>, <strong>Accessibility</strong>, and <strong>Input Monitoring</strong> permissions when prompted. Permissions are detected automatically — no restart needed.</p>
                             <p class="text-secondary" style="margin-top: 8px;">Hold <strong>Right Option (⌥)</strong> → speak → release. Text appears at your cursor. ✨</p>
                         </div>
                     </div>
@@ -609,7 +642,7 @@
                 </details>
                 <details class="faq__item">
                     <summary>Is VocaMac free?</summary>
-                    <p>Yes, completely free and open source under the MIT license. No premium tiers, no subscriptions, no tracking — just free software.</p>
+                    <p>Yes, completely free and open source under the AGPL-3.0 license. No premium tiers, no subscriptions, no tracking — just free software.</p>
                 </details>
                 <details class="faq__item">
                     <summary>What's the difference between WhisperKit and whisper.cpp?</summary>
@@ -644,6 +677,7 @@
             </div>
             <div class="footer__links">
                 <a href="https://github.com/jatinkrmalik/vocamac" target="_blank" rel="noopener">GitHub</a>
+                <a href="screenshots.html">Screenshots</a>
                 <a href="https://vocalinux.com" target="_blank" rel="noopener">VocaLinux</a>
                 <a href="https://vocawin.com" target="_blank" rel="noopener">VocaWin</a>
             </div>
