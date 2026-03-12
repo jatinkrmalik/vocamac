@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="web/logo.png" alt="VocaMac" width="128" height="128">
+  <img src="web/static/logo.png" alt="VocaMac" width="128" height="128">
 </p>
 
 <h1 align="center">VocaMac</h1>
