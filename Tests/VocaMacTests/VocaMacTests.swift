@@ -725,8 +725,11 @@ final class AppStateOnboardingTests: XCTestCase {
         // Verify it was loaded from UserDefaults
         XCTAssertTrue(appState.hasCompletedOnboarding)
     }
+}
 
-    // MARK: - WhisperService Hallucination Filtering Tests
+// MARK: - WhisperService Hallucination Filtering Tests
+
+final class WhisperServiceHallucinationTests: XCTestCase {
 
     func testFilterBlankAudioToken() {
         let input = "[BLANK_AUDIO]"
