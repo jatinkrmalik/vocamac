@@ -95,6 +95,8 @@ final class AudioEngine {
         }
         lastSoundTime = Date()
         recordingStartTime = Date()
+        silenceCallbackFired = false
+        maxDurationCallbackFired = false
         isCurrentlyRecording = true
 
         let inputNode = engine.inputNode
@@ -133,18 +135,15 @@ final class AudioEngine {
 
     // MARK: - Audio Processing
 
+    /// Whether silence detection has already fired (prevents repeated callbacks)
+    private var silenceCallbackFired = false
+
+    /// Whether max duration callback has already fired
+    private var maxDurationCallbackFired = false
+
     /// Process an incoming audio buffer from AVAudioEngine
     private func processAudioBuffer(_ buffer: AVAudioPCMBuffer, inputFormat: AVAudioFormat) {
         guard isCurrentlyRecording else { return }
-
-        // Check max duration
-        let elapsed = Date().timeIntervalSince(recordingStartTime)
-        if elapsed >= maxDuration {
-            DispatchQueue.main.async { [weak self] in
-                self?.onMaxDurationReached?()
-            }
-            return
-        }
 
         // Convert to whisper format (16kHz, mono, Float32)
         guard let convertedBuffer = convertToWhisperFormat(buffer, from: inputFormat) else {
@@ -162,17 +161,9 @@ final class AudioEngine {
             onAudioLevel?(normalizedLevel)
         }
 
-        // Silence detection
-        if energy > silenceThreshold {
-            lastSoundTime = now
-        } else if now.timeIntervalSince(lastSoundTime) >= silenceDuration {
-            DispatchQueue.main.async { [weak self] in
-                self?.onSilenceDetected?()
-            }
-            return
-        }
-
-        // Append samples to buffer
+        // Always append audio samples to the buffer BEFORE checking stop conditions.
+        // This ensures no audio frames are discarded when silence or max duration
+        // is detected — the triggering frame and any trailing audio are preserved.
         if let channelData = convertedBuffer.floatChannelData {
             let frameCount = Int(convertedBuffer.frameLength)
             bufferQueue.sync {
@@ -180,6 +171,27 @@ final class AudioEngine {
                 for i in 0..<frameCount {
                     audioBuffer.append(channelData[0][i])
                 }
+            }
+        }
+
+        // Check max duration (fire callback only once)
+        let elapsed = now.timeIntervalSince(recordingStartTime)
+        if elapsed >= maxDuration && !maxDurationCallbackFired {
+            maxDurationCallbackFired = true
+            DispatchQueue.main.async { [weak self] in
+                self?.onMaxDurationReached?()
+            }
+            return
+        }
+
+        // Silence detection
+        if energy > silenceThreshold {
+            lastSoundTime = now
+            silenceCallbackFired = false  // Reset so silence can be detected again after speech resumes
+        } else if now.timeIntervalSince(lastSoundTime) >= silenceDuration && !silenceCallbackFired {
+            silenceCallbackFired = true
+            DispatchQueue.main.async { [weak self] in
+                self?.onSilenceDetected?()
             }
         }
     }
