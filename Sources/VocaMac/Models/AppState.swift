@@ -125,6 +125,11 @@ final class AppState: ObservableObject {
 
     private var cancellables = Set<AnyCancellable>()
 
+    /// Timer that periodically polls permissions until all are granted.
+    /// Accessibility and Input Monitoring don't have callback-based APIs,
+    /// so we must poll to detect when the user grants them in System Settings.
+    private var permissionPollTimer: Timer?
+
     // MARK: - Initialization
 
     init() {
@@ -247,6 +252,55 @@ final class AppState: ObservableObject {
         inputMonitoringPermission = inputMonitoringGranted ? .granted : .denied
     }
 
+    /// Start polling permissions every 3 seconds until all are granted.
+    /// This is necessary because Accessibility and Input Monitoring permissions
+    /// don't have callback-based APIs — we must poll to detect changes.
+    func startPermissionPolling() {
+        // Don't start if already polling
+        guard permissionPollTimer == nil else { return }
+
+        // Don't start if all permissions are already granted
+        guard !allPermissionsGranted else { return }
+
+        VocaLogger.debug(.appState, "Starting permission polling")
+        permissionPollTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.checkPermissions()
+
+                // If a permission was just granted, try to start the hotkey listener
+                // (it may have failed earlier due to missing permissions)
+                if let self = self, self.accessibilityPermission == .granted &&
+                    self.inputMonitoringPermission == .granted && !self.hotKeyManager.isListening {
+                    self.hotKeyManager.startListening(
+                        keyCode: self.hotKeyCode,
+                        mode: self.activationMode,
+                        doubleTapThreshold: self.doubleTapThreshold
+                    )
+                    VocaLogger.info(.appState, "Hotkey listener started after permission grant")
+                }
+
+                // Stop polling once all permissions are granted
+                if self?.allPermissionsGranted == true {
+                    self?.stopPermissionPolling()
+                }
+            }
+        }
+    }
+
+    /// Stop the permission polling timer
+    func stopPermissionPolling() {
+        VocaLogger.debug(.appState, "Stopping permission polling — all permissions granted")
+        permissionPollTimer?.invalidate()
+        permissionPollTimer = nil
+    }
+
+    /// Whether all required permissions are granted
+    var allPermissionsGranted: Bool {
+        micPermission == .granted &&
+        accessibilityPermission == .granted &&
+        inputMonitoringPermission == .granted
+    }
+
     /// Check Input Monitoring permission.
     /// Uses multiple strategies since no single approach is 100% reliable:
     /// 1. If HotKeyManager created a tap, check if macOS has disabled it (revocation)
@@ -306,10 +360,8 @@ final class AppState: ObservableObject {
 
     func requestAccessibilityPermission() {
         let _ = HotKeyManager.checkAccessibilityPermission(prompt: true)
-        // User must manually enable in System Settings; re-check after delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
-            self?.checkPermissions()
-        }
+        // Start polling to detect when user grants permission in System Settings
+        startPermissionPolling()
     }
 
     func requestInputMonitoringPermission() {
@@ -333,10 +385,8 @@ final class AppState: ObservableObject {
             NSWorkspace.shared.open(url)
         }
 
-        // Re-check after user has time to toggle
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
-            self?.checkPermissions()
-        }
+        // Start polling to detect when user grants permission in System Settings
+        startPermissionPolling()
     }
 
     // MARK: - Recording Flow
@@ -553,6 +603,9 @@ final class AppState: ObservableObject {
             VocaLogger.info(.appState, "Mic permission not determined — requesting...")
             requestMicrophonePermission()
         }
+
+        // Start polling if any permission is still missing
+        startPermissionPolling()
 
         // 3. Load the user's preferred model (or auto-select on first launch)
         if let preferredSize = ModelSize(rawValue: selectedModelSize),
