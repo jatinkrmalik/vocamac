@@ -199,7 +199,10 @@ h4 { font-size: 16px; font-weight: 600; }
     border-color: var(--border-hover);
 }
 .navbar__toggle { display: none; background: none; border: none; cursor: pointer; flex-direction: column; gap: 5px; min-width: 44px; min-height: 44px; align-items: center; justify-content: center; -webkit-tap-highlight-color: transparent; }
-.navbar__toggle span { width: 20px; height: 2px; background: var(--text-primary); transition: 0.3s; }
+.navbar__toggle span { display: block; width: 20px; height: 2px; background: var(--text-primary); transition: transform 0.3s ease, opacity 0.3s ease; transform-origin: center; }
+.navbar__toggle.active span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+.navbar__toggle.active span:nth-child(2) { opacity: 0; }
+.navbar__toggle.active span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
 
 /* Light mode code block adjustments */
 .code-block { color: #1D1D1F; }
@@ -837,8 +840,8 @@ a.feature-card:hover::after {
 @media (max-width: 768px) {
     .container { padding: 0 20px; }
     section { padding: 64px 0; }
-    .navbar__menu { display: none; position: absolute; top: 100%; left: 0; right: 0; background: var(--navbar-bg); backdrop-filter: blur(20px); flex-direction: column; padding: 20px; gap: 16px; border-bottom: 1px solid var(--border-color); }
-    .navbar__menu--open { display: flex; }
+    .navbar__menu { display: flex; position: absolute; top: 100%; left: 0; right: 0; background: var(--bg-primary); backdrop-filter: blur(20px); flex-direction: column; padding: 20px; gap: 16px; border-bottom: 1px solid var(--border-color); opacity: 0; visibility: hidden; transform: translateY(-10px); transition: opacity 0.3s ease, transform 0.3s ease, visibility 0.3s ease; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15); }
+    .navbar__menu--open { opacity: 1; visibility: visible; transform: translateY(0); }
     .navbar__cta { padding: 10px 12px; min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center; }
     .navbar__cta-text { display: none; }
     .navbar__cta svg { margin-right: 0 !important; }
