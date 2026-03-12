@@ -30,6 +30,19 @@ Speak. It types. 100% offline, open-source voice-to-text for macOS - powered by 
 
 ---
 
+## ✨ Features
+
+- **🔒 100% Local** - All audio processing happens on your machine. No internet required (except for one-time model downloads).
+- **⌨️ System-Wide Text Injection** - Transcribed text is typed wherever your cursor is: browsers, Slack, VS Code, spreadsheets, terminals - everywhere.
+- **🎯 Push-to-Talk** - Hold a hotkey (default: Right Option) to record. Release to transcribe.
+- **👆 Double-Tap Toggle** - Double-tap the hotkey to start/stop recording.
+- **🧠 Smart Model Selection** - Auto-detects your hardware (Apple Silicon/Intel, RAM) and recommends the best whisper model via WhisperKit.
+- **⚡ Native Apple Acceleration** - CoreML + Metal + Neural Engine acceleration on Apple Silicon. No manual setup.
+- **📊 Visual Feedback** - Menu bar icon changes color during recording and processing. Audio level indicator shows input.
+- **⚙️ Configurable** - Choose hotkeys, models, languages, silence detection thresholds, and more.
+
+---
+
 ## 📸 Screenshots
 
 <p align="center">
@@ -67,19 +80,6 @@ Speak. It types. 100% offline, open-source voice-to-text for macOS - powered by 
   <br>
   <em>Floating mic indicator near text cursor during recording</em>
 </p>
-
----
-
-## ✨ Features
-
-- **🔒 100% Local** - All audio processing happens on your machine. No internet required (except for one-time model downloads).
-- **⌨️ System-Wide Text Injection** - Transcribed text is typed wherever your cursor is: browsers, Slack, VS Code, spreadsheets, terminals - everywhere.
-- **🎯 Push-to-Talk** - Hold a hotkey (default: Right Option) to record. Release to transcribe.
-- **👆 Double-Tap Toggle** - Double-tap the hotkey to start/stop recording.
-- **🧠 Smart Model Selection** - Auto-detects your hardware (Apple Silicon/Intel, RAM) and recommends the best whisper model via WhisperKit.
-- **⚡ Native Apple Acceleration** - CoreML + Metal + Neural Engine acceleration on Apple Silicon. No manual setup.
-- **📊 Visual Feedback** - Menu bar icon changes color during recording and processing. Audio level indicator shows input.
-- **⚙️ Configurable** - Choose hotkeys, models, languages, silence detection thresholds, and more.
 
 ---
 
@@ -132,7 +132,7 @@ VocaMac requires three macOS permissions:
    xattr -cr /Applications/VocaMac.app
    ```
 4. **Open** VocaMac from Applications (right-click → Open on first launch)
-5. **Grant permissions** — Microphone, Accessibility, and Input Monitoring when prompted
+5. **Grant permissions**: Microphone, Accessibility, and Input Monitoring when prompted
 
 ### Option 2: Build from Source (Recommended)
 
@@ -142,7 +142,7 @@ cd vocamac
 make install
 ```
 
-This builds VocaMac, installs it to `/Applications`, and launches it. Permissions are granted directly to VocaMac — just like the DMG method.
+This builds VocaMac, installs it to `/Applications`, and launches it. Permissions are granted directly to VocaMac, just like the DMG method.
 
 ### Option 3: CLI Commands (For Developers)
 
@@ -153,17 +153,17 @@ make install-cli
 ```
 
 This installs two commands to `~/.local/bin`:
-- `vocamac &` — Launch VocaMac in background
-- `vocamac-build` — Rebuild from source after pulling updates
+- `vocamac &`: Launch VocaMac in background
+- `vocamac-build`: Rebuild from source after pulling updates
 
 > **Permissions note:** In CLI mode, macOS assigns permissions to your **terminal app** (Terminal, iTerm2, etc.) rather than VocaMac itself. Grant Microphone, Accessibility, and Input Monitoring to your terminal app instead.
 
 ### First Launch
 
 1. **VocaMac appears in your menu bar** (microphone icon, no Dock icon)
-2. **Grant permissions** — Microphone, Accessibility, and Input Monitoring (see [Permissions](#permissions) above)
-3. **First model download** — WhisperKit automatically downloads the recommended model for your device (~40–500 MB depending on hardware)
-4. **Start dictating** — Hold the **Right Option** key, speak, and release. Your words appear at the cursor!
+2. **Grant permissions**: Microphone, Accessibility, and Input Monitoring (see [Permissions](#permissions) above)
+3. **First model download**: WhisperKit automatically downloads the recommended model for your device (~40–500 MB depending on hardware)
+4. **Start dictating**: Hold the **Right Option** key, speak, and release. Your words appear at the cursor!
 
 ---
 
@@ -333,7 +333,7 @@ Use `--keep-build` to preserve build artifacts:
 defaults delete com.vocamac.app vocamac.hasCompletedOnboarding
 ```
 
-Then relaunch VocaMac. This only clears the onboarding state — all other preferences (hotkey, language, model) are preserved.
+Then relaunch VocaMac. This only clears the onboarding state; all other preferences (hotkey, language, model) are preserved.
 
 **Reset all preferences:** To start completely fresh:
 
@@ -376,15 +376,15 @@ Each platform uses native technologies for the best possible integration, while 
 
 ## ⚠️ Known Limitations
 
-- **Permissions reset on rebuild** — Accessibility and Input Monitoring permissions reset on every rebuild (see below).
-- **First launch requires internet** — WhisperKit downloads the speech recognition model on first run. All subsequent launches work fully offline.
-- **macOS only** — Requires macOS 13 (Ventura) or later.
+- **Permissions reset on rebuild**: Accessibility and Input Monitoring permissions reset on every rebuild (see below).
+- **First launch requires internet**: WhisperKit downloads the speech recognition model on first run. All subsequent launches work fully offline.
+- **macOS only**: Requires macOS 13 (Ventura) or later.
 
 ### Why Do Permissions Reset on Every Rebuild?
 
-macOS tracks Accessibility and Input Monitoring permissions using the app's **CDHash** (a cryptographic hash of the code signature), not the bundle identifier. When you rebuild VocaMac with ad-hoc signing (`codesign --sign -`), the binary changes, producing a new CDHash — so macOS treats it as a completely new, untrusted app.
+macOS tracks Accessibility and Input Monitoring permissions using the app's **CDHash** (a cryptographic hash of the code signature), not the bundle identifier. When you rebuild VocaMac with ad-hoc signing (`codesign --sign -`), the binary changes, producing a new CDHash, so macOS treats it as a completely new, untrusted app.
 
-This is **not a bug** — it's macOS security by design, preventing modified apps from inheriting sensitive permissions. All open-source macOS apps that use Accessibility (Rectangle, Maccy, AltTab, etc.) have the same limitation.
+This is **not a bug**. It's macOS security by design, preventing modified apps from inheriting sensitive permissions. All open-source macOS apps that use Accessibility (Rectangle, Maccy, AltTab, etc.) have the same limitation.
 
 **Why Microphone permission persists:** Microphone access uses AVFoundation's framework-level preference cache with relaxed verification, unlike the strict CDHash checks for Accessibility and Input Monitoring.
 
@@ -395,9 +395,9 @@ This is **not a bug** — it's macOS security by design, preventing modified app
 | **Reset permissions on update** | Settings → Debug → Reset All Permissions (or `tccutil reset All com.vocamac.app`) | Recommended before each update |
 | **Re-grant manually** | System Settings → Privacy & Security after each rebuild | Per rebuild |
 | **Run from Terminal** | Grant permissions to Terminal.app once, then run `make run` or `.build/arm64-apple-macosx/release/VocaMac` | ✅ Always |
-| **Developer ID signing** | Requires Apple Developer Program ($99/year) — planned for future releases | ✅ Always |
+| **Developer ID signing** | Requires Apple Developer Program ($99/year), planned for future releases | ✅ Always |
 
-> **💡 Developer tip:** Add your Terminal app (Terminal.app or iTerm2) to both Accessibility and Input Monitoring in System Settings. Then run VocaMac directly from Terminal — permissions are inherited and never reset.
+> **💡 Developer tip:** Add your Terminal app (Terminal.app or iTerm2) to both Accessibility and Input Monitoring in System Settings. Then run VocaMac directly from Terminal. Permissions are inherited and never reset.
 
 ---
 
