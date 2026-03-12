@@ -8,6 +8,8 @@ icon: "🤫"
 
 ## How It Works
 
+![VocaMac audio settings showing silence detection thresholds](/screenshots/settings-audio.png)
+
 Silence detection is VocaMac's intelligent feature that automatically stops recording when it detects you've finished speaking. You don't have to manually stop. Just speak, and when you pause, the app listens to the ambient sound in your environment and decides when recording should end.
 
 Under the hood, silence detection works by measuring the **root mean square (RMS) energy** of incoming audio. RMS energy is a standard measure of audio loudness. VocaMac continuously calculates this value and compares it against a threshold you set. When the audio level drops below that threshold for a configurable duration, recording stops automatically.

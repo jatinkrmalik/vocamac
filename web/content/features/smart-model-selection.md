@@ -14,6 +14,8 @@ On first launch, VocaMac analyzes your processor type (Apple Silicon or Intel), 
 
 ## Five Model Tiers
 
+![VocaMac Settings showing model management and system info](/screenshots/settings-models.png)
+
 VocaMac supports five Whisper model sizes, from lightweight to highly accurate. Each model is optimized for CoreML and runs entirely on your Mac.
 
 **Tiny (39 MB)**

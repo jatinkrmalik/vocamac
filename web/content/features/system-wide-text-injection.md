@@ -14,6 +14,8 @@ This works in your browser, code editor, terminal, spreadsheet, or any other mac
 
 ## How It Works
 
+![VocaMac popover showing transcription result](/screenshots/popover-panel.png)
+
 VocaMac uses macOS accessibility APIs to detect your cursor position in the foreground application, then injects text directly into the input field. This is the same technology that powers accessibility features like VoiceOver and Switch Control.
 
 When you stop recording, VocaMac:

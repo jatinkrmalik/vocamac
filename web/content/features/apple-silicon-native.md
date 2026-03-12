@@ -14,6 +14,8 @@ This isn't just optimization. It's a fundamental architectural advantage. While 
 
 ## Neural Engine Acceleration
 
+![VocaMac Settings showing model management on Apple Silicon](/screenshots/settings-models.png)
+
 Apple Silicon's Neural Engine is a specialized processor designed for machine learning tasks. When VocaMac transcribes your voice, it offloads the heavy computational work to this dedicated hardware.
 
 The result is remarkable. Transcription happens in real time. You finish speaking, and your words appear before you've had time to take your next breath. This responsiveness creates a natural, uninterrupted flow that makes dictation feel less like using an app and more like a natural extension of how you type.

@@ -8,6 +8,8 @@ icon: "⚙️"
 
 ## Make VocaMac Your Own
 
+![VocaMac Settings - General tab](/screenshots/settings-general.png)
+
 VocaMac understands that everyone has different preferences. Some people use dictation occasionally. Others rely on it for hours every day. Some work in quiet offices. Others dictate in bustling environments. The app adapts to your workflow through comprehensive, intuitive settings.
 
 Every major aspect of VocaMac can be customized. Hotkeys, audio behavior, transcription models, languages, and more. The settings window is organized into clear tabs that match how you think about the app.

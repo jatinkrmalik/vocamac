@@ -10,7 +10,10 @@ icon: "📊"
 
 Voice dictation works best when you have complete clarity about your recording state. VocaMac provides three layers of visual feedback so you're never uncertain about whether you're recording, what your audio input looks like, or exactly where your text will appear.
 
-## Menu Bar Icon Color States
+## Menu Bar Icon
+
+![VocaMac menu bar in idle state](/screenshots/menu-bar-idle.png)
+![VocaMac menu bar while recording](/screenshots/menu-bar-recording.png)
 
 The VocaMac menu bar icon is your primary indicator of recording status. It changes color instantly to show what's happening:
 
@@ -21,6 +24,8 @@ The VocaMac menu bar icon is your primary indicator of recording status. It chan
 These color changes happen instantly. The moment you press your activation hotkey, the icon turns green. The moment you release, it returns to blue. This immediate feedback eliminates the guesswork that plagues other voice apps.
 
 ## Real-Time Audio Level Indicator
+
+![VocaMac popover panel showing status and audio level](/screenshots/popover-panel.png)
 
 The popover panel displays a live audio level meter while you're recording. This horizontal bar shows your microphone's input volume in real time, helping you understand whether you're speaking loudly enough, too softly, or at an ideal level.
 
@@ -34,6 +39,8 @@ The audio level indicator serves multiple purposes:
 The meter updates continuously while recording and disappears when you finish. No guessing games with your input levels.
 
 ## Floating Cursor Indicator
+
+![VocaMac cursor indicator near text caret during recording](/screenshots/cursor-indicator.png)
 
 VocaMac can optionally display a small floating microphone icon that appears near your text cursor while you're recording. This is especially useful when working across multiple windows, fullscreen apps, or when your menu bar is hidden.
 

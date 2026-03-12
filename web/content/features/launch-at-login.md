@@ -16,6 +16,8 @@ When you enable Launch at Login in VocaMac's settings, the app registers itself 
 
 ## Enabling Launch at Login
 
+![VocaMac Settings showing Launch at Login toggle](/screenshots/settings-general.png)
+
 There are two ways to enable this feature:
 
 **Via Settings**

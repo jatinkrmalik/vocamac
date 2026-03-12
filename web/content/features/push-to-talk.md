@@ -30,6 +30,8 @@ Push-to-Talk eliminates that entirely:
 
 ## Choosing Your Hotkey
 
+![VocaMac Settings showing activation mode and hotkey configuration](/screenshots/settings-general.png)
+
 VocaMac supports a wide range of hotkeys for Push-to-Talk activation:
 
 - **Right Option (⌥)** - the default, ergonomic and rarely used by other apps

@@ -1051,3 +1051,13 @@ a.feature-card:hover::after {
     font-weight: 600;
     color: var(--text-primary);
 }
+
+/* Feature page images */
+.feature-content img {
+    max-width: 100%;
+    height: auto;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-sm);
+    margin: 16px 0 24px;
+}

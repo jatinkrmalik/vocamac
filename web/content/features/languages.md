@@ -8,6 +8,8 @@ icon: "🌍"
 
 ## Speak in Your Language
 
+![VocaMac Settings showing language configuration](/screenshots/settings-general.png)
+
 VocaMac supports over 99 languages. Whether you dictate in English, Spanish, Mandarin, Arabic, or any of dozens of other languages, the app understands you. More importantly, it transcribes with high accuracy regardless of which language you're using.
 
 This capability comes from OpenAI's Whisper model, one of the most advanced speech recognition systems ever created. Whisper was trained on 680,000 hours of multilingual audio data. It understands not just major languages, but regional dialects, accents, and linguistic variations.
