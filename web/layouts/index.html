@@ -615,8 +615,8 @@
 
         // ========== Install Tab Switcher ==========
         function switchInstallTab(tab, btn) {
-            document.getElementById('install-dmg').style.display = tab === 'dmg' ? 'block' : 'none';
-            document.getElementById('install-source').style.display = tab === 'source' ? 'block' : 'none';
+            document.getElementById('install-dmg').style.display = tab === 'dmg' ? 'grid' : 'none';
+            document.getElementById('install-source').style.display = tab === 'source' ? 'grid' : 'none';
             document.querySelectorAll('.install__tab').forEach(t => {
                 t.classList.remove('install__tab--active');
                 t.setAttribute('aria-selected', 'false');
