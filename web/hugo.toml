@@ -1,0 +1,27 @@
+baseURL = "https://vocamac.com/"
+languageCode = "en-us"
+title = "VocaMac - 100% Local Voice-to-Text for macOS"
+
+[params]
+  description = "100% offline, open-source voice-to-text for macOS. Powered by WhisperKit + CoreML."
+  author = "Jatin Kumar Malik"
+  twitterHandle = "@jatinkrmalik"
+  githubRepo = "https://github.com/jatinkrmalik/vocamac"
+  gaID = "G-8W6EJV2KP0"
+  ogImage = "https://vocamac.com/og-image.png"
+
+[build]
+  [build.buildStats]
+    enable = false
+
+[sitemap]
+  changeFreq = "weekly"
+  priority = 0.5
+
+enableRobotsTXT = true
+
+# Disable Hugo's default taxonomies since we don't need them
+[taxonomies]
+
+# Disable default RSS
+disableKinds = ["taxonomy", "term", "RSS"]

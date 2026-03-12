@@ -1,0 +1,23 @@
+    <nav class="navbar">
+        <div class="container navbar__container">
+            <a href="/" class="navbar__logo">
+                <img src="/logo.png" alt="VocaMac" class="navbar__logo-img">
+                <span>VocaMac</span>
+            </a>
+            <ul class="navbar__menu">
+                <li><a href="/#features" class="navbar__link">Features</a></li>
+                <li><a href="/#privacy" class="navbar__link">Privacy</a></li>
+                <li><a href="/#install" class="navbar__link">Install</a></li>
+                <li><a href="/screenshots/" class="navbar__link">Screenshots</a></li>
+                <li><a href="/#faq" class="navbar__link">FAQ</a></li>
+            </ul>
+            <div class="navbar__actions">
+                <a href="{{ .Site.Params.githubRepo }}" class="navbar__cta" target="_blank" rel="noopener">
+                    <span class="navbar__cta-text">View Source</span>
+                </a>
+                <button class="navbar__toggle" aria-label="Menu">
+                    <span></span><span></span><span></span>
+                </button>
+            </div>
+        </div>
+    </nav>

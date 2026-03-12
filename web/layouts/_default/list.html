@@ -1,0 +1,25 @@
+{{ define "main" }}
+<section class="feature-hero">
+    <div class="container">
+        <a href="/" class="back-link">← Back to Home</a>
+        <h1>{{ .Title }}</h1>
+        {{ with .Params.description }}<p class="feature-hero__subtitle">{{ . }}</p>{{ end }}
+    </div>
+</section>
+<section class="feature-content">
+    <div class="container">
+        {{ .Content }}
+        {{ range .Pages }}
+        <div style="margin-bottom: 16px;">
+            <a href="{{ .Permalink }}" style="text-decoration: none; color: inherit;">
+                <div class="feature-card" style="cursor: pointer;">
+                    <div class="feature-card__icon">{{ .Params.icon }}</div>
+                    <h3>{{ .Title }}</h3>
+                    <p>{{ .Params.subtitle }}</p>
+                </div>
+            </a>
+        </div>
+        {{ end }}
+    </div>
+</section>
+{{ end }}

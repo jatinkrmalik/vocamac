@@ -1,0 +1,72 @@
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Primary Meta Tags -->
+    <title>{{ if .IsHome }}VocaMac - 100% Local Voice-to-Text for macOS{{ else }}{{ .Title }} | VocaMac{{ end }}</title>
+    <meta name="title" content="{{ if .IsHome }}VocaMac - 100% Local Voice-to-Text for macOS{{ else }}{{ .Title }} | VocaMac{{ end }}">
+    <meta name="description" content="{{ with .Params.description }}{{ . }}{{ else }}{{ .Site.Params.description }}{{ end }}">
+    {{ with .Params.keywords }}<meta name="keywords" content="{{ . }}">{{ end }}
+    {{ if .IsPage }}{{ if not .IsHome }}
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        "name": "{{ .Title }}",
+        "description": "{{ with .Params.description }}{{ . }}{{ else }}{{ .Site.Params.description }}{{ end }}",
+        "url": "{{ .Permalink }}",
+        "isPartOf": {
+            "@type": "WebSite",
+            "name": "VocaMac",
+            "url": "{{ .Site.BaseURL }}"
+        },
+        "author": {
+            "@type": "Person",
+            "name": "{{ .Site.Params.author }}",
+            "url": "https://github.com/jatinkrmalik"
+        }
+    }
+    </script>
+    {{ end }}{{ end }}
+    <meta name="author" content="{{ .Site.Params.author }}">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="{{ .Permalink }}">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <meta name="theme-color" content="#FFFFFF">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="{{ .Permalink }}">
+    <meta property="og:title" content="{{ if .IsHome }}VocaMac - 100% Local Voice-to-Text for macOS{{ else }}{{ .Title }} | VocaMac{{ end }}">
+    <meta property="og:description" content="{{ with .Params.description }}{{ . }}{{ else }}{{ .Site.Params.description }}{{ end }}">
+    <meta property="og:image" content="{{ .Site.Params.ogImage }}">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="VocaMac - Local Voice-to-Text for macOS">
+    <meta property="og:site_name" content="VocaMac">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="{{ .Permalink }}">
+    <meta name="twitter:title" content="{{ if .IsHome }}VocaMac - 100% Local Voice-to-Text for macOS{{ else }}{{ .Title }} | VocaMac{{ end }}">
+    <meta name="twitter:description" content="{{ with .Params.description }}{{ . }}{{ else }}{{ .Site.Params.description }}{{ end }}">
+    <meta name="twitter:image" content="{{ .Site.Params.ogImage }}">
+    <meta name="twitter:image:alt" content="VocaMac - Local Voice-to-Text for macOS">
+    <meta name="twitter:creator" content="{{ .Site.Params.twitterHandle }}">
+
+    <link rel="stylesheet" href="/style.css">
+
+    <!-- Google tag (gtag.js) -->
+    {{ with .Site.Params.gaID }}
+    <script async src="https://www.googletagmanager.com/gtag/js?id={{ . }}"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', '{{ . }}');
+    </script>
+    {{ end }}

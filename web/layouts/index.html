@@ -1,46 +1,4 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <!-- Primary Meta Tags -->
-    <title>VocaMac - 100% Local Voice-to-Text for macOS | Privacy-First Dictation</title>
-    <meta name="title" content="VocaMac - 100% Local Voice-to-Text for macOS | Privacy-First Dictation">
-    <meta name="description" content="Free, open-source voice dictation for macOS. Hold a hotkey, speak, and text appears at your cursor. 100% offline, powered by WhisperKit. No cloud, no subscriptions, your data never leaves your Mac.">
-    <meta name="keywords" content="voice to text, speech to text, speech recognition, macOS, dictation software, whisper, whisperkit, local dictation, offline voice recognition, privacy, open source, mac app, voice typing, transcription">
-    <meta name="author" content="Jatin Kumar Malik">
-    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
-    <link rel="canonical" href="https://vocamac.com/">
-
-    <!-- Favicon -->
-    <link rel="icon" type="image/x-icon" href="favicon.ico">
-    <link rel="icon" type="image/png" sizes="32x32" href="favicon.png">
-    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
-    <meta name="theme-color" content="#FFFFFF">
-
-    <!-- Open Graph / Facebook -->
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://vocamac.com/">
-    <meta property="og:title" content="VocaMac - 100% Local Voice-to-Text for macOS">
-    <meta property="og:description" content="Free, open-source voice dictation for macOS. Hold a hotkey, speak, and text appears at your cursor. 100% offline, powered by WhisperKit. No cloud, no subscriptions.">
-    <meta property="og:image" content="https://vocamac.com/og-image.png">
-    <meta property="og:image:width" content="1200">
-    <meta property="og:image:height" content="630">
-    <meta property="og:image:alt" content="VocaMac - Local Voice-to-Text for macOS">
-    <meta property="og:site_name" content="VocaMac">
-    <meta property="og:locale" content="en_US">
-
-    <!-- Twitter -->
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:url" content="https://vocamac.com/">
-    <meta name="twitter:title" content="VocaMac - 100% Local Voice-to-Text for macOS">
-    <meta name="twitter:description" content="Free, open-source voice dictation for macOS. Hold a hotkey, speak, and text appears at your cursor. 100% offline, powered by WhisperKit.">
-    <meta name="twitter:image" content="https://vocamac.com/og-image.png">
-    <meta name="twitter:image:alt" content="VocaMac - Local Voice-to-Text for macOS">
-    <meta name="twitter:creator" content="@jatinkrmalik">
-
-    <!-- JSON-LD Structured Data -->
+{{ define "extra_head" }}
     <script type="application/ld+json">
     {
         "@context": "https://schema.org",
@@ -82,46 +40,9 @@
         "softwareRequirements": "macOS 13 (Ventura) or later, Xcode 15+ or Swift 5.9+ toolchain, 8 GB RAM minimum"
     }
     </script>
+{{ end }}
 
-    <link rel="stylesheet" href="style.css">
-
-    <!-- Google tag (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-8W6EJV2KP0"></script>
-    <script>
-        window.dataLayer = window.dataLayer || [];
-        function gtag(){dataLayer.push(arguments);}
-        gtag('js', new Date());
-        gtag('config', 'G-8W6EJV2KP0');
-    </script>
-</head>
-<body>
-    <!-- Navigation -->
-    <nav class="navbar">
-        <div class="container navbar__container">
-            <a href="/" class="navbar__logo">
-                <img src="logo.png" alt="VocaMac" class="navbar__logo-img">
-                <span>VocaMac</span>
-            </a>
-            <ul class="navbar__menu">
-                <li><a href="#features" class="navbar__link">Features</a></li>
-                <li><a href="#privacy" class="navbar__link">Privacy</a></li>
-                <li><a href="#install" class="navbar__link">Install</a></li>
-                <li><a href="screenshots.html" class="navbar__link">Screenshots</a></li>
-                <li><a href="#faq" class="navbar__link">FAQ</a></li>
-            </ul>
-            <div class="navbar__actions">
-                <a href="https://github.com/jatinkrmalik/vocamac" class="navbar__cta" target="_blank" rel="noopener">
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="vertical-align: -2px; margin-right: 6px;"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-                    <span class="navbar__cta-text">View Source</span>
-                </a>
-                <button class="navbar__toggle" aria-label="Menu">
-                    <span></span><span></span><span></span>
-                </button>
-            </div>
-        </div>
-    </nav>
-
-    <main>
+{{ define "main" }}
     <!-- Hero -->
     <section class="hero">
         <div class="container hero__container">
@@ -136,7 +57,7 @@
                     <span class="text-gradient">Your Privacy.</span>
                 </h1>
                 <p class="hero__subtext">
-                    Speak. It types. 100% offline, open-source voice-to-text for macOS. Hold a hotkey, speak, and your words appear wherever your cursor is. No cloud. No subscriptions. No data leaves your Mac.
+                    100% offline voice-to-text for macOS. Hold a hotkey, speak, and text appears at your cursor. Open source, private by design, and completely free.
                 </p>
             </div>
             <div class="hero__visual">
@@ -149,14 +70,14 @@
                             <span class="mockup__menubar-item">Edit</span>
                         </div>
                         <div class="mockup__menubar-right">
-                            <img src="logo.png" alt="VocaMac" class="mockup__menubar-icon mockup__mic-icon">
+                            <img src="/logo.png" alt="VocaMac" class="mockup__menubar-icon mockup__mic-icon">
                             <span class="mockup__menubar-item" id="mockup-date">Tue 4 Mar</span>
                         </div>
                     </div>
                     <div class="mockup__popover">
                         <div class="mockup__header">
                             <div class="mockup__header-left">
-                                <img src="logo.png" alt="VocaMac" class="mockup__app-logo">
+                                <img src="/logo.png" alt="VocaMac" class="mockup__app-logo">
                                 <div>
                                     <div class="mockup__app-name">VocaMac</div>
                                     <div class="mockup__model">Model: Small</div>
@@ -178,7 +99,7 @@
                                 <span class="mockup__transcription-label">Last Transcription</span>
                                 <span class="mockup__copy-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></span>
                             </div>
-                            <div class="mockup__transcription-text">Hey Siri, just kidding.<br>VocaMac does it all locally.</div>
+                            <div class="mockup__transcription-text">Hey Siri, just kidding.<br>VocaMac does it all locally!</div>
                             <div class="mockup__transcription-meta">2.1s audio • 0.2s to transcribe • en</div>
                         </div>
                     </div>
@@ -242,11 +163,11 @@
                     <h3>System-Wide Text Injection</h3>
                     <p>Transcribed text appears wherever your cursor is. Browsers, Slack, VS Code, spreadsheets, terminals. Everywhere.</p>
                 </div>
-                <div class="feature-card">
+                <a href="/features/push-to-talk/" class="feature-card" style="text-decoration: none; color: inherit;">
                     <div class="feature-card__icon">🎯</div>
                     <h3>Push-to-Talk</h3>
                     <p>Hold a hotkey to record. Release to transcribe. Simple, predictable, no surprises.</p>
-                </div>
+                </a>
                 <div class="feature-card">
                     <div class="feature-card__icon">👆</div>
                     <h3>Double-Tap Toggle</h3>
@@ -659,59 +580,10 @@
         </div>
     </section>
 
-    </main>
+{{ end }}
 
-    <!-- Footer -->
-    <footer class="footer">
-        <div class="container footer__container">
-            <div class="footer__left">
-                <img src="logo.png" alt="VocaMac" class="footer__logo-img">
-                <span class="footer__brand">VocaMac</span>
-                <span class="badge badge--alpha" style="font-size: 9px;">ALPHA</span>
-            </div>
-            <div class="footer__links">
-                <a href="https://github.com/jatinkrmalik/vocamac" target="_blank" rel="noopener">GitHub</a>
-                <a href="screenshots.html">Screenshots</a>
-                <a href="https://vocalinux.com" target="_blank" rel="noopener">VocaLinux</a>
-                <a href="https://vocawin.com" target="_blank" rel="noopener">VocaWin</a>
-            </div>
-            <div class="footer__right">
-                Made with ❤️ by <a href="https://x.com/intent/user?screen_name=jatinkrmalik" target="_blank" rel="noopener">Jatin Kumar Malik</a>
-            </div>
-        </div>
-    </footer>
-
+{{ define "extra_scripts" }}
     <script>
-        // ========== Mobile Menu ==========
-        document.querySelector('.navbar__toggle')?.addEventListener('click', function() {
-            document.querySelector('.navbar__menu')?.classList.toggle('navbar__menu--open');
-        });
-
-        // ========== Smooth Scroll ==========
-        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-            anchor.addEventListener('click', function(e) {
-                e.preventDefault();
-                const target = document.querySelector(this.getAttribute('href'));
-                if (target) {
-                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
-                document.querySelector('.navbar__menu')?.classList.remove('navbar__menu--open');
-            });
-        });
-
-        // ========== Scroll Animations ==========
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    entry.target.classList.add('visible');
-                }
-            });
-        }, { threshold: 0.1 });
-
-        document.querySelectorAll('.feature-card, .step, .privacy__point, .model-card, .family-card, .faq__item').forEach(el => {
-            observer.observe(el);
-        });
-
         // ========== Live Date in Mockup ==========
         (function() {
             const el = document.getElementById('mockup-date');
@@ -730,7 +602,6 @@
                 if (data.tag_name) {
                     document.getElementById('version-badge').textContent = data.tag_name;
                 }
-                // Find the DMG asset and update the download link
                 const dmgAsset = (data.assets || []).find(a => a.name.endsWith('.dmg'));
                 if (dmgAsset && dmgAsset.browser_download_url) {
                     const link = document.getElementById('dmg-download-link');
@@ -740,13 +611,25 @@
                     }
                 }
             })
-            .catch(() => {}); // Silently fall back to hardcoded version/link
+            .catch(() => {});
+
+        // ========== Install Tab Switcher ==========
+        function switchInstallTab(tab, btn) {
+            document.getElementById('install-dmg').style.display = tab === 'dmg' ? 'grid' : 'none';
+            document.getElementById('install-source').style.display = tab === 'source' ? 'grid' : 'none';
+            document.querySelectorAll('.install__tab').forEach(t => {
+                t.classList.remove('install__tab--active');
+                t.setAttribute('aria-selected', 'false');
+            });
+            btn.classList.add('install__tab--active');
+            btn.setAttribute('aria-selected', 'true');
+        }
 
         // ========== Copy Code ==========
         function copyCode(btn) {
             const codeBlock = btn.closest('.code-block');
             const code = codeBlock.querySelector('code').textContent
-                .replace(/^\$ /gm, '')  // Remove prompt symbols
+                .replace(/^\$ /gm, '')
                 .trim();
             navigator.clipboard.writeText(code).then(() => {
                 btn.innerHTML = '✅ Copied!';
@@ -757,22 +640,5 @@
                 }, 2000);
             });
         }
-
-        // ========== Install Tabs ==========
-        function switchInstallTab(tab, btn) {
-            // Hide all panels
-            document.getElementById('install-dmg').style.display = 'none';
-            document.getElementById('install-source').style.display = 'none';
-            // Show selected panel
-            document.getElementById('install-' + tab).style.display = 'grid';
-            // Toggle active tab
-            document.querySelectorAll('.install__tab').forEach(t => {
-                t.classList.remove('install__tab--active');
-                t.setAttribute('aria-selected', 'false');
-            });
-            btn.classList.add('install__tab--active');
-            btn.setAttribute('aria-selected', 'true');
-        }
     </script>
-</body>
-</html>
+{{ end }}
