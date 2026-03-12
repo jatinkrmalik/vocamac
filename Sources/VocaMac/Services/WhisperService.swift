@@ -176,7 +176,11 @@ final class WhisperService: @unchecked Sendable {
             let elapsed = CFAbsoluteTimeGetCurrent() - startTime
 
             // Concatenate all segment texts
-            let fullText = results.map { $0.text }.joined(separator: " ")
+            let rawText = results.map { $0.text }.joined(separator: " ")
+
+            // Filter out WhisperKit hallucination tokens that should not be
+            // exposed to the user (e.g. "[BLANK_AUDIO]", "(blank audio)", etc.)
+            let fullText = Self.filterHallucinationTokens(rawText)
 
             // Get detected language from first result
             let detectedLanguage = results.first?.language ?? language ?? "en"
@@ -215,6 +219,38 @@ final class WhisperService: @unchecked Sendable {
     }
 
     // MARK: - Utilities
+
+    // MARK: - Hallucination Filtering
+
+    /// Tokens that WhisperKit may emit when the audio contains silence,
+    /// background noise, or is too short to produce real speech. These are
+    /// internal model artifacts and should never be shown to the user.
+    private static let hallucinationPatterns: [String] = [
+        "[BLANK_AUDIO]",
+        "(blank audio)",
+        "[NO_SPEECH]",
+        "(no speech)",
+        "[ Silence ]",
+        "[silence]",
+        "(silence)",
+        "[Music]",
+        "(music)",
+        "[Applause]",
+        "(applause)",
+    ]
+
+    /// Remove hallucination tokens from transcribed text.
+    /// Returns the cleaned string, which may be empty if the entire output
+    /// consisted of hallucination tokens.
+    static func filterHallucinationTokens(_ text: String) -> String {
+        var cleaned = text
+        for pattern in hallucinationPatterns {
+            cleaned = cleaned.replacingOccurrences(of: pattern, with: "", options: .caseInsensitive)
+        }
+        // Collapse multiple spaces left behind by removed tokens
+        cleaned = cleaned.replacingOccurrences(of: "  +", with: " ", options: .regularExpression)
+        return cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 
     /// Map a model name string to our ModelSize enum
     private func modelSizeFromName(_ name: String) -> ModelSize {

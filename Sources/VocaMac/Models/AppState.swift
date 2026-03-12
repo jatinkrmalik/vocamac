@@ -457,12 +457,16 @@ final class AppState: ObservableObject {
 
             lastTranscription = result
 
-            // Inject text at cursor position
-            if !result.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            // Inject text at cursor position (text is already filtered
+            // by WhisperService to remove hallucination tokens like [BLANK_AUDIO])
+            let trimmedText = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmedText.isEmpty {
                 textInjector.inject(
-                    text: result.text.trimmingCharacters(in: .whitespacesAndNewlines),
+                    text: trimmedText,
                     preserveClipboard: preserveClipboard
                 )
+            } else {
+                VocaLogger.info(.appState, "Transcription produced no usable text (silence or blank audio)")
             }
 
             cursorOverlay.hide()
