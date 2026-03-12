@@ -185,6 +185,7 @@ h4 { font-size: 16px; font-weight: 600; }
 .navbar__cta {
     display: inline-flex;
     align-items: center;
+    gap: 6px;
     padding: 8px 18px;
     border-radius: var(--radius-sm);
     border: 1px solid var(--border-color);
