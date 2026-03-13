@@ -125,15 +125,34 @@ struct MenuBarView: View {
                     .fontWeight(.semibold)
 
                 if let model = appState.currentModel {
+                    // Model is loaded and ready
                     Text("Model: \(model.size.displayName)")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 } else if appState.whisperService.isModelLoaded {
+                    // Loaded but currentModel wasn't set (shouldn't happen, but safety net)
                     Text("Model: \(appState.whisperService.loadedModelName ?? "Loaded")")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
+                } else if let downloadingModel = appState.availableModels.first(where: { $0.downloadProgress != nil }),
+                          let progress = downloadingModel.downloadProgress {
+                    // A model is being downloaded — show progress
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Downloading \(downloadingModel.size.displayName)… \(Int(progress * 100))%")
+                            .font(.subheadline)
+                            .foregroundStyle(.orange)
+                        ProgressView(value: progress)
+                            .progressViewStyle(.linear)
+                            .tint(.orange)
+                    }
+                } else if let loadingModel = appState.availableModels.first(where: { $0.isLoading }) {
+                    // A model is being loaded (already downloaded, now initializing)
+                    Text("Loading \(loadingModel.size.displayName)…")
+                        .font(.subheadline)
+                        .foregroundStyle(.orange)
                 } else {
-                    Text("Loading model...")
+                    // Fallback: no model loaded and nothing actively in progress
+                    Text("No model loaded")
                         .font(.subheadline)
                         .foregroundStyle(.orange)
                 }
