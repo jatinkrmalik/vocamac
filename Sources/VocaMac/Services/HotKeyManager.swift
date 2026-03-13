@@ -47,8 +47,11 @@ final class HotKeyManager {
     private var keyHeldSafetyTimer: DispatchWorkItem?
 
     /// Maximum duration (seconds) before the safety timer forces a key-up.
-    /// Matches the app's max recording duration with a small buffer.
-    private static let safetyTimeoutSeconds: Double = 120.0
+    /// Set via `startListening(safetyTimeout:)` — should match (or slightly
+    /// exceed) the app's max recording duration so the safety timer acts as
+    /// a last-resort backstop *after* AudioEngine's own max-duration callback
+    /// has had a chance to fire.
+    private var safetyTimeoutSeconds: Double = 65.0
 
     // MARK: - Callbacks
 
@@ -75,10 +78,15 @@ final class HotKeyManager {
     ///   - keyCode: The virtual key code to listen for (default: 61 = Right Option)
     ///   - mode: The activation mode (push-to-talk or double-tap toggle)
     ///   - doubleTapThreshold: Time window for double-tap detection (seconds)
+    ///   - safetyTimeout: Maximum seconds before the safety timer forces a key-up
+    ///     in push-to-talk mode. Should be slightly longer than the app's max
+    ///     recording duration so AudioEngine's own limit fires first. The safety
+    ///     timer is a last-resort backstop for when a key-up event is lost entirely.
     func startListening(
         keyCode: Int = 61,
         mode: ActivationMode = .pushToTalk,
-        doubleTapThreshold: Double = 0.4
+        doubleTapThreshold: Double = 0.4,
+        safetyTimeout: Double = 65.0
     ) {
         guard !isListening else {
             VocaLogger.debug(.hotKeyManager, "Already listening")
@@ -88,6 +96,7 @@ final class HotKeyManager {
         self.targetKeyCode = keyCode
         self.mode = mode
         self.doubleTapThreshold = doubleTapThreshold
+        self.safetyTimeoutSeconds = safetyTimeout
         self.lastKeyDownTime = 0
         self.isKeyHeld = false
         self.isToggled = false
@@ -150,14 +159,23 @@ final class HotKeyManager {
     }
 
     /// Update the configuration while listening
+    /// - Parameters:
+    ///   - keyCode: New key code to listen for
+    ///   - mode: New activation mode
+    ///   - doubleTapThreshold: New double-tap detection window (seconds)
+    ///   - safetyTimeout: New safety timer duration (seconds). Should be
+    ///     `maxRecordingDuration + 5` to act as a backstop after AudioEngine's
+    ///     own max-duration callback.
     func updateConfiguration(
         keyCode: Int? = nil,
         mode: ActivationMode? = nil,
-        doubleTapThreshold: Double? = nil
+        doubleTapThreshold: Double? = nil,
+        safetyTimeout: Double? = nil
     ) {
         if let keyCode = keyCode { self.targetKeyCode = keyCode }
         if let mode = mode { self.mode = mode }
         if let threshold = doubleTapThreshold { self.doubleTapThreshold = threshold }
+        if let timeout = safetyTimeout { self.safetyTimeoutSeconds = timeout }
     }
 
     // MARK: - Event Tap Callback
@@ -365,19 +383,25 @@ final class HotKeyManager {
 
     /// Start a safety timer that forces a key-up if the real event is never received.
     /// This prevents the app from getting stuck in a "recording" state indefinitely.
+    ///
+    /// The timeout is set via `startListening(safetyTimeout:)` and should be
+    /// slightly longer than `maxRecordingDuration` so that AudioEngine's own
+    /// max-duration callback fires first under normal conditions. The safety
+    /// timer only kicks in when a key-up event is completely lost.
     private func startSafetyTimer() {
         cancelSafetyTimer()
 
+        let timeout = safetyTimeoutSeconds
         let work = DispatchWorkItem { [weak self] in
             guard let self = self, self.isKeyHeld else { return }
-            VocaLogger.warning(.hotKeyManager, "Safety timer fired — forcing key-up (key held for >\(Self.safetyTimeoutSeconds)s)")
+            VocaLogger.warning(.hotKeyManager, "Safety timer fired — forcing key-up (key held for >\(timeout)s)")
             self.isKeyHeld = false
             DispatchQueue.main.async { [weak self] in
                 self?.onRecordingStop?()
             }
         }
         keyHeldSafetyTimer = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.safetyTimeoutSeconds, execute: work)
+        DispatchQueue.main.asyncAfter(deadline: .now() + timeout, execute: work)
     }
 
     /// Cancel the safety timer (called on normal key-up)

@@ -231,8 +231,22 @@ final class AppState: ObservableObject {
             Task { @MainActor in
                 guard let self = self else { return }
                 if self.activationMode == .doubleTapToggle && self.isRecording {
+                    VocaLogger.info(.appState, "Silence detected — auto-stopping recording (double-tap mode)")
                     await self.stopRecordingAndTranscribe()
                 }
+            }
+        }
+
+        // Setup max recording duration callback.
+        // AudioEngine fires this when the recording reaches maxRecordingDuration.
+        // This is the primary duration limit — the HotKeyManager safety timer
+        // (maxRecordingDuration + 5s) acts as a backstop in case this callback
+        // fails or the key-up event is lost entirely.
+        audioEngine.onMaxDurationReached = { [weak self] in
+            Task { @MainActor in
+                guard let self = self, self.isRecording else { return }
+                VocaLogger.info(.appState, "Max recording duration (\(self.maxRecordingDuration)s) reached — auto-stopping")
+                await self.stopRecordingAndTranscribe()
             }
         }
 
@@ -292,7 +306,8 @@ final class AppState: ObservableObject {
                     self.hotKeyManager.startListening(
                         keyCode: self.hotKeyCode,
                         mode: self.activationMode,
-                        doubleTapThreshold: self.doubleTapThreshold
+                        doubleTapThreshold: self.doubleTapThreshold,
+                        safetyTimeout: Double(self.maxRecordingDuration) + 5.0
                     )
                     VocaLogger.info(.appState, "Hotkey listener started after permission grant")
                 }
@@ -694,7 +709,8 @@ final class AppState: ObservableObject {
         hotKeyManager.startListening(
             keyCode: hotKeyCode,
             mode: activationMode,
-            doubleTapThreshold: doubleTapThreshold
+            doubleTapThreshold: doubleTapThreshold,
+            safetyTimeout: Double(maxRecordingDuration) + 5.0
         )
         if hotKeyManager.isListening {
             VocaLogger.info(.appState, "Hotkey listener active (keyCode=\(hotKeyCode), mode=\(activationMode.rawValue))")
