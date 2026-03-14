@@ -275,13 +275,23 @@ final class AppState: ObservableObject {
 
         // Check accessibility permission
         let accessibilityGranted = HotKeyManager.checkAccessibilityPermission(prompt: false)
+        let previousAccessibility = accessibilityPermission
         accessibilityPermission = accessibilityGranted ? .granted : .denied
 
         // Check input monitoring permission
         // If we can successfully create an event tap (even briefly), Input Monitoring is granted.
         // CGPreflightListenEventAccess() is available on macOS 15+, so we use a tap test as fallback.
         let inputMonitoringGranted = checkInputMonitoringPermission()
+        let previousInputMonitoring = inputMonitoringPermission
         inputMonitoringPermission = inputMonitoringGranted ? .granted : .denied
+
+        // Detect permission revocation (common with ad-hoc signed apps after updates)
+        if previousAccessibility == .granted && accessibilityPermission != .granted {
+            VocaLogger.warning(.appState, "Accessibility permission was revoked. This commonly happens after app updates with ad-hoc code signing. Please re-grant in System Settings → Privacy & Security → Accessibility.")
+        }
+        if previousInputMonitoring == .granted && inputMonitoringPermission != .granted {
+            VocaLogger.warning(.appState, "Input Monitoring permission was revoked. This commonly happens after app updates with ad-hoc code signing. Please re-grant in System Settings → Privacy & Security → Input Monitoring.")
+        }
     }
 
     /// Start polling permissions every 3 seconds until all are granted.
