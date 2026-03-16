@@ -5,7 +5,7 @@
     <title>{{ if .IsHome }}VocaMac - 100% Local Voice-to-Text for macOS{{ else }}{{ .Title }} | VocaMac{{ end }}</title>
     <meta name="title" content="{{ if .IsHome }}VocaMac - 100% Local Voice-to-Text for macOS{{ else }}{{ .Title }} | VocaMac{{ end }}">
     <meta name="description" content="{{ with .Params.description }}{{ . }}{{ else }}{{ .Site.Params.description }}{{ end }}">
-    {{ with .Params.keywords }}<meta name="keywords" content="{{ . }}">{{ end }}
+    {{ with .Params.keywords }}<meta name="keywords" content="{{ if reflect.IsSlice . }}{{ delimit . " " }}{{ else }}{{ . }}{{ end }}">{{ end }}
     {{ if .IsPage }}{{ if not .IsHome }}
     <script type="application/ld+json">
     {

@@ -18,7 +18,8 @@ title = "VocaMac - 100% Local Voice-to-Text for macOS"
   changeFreq = "weekly"
   priority = 0.5
 
-enableRobotsTXT = true
+# robots.txt is served from static/robots.txt
+enableRobotsTXT = false
 
 # Disable Hugo's default taxonomies since we don't need them
 [taxonomies]
