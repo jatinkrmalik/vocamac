@@ -742,6 +742,12 @@ struct DebugTab: View {
                     }
                     .controlSize(.small)
 
+                    Button(action: repairPermissions) {
+                        Label("Repair Permissions", systemImage: "wrench.and.screwdriver")
+                    }
+                    .controlSize(.small)
+                    .help("Open System Settings to re-grant permissions. Use this after app updates when permissions stop working.")
+
                     Spacer()
 
                     Button(action: resetPermissions) {
@@ -832,6 +838,48 @@ struct DebugTab: View {
     }
 
     // MARK: - Actions
+
+    /// Guide the user through re-granting permissions after an app update.
+    /// Ad-hoc signed apps lose their TCC grants when the binary changes,
+    /// so we open the relevant System Settings panes and log guidance.
+    private func repairPermissions() {
+        VocaLogger.info(.general, "Repair Permissions: opening System Settings panes for user to re-grant")
+
+        // If all permissions are already granted, inform the user
+        if appState.allPermissionsGranted {
+            let alert = NSAlert()
+            alert.messageText = "All Permissions Granted"
+            alert.informativeText = "Microphone, Accessibility, and Input Monitoring permissions are all active. No repair needed."
+            alert.alertStyle = .informational
+            alert.addButton(withTitle: "OK")
+            alert.runModal()
+            return
+        }
+
+        // Open both privacy panes the user typically needs to fix
+        if appState.accessibilityPermission != .granted {
+            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+                NSWorkspace.shared.open(url)
+            }
+        }
+
+        if appState.inputMonitoringPermission != .granted {
+            // Small delay so the first pane has time to open
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent") {
+                    NSWorkspace.shared.open(url)
+                }
+            }
+        }
+
+        // Re-check after giving the user time to toggle
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
+            appState.checkPermissions()
+        }
+
+        // Start polling to auto-detect when permissions are granted
+        appState.startPermissionPolling()
+    }
 
     private func resetPermissions() {
         let alert = NSAlert()
