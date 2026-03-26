@@ -268,3 +268,205 @@ final class AudioEngineTests: XCTestCase {
     }
 }
 
+
+// MARK: - AudioEngine Force Reset Tests
+
+final class AudioEngineForceResetTests: XCTestCase {
+
+    func testForceResetWhenNotRecording() {
+        // forceReset() should be safe to call even when not recording
+        let engine = AudioEngine()
+        engine.forceReset()
+
+        // Engine should be in a clean state
+        XCTAssertFalse(engine.isCurrentlyRecording,
+            "Engine should not be recording after force reset")
+    }
+
+    func testForceResetDuringRecording() {
+        let engine = AudioEngine()
+
+        engine.startRecording(
+            silenceThreshold: 0.01,
+            silenceDuration: 999.0,
+            maxDuration: 60.0
+        )
+
+        // Wait for recording to start and accumulate some data
+        let expectation = XCTestExpectation(description: "Recording started")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            expectation.fulfill()
+        }
+        wait(for: [expectation], timeout: 2.0)
+
+        // Force reset should stop everything
+        engine.forceReset()
+
+        XCTAssertFalse(engine.isCurrentlyRecording,
+            "Engine should not be recording after force reset")
+
+        // stopRecording should return empty after a force reset
+        let samples = engine.stopRecording()
+        XCTAssertTrue(samples.isEmpty,
+            "stopRecording after forceReset should return empty (buffer was cleared)")
+    }
+
+    func testForceResetAllowsNewRecording() {
+        // After a force reset, starting a new recording should work normally
+        let engine = AudioEngine()
+
+        // Start, force reset, then start again
+        engine.startRecording(
+            silenceThreshold: 0.01,
+            silenceDuration: 999.0,
+            maxDuration: 60.0
+        )
+        engine.forceReset()
+
+        // Start a fresh recording
+        engine.startRecording(
+            silenceThreshold: 0.01,
+            silenceDuration: 999.0,
+            maxDuration: 60.0
+        )
+
+        // Wait for some audio to accumulate
+        let expectation = XCTestExpectation(description: "New recording")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            expectation.fulfill()
+        }
+        wait(for: [expectation], timeout: 2.0)
+
+        let samples = engine.stopRecording()
+        XCTAssertFalse(samples.isEmpty,
+            "Should be able to record new audio after force reset")
+    }
+
+    func testForceResetMultipleTimes() {
+        // Calling forceReset multiple times in a row should not crash
+        let engine = AudioEngine()
+        engine.forceReset()
+        engine.forceReset()
+        engine.forceReset()
+
+        XCTAssertFalse(engine.isCurrentlyRecording,
+            "Engine should be idle after multiple force resets")
+    }
+
+    func testIsCurrentlyRecordingReflectsState() {
+        let engine = AudioEngine()
+
+        XCTAssertFalse(engine.isCurrentlyRecording,
+            "Engine should not be recording initially")
+
+        engine.startRecording(
+            silenceThreshold: 0.01,
+            silenceDuration: 999.0,
+            maxDuration: 60.0
+        )
+
+        // Allow engine to start
+        let startExpectation = XCTestExpectation(description: "Recording started")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            startExpectation.fulfill()
+        }
+        wait(for: [startExpectation], timeout: 1.0)
+
+        XCTAssertTrue(engine.isCurrentlyRecording,
+            "Engine should be recording after startRecording")
+
+        let _ = engine.stopRecording()
+
+        XCTAssertFalse(engine.isCurrentlyRecording,
+            "Engine should not be recording after stopRecording")
+    }
+}
+
+// MARK: - AudioEngine Device Change Tests
+
+final class AudioEngineDeviceChangeTests: XCTestCase {
+
+    func testOnAudioDeviceChangedCallbackExists() {
+        // Verify the callback property can be set
+        let engine = AudioEngine()
+        var callbackInvoked = false
+
+        engine.onAudioDeviceChanged = {
+            callbackInvoked = true
+        }
+
+        XCTAssertNotNil(engine.onAudioDeviceChanged)
+        // Callback hasn't been invoked yet (no device change)
+        XCTAssertFalse(callbackInvoked)
+    }
+
+    func testForceResetSimulatesDeviceChangeRecovery() {
+        // When a device change occurs during recording, the engine should be
+        // resettable via forceReset (which is what the notification handler calls).
+        // This tests the recovery path without relying on the private AVAudioEngine object.
+        let engine = AudioEngine()
+
+        engine.startRecording(
+            silenceThreshold: 0.01,
+            silenceDuration: 999.0,
+            maxDuration: 60.0
+        )
+
+        // Wait for recording to start
+        let startExpectation = XCTestExpectation(description: "Recording started")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            startExpectation.fulfill()
+        }
+        wait(for: [startExpectation], timeout: 2.0)
+
+        XCTAssertTrue(engine.isCurrentlyRecording, "Should be recording before simulated device change")
+
+        // Simulate what the notification handler does: force reset
+        engine.forceReset()
+
+        XCTAssertFalse(engine.isCurrentlyRecording,
+            "Engine should stop recording after force reset (simulating device change recovery)")
+
+        // Should be able to start a new recording after recovery
+        engine.startRecording(
+            silenceThreshold: 0.01,
+            silenceDuration: 999.0,
+            maxDuration: 60.0
+        )
+
+        let restartExpectation = XCTestExpectation(description: "Restarted recording")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            restartExpectation.fulfill()
+        }
+        wait(for: [restartExpectation], timeout: 2.0)
+
+        XCTAssertTrue(engine.isCurrentlyRecording,
+            "Should be able to record again after device change recovery")
+        let _ = engine.stopRecording()
+    }
+
+    func testDeviceChangeCallbackNotFiredWhenNotRecording() {
+        // forceReset when not recording should not cause any issues
+        let engine = AudioEngine()
+        var deviceChangeCalled = false
+
+        engine.onAudioDeviceChanged = {
+            deviceChangeCalled = true
+        }
+
+        XCTAssertFalse(engine.isCurrentlyRecording, "Should not be recording")
+
+        // Force reset while not recording — callback should not fire
+        engine.forceReset()
+
+        // Wait for any async processing
+        let expectation = XCTestExpectation(description: "Processing complete")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            expectation.fulfill()
+        }
+        wait(for: [expectation], timeout: 2.0)
+
+        XCTAssertFalse(deviceChangeCalled,
+            "Device change callback should NOT fire during forceReset (only notification handler fires it)")
+    }
+}

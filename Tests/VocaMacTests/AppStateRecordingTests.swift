@@ -36,15 +36,17 @@ final class AppStateRecordingTests: XCTestCase {
                      "Error message should mention microphone")
     }
 
-    func testStartRecordingIgnoredInProcessingState() async {
+    func testStartRecordingInProcessingStateForceRecovers() async {
         let appState = AppState()
         appState.appStatus = .processing
 
         await appState.startRecording()
 
-        // Should remain in processing — startRecording is ignored in non-idle state
-        XCTAssertEqual(appState.appStatus, .processing,
-                      "startRecording should be ignored when in processing state")
+        // PR #84 changed behavior: startRecording in processing/error state now
+        // force-recovers to idle so the user can unstick the app by pressing
+        // the hotkey again (instead of silently ignoring the press).
+        XCTAssertEqual(appState.appStatus, .idle,
+                      "startRecording in processing state should force recover to idle")
     }
 
     func testStopRecordingWhenNotRecording() async {
@@ -225,5 +227,155 @@ final class AppStateErrorRecoveryTests: XCTestCase {
         // After recovery, should not be recording
         XCTAssertFalse(appState.isRecording,
                       "Recovery path should stop recording")
+    }
+}
+
+// MARK: - AppState Force Recovery Tests
+
+final class AppStateForceRecoveryTests: XCTestCase {
+
+    override func setUp() {
+        super.setUp()
+        // Clean up persisted state
+        UserDefaults.standard.removeObject(forKey: "vocamac.hasCompletedOnboarding")
+        UserDefaults.standard.removeObject(forKey: "vocamac.launchAtLogin")
+    }
+
+    @MainActor
+    func testForceRecoveryResetsToIdle() {
+        let appState = AppState()
+
+        // Simulate a stuck recording state
+        appState.appStatus = .recording
+        appState.isRecording = true
+        appState.audioLevel = 0.5
+
+        appState.forceRecovery()
+
+        XCTAssertEqual(appState.appStatus, .idle,
+            "appStatus should be idle after force recovery")
+        XCTAssertFalse(appState.isRecording,
+            "isRecording should be false after force recovery")
+        XCTAssertEqual(appState.audioLevel, 0.0,
+            "audioLevel should be 0 after force recovery")
+        XCTAssertNil(appState.errorMessage,
+            "errorMessage should be nil after force recovery")
+    }
+
+    @MainActor
+    func testForceRecoveryFromErrorState() {
+        let appState = AppState()
+
+        appState.appStatus = .error
+        appState.errorMessage = "Something went wrong"
+
+        appState.forceRecovery()
+
+        XCTAssertEqual(appState.appStatus, .idle,
+            "appStatus should be idle after force recovery from error")
+        XCTAssertNil(appState.errorMessage,
+            "errorMessage should be cleared after force recovery")
+    }
+
+    @MainActor
+    func testForceRecoveryFromProcessingState() {
+        let appState = AppState()
+
+        appState.appStatus = .processing
+        appState.isRecording = false
+
+        appState.forceRecovery()
+
+        XCTAssertEqual(appState.appStatus, .idle,
+            "appStatus should be idle after force recovery from processing")
+    }
+
+    @MainActor
+    func testForceRecoveryWhenAlreadyIdle() {
+        // Force recovery should be safe to call when already idle
+        let appState = AppState()
+
+        XCTAssertEqual(appState.appStatus, .idle)
+
+        appState.forceRecovery()
+
+        XCTAssertEqual(appState.appStatus, .idle,
+            "appStatus should remain idle")
+        XCTAssertFalse(appState.isRecording)
+        XCTAssertNil(appState.errorMessage)
+    }
+
+    @MainActor
+    func testForceRecoveryMultipleTimes() {
+        // Calling forceRecovery multiple times should be safe
+        let appState = AppState()
+        appState.appStatus = .recording
+        appState.isRecording = true
+
+        appState.forceRecovery()
+        appState.forceRecovery()
+        appState.forceRecovery()
+
+        XCTAssertEqual(appState.appStatus, .idle)
+        XCTAssertFalse(appState.isRecording)
+    }
+}
+
+// MARK: - AppState Recording State Guard Tests
+
+final class AppStateRecordingGuardTests: XCTestCase {
+
+    override func setUp() {
+        super.setUp()
+        UserDefaults.standard.removeObject(forKey: "vocamac.hasCompletedOnboarding")
+        UserDefaults.standard.removeObject(forKey: "vocamac.launchAtLogin")
+    }
+
+    @MainActor
+    func testStartRecordingInErrorStateForceRecovers() async {
+        let appState = AppState()
+        appState.appStatus = .error
+        appState.errorMessage = "Previous error"
+
+        await appState.startRecording()
+
+        // Should have force-recovered to idle (not started recording in same call)
+        XCTAssertEqual(appState.appStatus, .idle,
+            "startRecording in error state should force recover to idle")
+        XCTAssertNil(appState.errorMessage,
+            "Error message should be cleared after force recovery")
+    }
+
+    @MainActor
+    func testStartRecordingInProcessingStateForceRecovers() async {
+        let appState = AppState()
+        appState.appStatus = .processing
+
+        await appState.startRecording()
+
+        XCTAssertEqual(appState.appStatus, .idle,
+            "startRecording in processing state should force recover to idle")
+    }
+
+    @MainActor
+    func testStopRecordingWhenNotRecordingIsNoop() async {
+        let appState = AppState()
+        XCTAssertEqual(appState.appStatus, .idle)
+        XCTAssertFalse(appState.isRecording)
+
+        await appState.stopRecordingAndTranscribe()
+
+        // Should still be idle — no crash, no state change
+        XCTAssertEqual(appState.appStatus, .idle)
+        XCTAssertFalse(appState.isRecording)
+    }
+
+    @MainActor
+    func testInitialStateIsIdle() {
+        let appState = AppState()
+        XCTAssertEqual(appState.appStatus, .idle)
+        XCTAssertFalse(appState.isRecording)
+        XCTAssertEqual(appState.audioLevel, 0.0)
+        XCTAssertNil(appState.errorMessage)
     }
 }
