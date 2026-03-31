@@ -37,3 +37,7 @@ dist/
 # Legacy stubs
 Sources/CWhisper/
 VocaMac.iconset/
+
+# Tool artifacts
+.desloppify/
+.claude/
