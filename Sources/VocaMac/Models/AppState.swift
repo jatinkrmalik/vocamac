@@ -572,7 +572,7 @@ final class AppState: ObservableObject {
 
         VocaLogger.info(.appState, "Loading model: \(preferredSize.displayName)...")
         await loadModel(preferredSize)
-        NSLog("[AppState] Model loaded: %@", whisperService.loadedModelName ?? "none")
+        VocaLogger.info(.appState, "Model loaded: \(whisperService.loadedModelName ?? "none")")
 
         // 4. Always attempt to start hotkey listener
         // The event tap creation itself will fail if permissions aren't granted,
@@ -594,6 +594,6 @@ final class AppState: ObservableObject {
     }
     func completeOnboarding() {
         hasCompletedOnboarding = true
-        NSLog("[AppState] Onboarding completed!")
+        VocaLogger.info(.appState, "Onboarding completed")
     }
 }
