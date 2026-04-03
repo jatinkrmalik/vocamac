@@ -38,6 +38,9 @@ dist/
 Sources/CWhisper/
 VocaMac.iconset/
 
+# Bitbucket Pipelines (lives only on Bitbucket's release branch, not GitHub)
+bitbucket-pipelines.yml
+
 # Tool artifacts
 .desloppify/
 .claude/
