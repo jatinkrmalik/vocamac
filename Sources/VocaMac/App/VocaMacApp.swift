@@ -190,7 +190,7 @@ struct VocaMacApp: App {
         let runningApps = NSRunningApplication.runningApplications(withBundleIdentifier: "com.vocamac.app")
 
         for app in runningApps where app.processIdentifier != currentPID {
-            NSLog("[VocaMac] Terminating previous instance (PID %d)", app.processIdentifier)
+            VocaLogger.info(.general, "Terminating previous instance (PID \(app.processIdentifier))")
             app.terminate()
         }
 
@@ -209,7 +209,7 @@ struct VocaMacApp: App {
             if let output = String(data: data, encoding: .utf8) {
                 let pids = output.split(separator: "\n").compactMap { Int32($0) }
                 for pid in pids where pid != currentPID {
-                    NSLog("[VocaMac] Killing previous VocaMac process (PID %d)", pid)
+                    VocaLogger.info(.general, "Killing previous VocaMac process (PID \(pid))")
                     kill(pid, SIGTERM)
                 }
             }

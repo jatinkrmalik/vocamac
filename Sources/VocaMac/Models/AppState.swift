@@ -78,14 +78,11 @@ final class AppState: ObservableObject {
     /// All available models and their statuses
     @Published var availableModels: [WhisperModelInfo] = []
 
-    /// Microphone permission status
-    @Published var micPermission: PermissionStatus = .notDetermined
-
-    /// Accessibility permission status
-    @Published var accessibilityPermission: PermissionStatus = .notDetermined
-
-    /// Input Monitoring permission status
-    @Published var inputMonitoringPermission: PermissionStatus = .notDetermined
+    // Permissions are managed by PermissionManager.
+    // These computed properties maintain backward compatibility for views.
+    var micPermission: PermissionStatus { permissionManager.micPermission }
+    var accessibilityPermission: PermissionStatus { permissionManager.accessibilityPermission }
+    var inputMonitoringPermission: PermissionStatus { permissionManager.inputMonitoringPermission }
 
     /// Detected system capabilities
     @Published var systemCapabilities: SystemCapabilities?
@@ -120,15 +117,11 @@ final class AppState: ObservableObject {
     let modelManager = ModelManager()
     let soundManager = SoundManager()
     let cursorOverlay = CursorOverlayManager()
+    let permissionManager: PermissionManager
 
     // MARK: - Private
 
     private var cancellables = Set<AnyCancellable>()
-
-    /// Timer that periodically polls permissions until all are granted.
-    /// Accessibility and Input Monitoring don't have callback-based APIs,
-    /// so we must poll to detect when the user grants them in System Settings.
-    private var permissionPollTimer: Timer?
 
     // MARK: - Initialization
 
@@ -137,6 +130,7 @@ final class AppState: ObservableObject {
     private var hasStarted = false
 
     init() {
+        self.permissionManager = PermissionManager(audioEngine: audioEngine, hotKeyManager: hotKeyManager)
         VocaLogger.info(.appState, "Initializing...")
         syncLaunchAtLogin()
         setupServices()
@@ -263,164 +257,37 @@ final class AppState: ObservableObject {
             }
         }
 
+        // Wire permission manager: start hotkey listener when permissions granted
+        permissionManager.onAllPermissionsGranted = { [weak self] in
+            guard let self = self else { return }
+            self.hotKeyManager.startListening(
+                keyCode: self.hotKeyCode,
+                mode: self.activationMode,
+                doubleTapThreshold: self.doubleTapThreshold,
+                safetyTimeout: Double(self.maxRecordingDuration) + 5.0
+            )
+            VocaLogger.info(.appState, "Hotkey listener started after permission grant")
+        }
+
+        // Forward PermissionManager state changes to trigger SwiftUI updates
+        permissionManager.objectWillChange
+            .sink { [weak self] in self?.objectWillChange.send() }
+            .store(in: &cancellables)
+
         // Check permissions
         checkPermissions()
     }
 
-    // MARK: - Permission Handling
+    // MARK: - Permission Handling (delegated to PermissionManager)
 
-    func checkPermissions() {
-        // Check microphone permission (tri-state: notDetermined, granted, denied)
-        micPermission = audioEngine.checkPermissionStatus()
-
-        // Check accessibility permission
-        let accessibilityGranted = HotKeyManager.checkAccessibilityPermission(prompt: false)
-        accessibilityPermission = accessibilityGranted ? .granted : .denied
-
-        // Check input monitoring permission
-        // If we can successfully create an event tap (even briefly), Input Monitoring is granted.
-        // CGPreflightListenEventAccess() is available on macOS 15+, so we use a tap test as fallback.
-        let inputMonitoringGranted = checkInputMonitoringPermission()
-        inputMonitoringPermission = inputMonitoringGranted ? .granted : .denied
-    }
-
-    /// Start polling permissions every 3 seconds until all are granted.
-    /// This is necessary because Accessibility and Input Monitoring permissions
-    /// don't have callback-based APIs — we must poll to detect changes.
-    func startPermissionPolling() {
-        // Don't start if already polling
-        guard permissionPollTimer == nil else { return }
-
-        // Don't start if all permissions are already granted
-        guard !allPermissionsGranted else { return }
-
-        VocaLogger.debug(.appState, "Starting permission polling")
-        permissionPollTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                self?.checkPermissions()
-
-                // If a permission was just granted, try to start the hotkey listener
-                // (it may have failed earlier due to missing permissions)
-                if let self = self, self.accessibilityPermission == .granted &&
-                    self.inputMonitoringPermission == .granted && !self.hotKeyManager.isListening {
-                    self.hotKeyManager.startListening(
-                        keyCode: self.hotKeyCode,
-                        mode: self.activationMode,
-                        doubleTapThreshold: self.doubleTapThreshold,
-                        safetyTimeout: Double(self.maxRecordingDuration) + 5.0
-                    )
-                    VocaLogger.info(.appState, "Hotkey listener started after permission grant")
-                }
-
-                // Stop polling once all permissions are granted
-                if self?.allPermissionsGranted == true {
-                    self?.stopPermissionPolling()
-                }
-            }
-        }
-    }
-
-    /// Stop the permission polling timer
-    func stopPermissionPolling() {
-        VocaLogger.debug(.appState, "Stopping permission polling — all permissions granted")
-        permissionPollTimer?.invalidate()
-        permissionPollTimer = nil
-    }
-
-    /// Whether all required permissions are granted
-    var allPermissionsGranted: Bool {
-        micPermission == .granted &&
-        accessibilityPermission == .granted &&
-        inputMonitoringPermission == .granted
-    }
-
-    /// Check Input Monitoring permission.
-    /// Uses multiple strategies since no single approach is 100% reliable:
-    /// 1. If HotKeyManager created a tap, check if macOS has disabled it (revocation)
-    /// 2. If HotKeyManager failed to create a tap, permission is likely denied
-    /// 3. Try creating a fresh .cghidEventTap (same type HotKeyManager uses)
-    private func checkInputMonitoringPermission() -> Bool {
-        // Strategy 1: If HotKeyManager has an active tap, check if macOS disabled it.
-        // macOS disables existing taps when Input Monitoring is revoked.
-        if hotKeyManager.isListening, let tap = hotKeyManager.activeEventTap {
-            return CGEvent.tapIsEnabled(tap: tap)
-        }
-
-        // Strategy 2: Try creating a fresh .cghidEventTap — the same type
-        // HotKeyManager uses. This is more accurate than .cgSessionEventTap
-        // which may inherit Terminal's permissions when launched from CLI.
-        let tap = CGEvent.tapCreate(
-            tap: .cghidEventTap,
-            place: .headInsertEventTap,
-            options: .listenOnly,
-            eventsOfInterest: CGEventMask(1 << CGEventType.keyDown.rawValue),
-            callback: { _, _, event, _ in Unmanaged.passRetained(event) },
-            userInfo: nil
-        )
-        if let tap = tap {
-            CFMachPortInvalidate(tap)
-            return true
-        }
-        return false
-    }
-
-    func requestMicrophonePermission() {
-        if micPermission == .denied {
-            // Already denied — re-requesting won't show the prompt again.
-            // Open System Settings so the user can manually enable it.
-            openMicrophoneSettings()
-            return
-        }
-
-        // First time or notDetermined — trigger the system permission prompt
-        audioEngine.requestPermission { [weak self] granted in
-            Task { @MainActor in
-                self?.micPermission = granted ? .granted : .denied
-            }
-        }
-    }
-
-    /// Open the Microphone privacy pane in System Settings
-    func openMicrophoneSettings() {
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone") {
-            NSWorkspace.shared.open(url)
-        }
-        // Re-check after user has time to toggle
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
-            self?.checkPermissions()
-        }
-    }
-
-    func requestAccessibilityPermission() {
-        let _ = HotKeyManager.checkAccessibilityPermission(prompt: true)
-        // Start polling to detect when user grants permission in System Settings
-        startPermissionPolling()
-    }
-
-    func requestInputMonitoringPermission() {
-        // Attempting to create an event tap triggers macOS to auto-add
-        // the app to the Input Monitoring list in System Settings.
-        // Use .cghidEventTap (same as HotKeyManager) for consistent behavior.
-        let tap = CGEvent.tapCreate(
-            tap: .cghidEventTap,
-            place: .headInsertEventTap,
-            options: .listenOnly,
-            eventsOfInterest: CGEventMask(1 << CGEventType.keyDown.rawValue),
-            callback: { _, _, event, _ in Unmanaged.passRetained(event) },
-            userInfo: nil
-        )
-        if let tap = tap {
-            CFMachPortInvalidate(tap)
-        }
-
-        // Open Input Monitoring settings pane
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent") {
-            NSWorkspace.shared.open(url)
-        }
-
-        // Start polling to detect when user grants permission in System Settings
-        startPermissionPolling()
-    }
+    func checkPermissions() { permissionManager.checkPermissions() }
+    func startPermissionPolling() { permissionManager.startPermissionPolling() }
+    func stopPermissionPolling() { permissionManager.stopPermissionPolling() }
+    var allPermissionsGranted: Bool { permissionManager.allPermissionsGranted }
+    func requestMicrophonePermission() { permissionManager.requestMicrophonePermission() }
+    func openMicrophoneSettings() { permissionManager.openMicrophoneSettings() }
+    func requestAccessibilityPermission() { permissionManager.requestAccessibilityPermission() }
+    func requestInputMonitoringPermission() { permissionManager.requestInputMonitoringPermission() }
 
     // MARK: - Recording Flow
 
@@ -705,7 +572,7 @@ final class AppState: ObservableObject {
 
         VocaLogger.info(.appState, "Loading model: \(preferredSize.displayName)...")
         await loadModel(preferredSize)
-        NSLog("[AppState] Model loaded: %@", whisperService.loadedModelName ?? "none")
+        VocaLogger.info(.appState, "Model loaded: \(whisperService.loadedModelName ?? "none")")
 
         // 4. Always attempt to start hotkey listener
         // The event tap creation itself will fail if permissions aren't granted,
@@ -727,6 +594,6 @@ final class AppState: ObservableObject {
     }
     func completeOnboarding() {
         hasCompletedOnboarding = true
-        NSLog("[AppState] Onboarding completed!")
+        VocaLogger.info(.appState, "Onboarding completed")
     }
 }

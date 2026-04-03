@@ -74,7 +74,7 @@ final class SoundManager: NSObject, NSSoundDelegate, @unchecked Sendable {
     private func playSystemSoundAsync(_ name: String) async {
         let soundPath = "/System/Library/Sounds/\(name).aiff"
         guard let sound = NSSound(contentsOfFile: soundPath, byReference: true) else {
-            NSLog("[SoundManager] Could not load system sound: %@", name)
+            VocaLogger.warning(.soundManager, "Could not load system sound: \(name)")
             return
         }
 
@@ -93,7 +93,7 @@ final class SoundManager: NSObject, NSSoundDelegate, @unchecked Sendable {
                 guard let self = self else { return }
                 self.continuationLock.lock()
                 if self.soundCompletionContinuation != nil {
-                    NSLog("[SoundManager] Sound playback timeout for: %@", name)
+                    VocaLogger.warning(.soundManager, "Sound playback timeout for: \(name)")
                     self.soundCompletionContinuation?.resume()
                     self.soundCompletionContinuation = nil
                 }
