@@ -158,6 +158,17 @@ final class HotKeyManager {
         VocaLogger.info(.hotKeyManager, "Stopped listening")
     }
 
+    /// Reset internal key tracking state without stopping the listener.
+    /// Used when the app forcibly recovers from a stuck recording state
+    /// (e.g., after an audio device change) so that the next keypress
+    /// is treated as a fresh key-down rather than a recovery key-down.
+    func resetKeyState() {
+        isKeyHeld = false
+        isToggled = false
+        cancelSafetyTimer()
+        VocaLogger.debug(.hotKeyManager, "Key state reset")
+    }
+
     /// Update the configuration while listening
     /// - Parameters:
     ///   - keyCode: New key code to listen for
@@ -408,6 +419,50 @@ final class HotKeyManager {
     private func cancelSafetyTimer() {
         keyHeldSafetyTimer?.cancel()
         keyHeldSafetyTimer = nil
+    }
+
+    // MARK: - Event Tap Health Check
+
+    /// Check whether the event tap is still healthy.
+    /// macOS can silently disable event taps (e.g., after sleep/wake, permission
+    /// changes, or system resource pressure). If we detect a disabled tap, we
+    /// attempt to re-enable it. Returns `true` if the tap is healthy.
+    ///
+    /// Call this periodically (e.g., from a timer in AppState) to catch cases
+    /// where the tap dies without triggering the `tapDisabledByTimeout` callback
+    /// (which only fires when an event arrives — if no events arrive, the
+    /// callback never runs and the tap stays dead).
+    func checkAndRepairEventTap() -> Bool {
+        guard isListening, let tap = eventTap else {
+            // Not listening or no tap — not healthy
+            return false
+        }
+
+        if CGEvent.tapIsEnabled(tap: tap) {
+            return true
+        }
+
+        // Tap exists but is disabled — try to re-enable it
+        VocaLogger.warning(.hotKeyManager, "Event tap was disabled by macOS — re-enabling")
+        CGEvent.tapEnable(tap: tap, enable: true)
+
+        // Verify re-enable worked
+        let reEnabled = CGEvent.tapIsEnabled(tap: tap)
+        if reEnabled {
+            VocaLogger.info(.hotKeyManager, "Event tap re-enabled successfully")
+        } else {
+            VocaLogger.error(.hotKeyManager, "Failed to re-enable event tap — recreating")
+            // Tear down and recreate the tap entirely
+            stopListening()
+            startListening(
+                keyCode: targetKeyCode,
+                mode: mode,
+                doubleTapThreshold: doubleTapThreshold,
+                safetyTimeout: safetyTimeoutSeconds
+            )
+        }
+
+        return isListening
     }
 
     // MARK: - Deinit
