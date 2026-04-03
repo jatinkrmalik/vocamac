@@ -39,9 +39,9 @@ echo "📥 Pulling latest main from GitHub..."
 git checkout main
 git pull origin main
 
-# Step 2: Sync main to Bitbucket
+# Step 2: Sync main to Bitbucket (main-mirror branch)
 echo "📤 Syncing main to Bitbucket..."
-git push atlassian main
+git push atlassian main:main-mirror
 
 # Step 3: Rebase Bitbucket's release branch onto updated main
 echo "🔄 Rebasing Bitbucket release branch..."
