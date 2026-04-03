@@ -1,0 +1,295 @@
+name: Nightly Build
+
+on:
+  schedule:
+    # Run every day at midnight UTC
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+    # Allow manual trigger for testing
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nightly-build
+  cancel-in-progress: true
+
+jobs:
+  check-for-changes:
+    name: Check for New Commits
+    runs-on: ubuntu-latest
+    outputs:
+      has_changes: ${{ steps.check.outputs.has_changes }}
+      latest_tag: ${{ steps.check.outputs.latest_tag }}
+      changelog: ${{ steps.changelog.outputs.changelog }}
+      commit_count: ${{ steps.check.outputs.commit_count }}
+      short_sha: ${{ steps.check.outputs.short_sha }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Check for changes since last tag
+        id: check
+        run: |
+          # Find the latest stable release tag (vX.Y.Z format)
+          LATEST_TAG=$(git tag --sort=-version:refname --list 'v*' | head -1)
+          echo "latest_tag=${LATEST_TAG}" >> "$GITHUB_OUTPUT"
+          echo "📌 Latest stable tag: ${LATEST_TAG}"
+
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+
+          if [ -z "$LATEST_TAG" ]; then
+            echo "No tags found — treating all commits as new"
+            COMMIT_COUNT=$(git rev-list --count HEAD)
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+            echo "commit_count=${COMMIT_COUNT}" >> "$GITHUB_OUTPUT"
+          else
+            # Count commits since last tag
+            COMMIT_COUNT=$(git rev-list --count "${LATEST_TAG}..HEAD")
+            echo "commit_count=${COMMIT_COUNT}" >> "$GITHUB_OUTPUT"
+
+            if [ "$COMMIT_COUNT" -eq 0 ]; then
+              echo "✅ No new commits since ${LATEST_TAG} — skipping nightly build"
+              echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "🔄 Found ${COMMIT_COUNT} new commit(s) since ${LATEST_TAG}"
+              echo "has_changes=true" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+      - name: Generate changelog
+        id: changelog
+        if: steps.check.outputs.has_changes == 'true'
+        run: |
+          LATEST_TAG="${{ steps.check.outputs.latest_tag }}"
+
+          # Build changelog from commits since last tag
+          if [ -z "$LATEST_TAG" ]; then
+            RANGE="HEAD"
+          else
+            RANGE="${LATEST_TAG}..HEAD"
+          fi
+
+          # Generate categorized changelog
+          {
+            echo "changelog<<CHANGELOG_EOF"
+
+            # Features
+            FEATS=$(git log "$RANGE" --pretty=format:"- %s (%h)" --grep="^feat" --no-merges 2>/dev/null || true)
+            if [ -n "$FEATS" ]; then
+              echo "### ✨ New Features"
+              echo "$FEATS"
+              echo ""
+            fi
+
+            # Fixes
+            FIXES=$(git log "$RANGE" --pretty=format:"- %s (%h)" --grep="^fix" --no-merges 2>/dev/null || true)
+            if [ -n "$FIXES" ]; then
+              echo "### 🐛 Bug Fixes"
+              echo "$FIXES"
+              echo ""
+            fi
+
+            # UI changes
+            UI=$(git log "$RANGE" --pretty=format:"- %s (%h)" --grep="^ui" --no-merges 2>/dev/null || true)
+            if [ -n "$UI" ]; then
+              echo "### 🎨 UI Improvements"
+              echo "$UI"
+              echo ""
+            fi
+
+            # CI/Chore/Docs
+            OTHER=$(git log "$RANGE" --pretty=format:"- %s (%h)" --grep="^chore\|^ci\|^docs\|^refactor\|^perf\|^test" --no-merges 2>/dev/null || true)
+            if [ -n "$OTHER" ]; then
+              echo "### 🔧 Maintenance & Other"
+              echo "$OTHER"
+              echo ""
+            fi
+
+            # Uncategorized (commits not matching conventional commit prefixes)
+            ALL_CATEGORIZED=$(git log "$RANGE" --pretty=format:"%h" --grep="^feat\|^fix\|^ui\|^chore\|^ci\|^docs\|^refactor\|^perf\|^test" --no-merges 2>/dev/null | sort || true)
+            ALL_COMMITS=$(git log "$RANGE" --pretty=format:"%h" --no-merges 2>/dev/null | sort || true)
+            UNCATEGORIZED_HASHES=$(comm -23 <(echo "$ALL_COMMITS") <(echo "$ALL_CATEGORIZED") 2>/dev/null || true)
+
+            if [ -n "$UNCATEGORIZED_HASHES" ]; then
+              UNCATEGORIZED=""
+              while IFS= read -r hash; do
+                [ -z "$hash" ] && continue
+                MSG=$(git log -1 --pretty=format:"- %s (%h)" "$hash" 2>/dev/null || true)
+                UNCATEGORIZED="${UNCATEGORIZED}${MSG}"$'\n'
+              done <<< "$UNCATEGORIZED_HASHES"
+              if [ -n "$(echo "$UNCATEGORIZED" | tr -d '[:space:]')" ]; then
+                echo "### 📝 Other Changes"
+                echo "$UNCATEGORIZED"
+                echo ""
+              fi
+            fi
+
+            echo "CHANGELOG_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+  build-nightly:
+    name: Build Nightly
+    needs: check-for-changes
+    if: needs.check-for-changes.outputs.has_changes == 'true'
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache SPM dependencies
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: spm-${{ runner.os }}-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            spm-${{ runner.os }}-
+
+      - name: Run tests
+        run: swift test
+
+      - name: Initialize Xcode tools
+        run: sudo xcodebuild -runFirstLaunch
+
+      - name: Build release app bundle
+        run: ./scripts/build.sh release
+
+      - name: Verify code signature
+        run: codesign -v --deep --strict VocaMac.app
+
+      - name: Create DMG
+        run: |
+          NIGHTLY_DATE=$(date -u +%Y%m%d)
+          SHORT_SHA="${{ needs.check-for-changes.outputs.short_sha }}"
+          DMG_NAME="VocaMac-nightly-${NIGHTLY_DATE}-${SHORT_SHA}-arm64.dmg"
+
+          mkdir -p dmg-staging
+          cp -R VocaMac.app dmg-staging/
+          ln -s /Applications dmg-staging/Applications
+
+          hdiutil create -volname "VocaMac Nightly" \
+            -srcfolder dmg-staging \
+            -ov -format UDZO \
+            "$DMG_NAME"
+
+          echo "DMG_NAME=${DMG_NAME}" >> "$GITHUB_ENV"
+          echo "DMG created:"
+          ls -lh "$DMG_NAME"
+
+      - name: Create ZIP archive
+        run: |
+          NIGHTLY_DATE=$(date -u +%Y%m%d)
+          SHORT_SHA="${{ needs.check-for-changes.outputs.short_sha }}"
+          ZIP_NAME="VocaMac-nightly-${NIGHTLY_DATE}-${SHORT_SHA}-arm64.zip"
+
+          ditto -c -k --sequesterRsrc --keepParent VocaMac.app "$ZIP_NAME"
+
+          echo "ZIP_NAME=${ZIP_NAME}" >> "$GITHUB_ENV"
+          echo "ZIP created:"
+          ls -lh "$ZIP_NAME"
+
+      - name: Generate checksums
+        run: |
+          shasum -a 256 VocaMac-nightly-*.dmg VocaMac-nightly-*.zip > checksums.txt
+          cat checksums.txt
+
+      - name: Delete existing nightly release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Delete the existing nightly release (if any) to keep only one active
+          echo "🗑️ Checking for existing nightly release..."
+          if gh release view nightly &>/dev/null; then
+            echo "   Found existing nightly release — deleting..."
+            gh release delete nightly --yes --cleanup-tag
+            echo "   ✅ Old nightly release deleted"
+          else
+            echo "   No existing nightly release found"
+          fi
+
+      - name: Create nightly release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CHANGELOG: ${{ needs.check-for-changes.outputs.changelog }}
+        run: |
+          LATEST_TAG="${{ needs.check-for-changes.outputs.latest_tag }}"
+          COMMIT_COUNT="${{ needs.check-for-changes.outputs.commit_count }}"
+          SHORT_SHA="${{ needs.check-for-changes.outputs.short_sha }}"
+          NIGHTLY_DATE=$(date -u +%Y-%m-%d)
+          REPO_URL="${{ github.server_url }}/${{ github.repository }}"
+
+          # Build the stable release link
+          if [ -n "$LATEST_TAG" ]; then
+            STABLE_LINK="[**${LATEST_TAG}**](${REPO_URL}/releases/tag/${LATEST_TAG})"
+          else
+            STABLE_LINK="_No stable release available yet._"
+          fi
+
+          # Write release notes to a file (avoids heredoc indentation issues)
+          {
+            echo "## ⚠️ Nightly Build — Not for Production Use"
+            echo ""
+            echo "> **This is an automated nightly build from the latest \`main\` branch.**"
+            echo "> It is intended for **developers and testers** who want to try the latest changes"
+            echo "> before they are included in a stable release."
+            echo ">"
+            echo "> **This build may be unstable, contain bugs, or include incomplete features.**"
+            echo "> Do not use it as your daily driver. If you encounter issues, please"
+            echo "> [report them](${REPO_URL}/issues/new) — your feedback helps us improve!"
+            echo ""
+            echo "### 🏷️ Latest Stable Release"
+            echo ""
+            echo "👉 For a reliable experience, use the latest stable release: ${STABLE_LINK}"
+            echo ""
+            echo "---"
+            echo ""
+            echo "### 📋 What's Changed Since ${LATEST_TAG:-the beginning}"
+            echo ""
+            echo "_${COMMIT_COUNT} commit(s) since the last stable release (${LATEST_TAG:-N/A}) • built from \`main\` @ [\`${SHORT_SHA}\`](${REPO_URL}/commit/${SHORT_SHA})_"
+            echo ""
+            echo "$CHANGELOG"
+            echo ""
+            echo "---"
+            echo ""
+            echo "### 📥 Installation"
+            echo ""
+            echo "1. Download \`${DMG_NAME}\`"
+            echo "2. Open the DMG and drag VocaMac to Applications"
+            echo "3. **Important:** Remove the quarantine attribute before launching:"
+            echo "   \`\`\`bash"
+            echo "   xattr -cr /Applications/VocaMac.app"
+            echo "   \`\`\`"
+            echo "4. Open VocaMac from Applications"
+            echo "5. Grant Microphone, Accessibility, and Input Monitoring permissions when prompted"
+            echo ""
+            echo "> **Why step 3?** macOS Gatekeeper blocks apps that aren't notarized with Apple."
+            echo "> Since VocaMac is ad-hoc signed (no Apple Developer certificate yet), you need to"
+            echo "> clear the quarantine flag manually."
+            echo ""
+            echo "### Checksums (SHA-256)"
+            echo "\`\`\`"
+            cat checksums.txt
+            echo "\`\`\`"
+            echo ""
+            echo "### Requirements"
+            echo "- macOS 13 (Ventura) or later"
+            echo "- Apple Silicon (arm64)"
+          } > release-notes.md
+
+          gh release create nightly \
+            --title "🌙 Nightly Build — ${NIGHTLY_DATE}" \
+            --notes-file release-notes.md \
+            --prerelease \
+            --target main \
+            VocaMac-nightly-*.dmg \
+            VocaMac-nightly-*.zip \
+            checksums.txt
+
+          echo "✅ Nightly release created!"
