@@ -317,6 +317,20 @@ struct PermissionsStep: View {
             .cornerRadius(8)
             .padding(.horizontal)
 
+            HStack(alignment: .top, spacing: 8) {
+                Image(systemName: "arrow.trianglehead.clockwise.icloud")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                Text("**Permissions may reset after updates.** VocaMac uses ad-hoc code signing, so macOS may clear Accessibility and Input Monitoring permissions when the app is updated or reinstalled. If this happens, remove the old VocaMac entry in System Settings \u{2192} Privacy & Security (using the minus \"-\" button), then re-add it.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding()
+            .background(Color.orange.opacity(0.05))
+            .cornerRadius(8)
+            .padding(.horizontal)
+
             Spacer()
         }
         .padding()

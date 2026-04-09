@@ -56,14 +56,26 @@ final class PermissionManager: ObservableObject {
     }
 
     /// Re-check all permission statuses from the system.
+    /// Detects permission revocation (common with ad-hoc signed apps after updates)
+    /// and logs a helpful warning when a previously-granted permission is lost.
     func checkPermissions() {
         micPermission = audioEngine.checkPermissionStatus()
 
         let accessibilityGranted = HotKeyManager.checkAccessibilityPermission(prompt: false)
+        let previousAccessibility = accessibilityPermission
         accessibilityPermission = accessibilityGranted ? .granted : .denied
 
         let inputMonitoringGranted = checkInputMonitoringPermission()
+        let previousInputMonitoring = inputMonitoringPermission
         inputMonitoringPermission = inputMonitoringGranted ? .granted : .denied
+
+        // Warn when a permission transitions granted → denied (e.g., after app update)
+        if previousAccessibility == .granted && accessibilityPermission != .granted {
+            VocaLogger.warning(.appState, "Accessibility permission was revoked. This commonly happens after app updates with ad-hoc code signing. Please re-grant in System Settings → Privacy & Security → Accessibility.")
+        }
+        if previousInputMonitoring == .granted && inputMonitoringPermission != .granted {
+            VocaLogger.warning(.appState, "Input Monitoring permission was revoked. This commonly happens after app updates with ad-hoc code signing. Please re-grant in System Settings → Privacy & Security → Input Monitoring.")
+        }
     }
 
     /// Check Input Monitoring permission using multiple strategies since no
@@ -72,7 +84,7 @@ final class PermissionManager: ObservableObject {
     /// 2. Try creating a fresh `.cghidEventTap` (same type HotKeyManager uses)
     private func checkInputMonitoringPermission() -> Bool {
         // Strategy 1: If HotKeyManager has an active tap, check if macOS disabled it.
-        if hotKeyManager.isListening, let tap = hotKeyManager.activeEventTap {
+        if hotKeyManager.isListening, let tap = hotKeyManager.eventTap {
             return CGEvent.tapIsEnabled(tap: tap)
         }
 
