@@ -629,7 +629,7 @@ struct AboutTab: View {
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
 
-            Text("Version 0.3.0 (Beta)")
+            Text("Version 0.4.0 (Beta)")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
 
