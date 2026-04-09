@@ -14,9 +14,6 @@ final class HotKeyManager {
     /// Event tap Mach port
     private(set) var eventTap: CFMachPort?
 
-    /// Public accessor for permission checking
-    var activeEventTap: CFMachPort? { eventTap }
-
     /// Run loop source for the event tap
     private var runLoopSource: CFRunLoopSource?
 
@@ -156,6 +153,17 @@ final class HotKeyManager {
         cancelSafetyTimer()
 
         VocaLogger.info(.hotKeyManager, "Stopped listening")
+    }
+
+    /// Reset internal key tracking state without stopping the listener.
+    /// Used when the app forcibly recovers from a stuck recording state
+    /// (e.g., after an audio device change) so that the next keypress
+    /// is treated as a fresh key-down rather than a recovery key-down.
+    func resetKeyState() {
+        isKeyHeld = false
+        isToggled = false
+        cancelSafetyTimer()
+        VocaLogger.debug(.hotKeyManager, "Key state reset")
     }
 
     /// Update the configuration while listening

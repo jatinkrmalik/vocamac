@@ -14,7 +14,6 @@ final class HotKeyManagerConfigurationTests: XCTestCase {
         let manager = HotKeyManager()
 
         XCTAssertFalse(manager.isListening, "Should not be listening initially")
-        XCTAssertNil(manager.activeEventTap, "Should have no event tap initially")
         XCTAssertNil(manager.eventTap, "Should have no event tap initially")
     }
 
@@ -107,4 +106,26 @@ final class HotKeyManagerConfigurationTests: XCTestCase {
         manager.stopListening()
         XCTAssertFalse(manager.isListening)
     }
+}
+
+// MARK: - HotKeyManager Reset State Tests
+
+final class HotKeyManagerResetStateTests: XCTestCase {
+
+    func testResetKeyStateDoesNotCrash() {
+        // resetKeyState should be safe to call in any state
+        let manager = HotKeyManager()
+        manager.resetKeyState()
+        // No crash = pass
+    }
+
+    func testResetKeyStateMultipleTimes() {
+        // Calling resetKeyState multiple times should be safe
+        let manager = HotKeyManager()
+        manager.resetKeyState()
+        manager.resetKeyState()
+        manager.resetKeyState()
+        // No crash = pass
+    }
+
 }
