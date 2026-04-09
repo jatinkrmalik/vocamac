@@ -244,6 +244,23 @@ final class AppState: ObservableObject {
             }
         }
 
+        // Setup audio device change callback.
+        // Fires when the microphone is unplugged/replugged, Bluetooth disconnects,
+        // or the default audio device changes (e.g., after sleep). AudioEngine has
+        // already stopped and reset itself — we just need to recover the app state.
+        audioEngine.onAudioDeviceChanged = { [weak self] in
+            Task { @MainActor in
+                guard let self = self else { return }
+                VocaLogger.warning(.appState, "Audio device changed — recovering from interrupted recording")
+                self.isRecording = false
+                self.audioLevel = 0.0
+                self.cursorOverlay.hide()
+                self.hotKeyManager.resetKeyState()
+                self.appStatus = .idle
+                self.errorMessage = nil
+            }
+        }
+
         // Setup hotkey callbacks
         hotKeyManager.onRecordingStart = { [weak self] in
             Task { @MainActor in
@@ -289,6 +306,29 @@ final class AppState: ObservableObject {
     func requestAccessibilityPermission() { permissionManager.requestAccessibilityPermission() }
     func requestInputMonitoringPermission() { permissionManager.requestInputMonitoringPermission() }
 
+    // MARK: - Force Recovery
+
+    /// Forcibly reset the entire recording pipeline to idle state.
+    /// This is a last-resort recovery mechanism callable from the menu bar UI.
+    /// It unconditionally resets the audio engine, hotkey state, cursor overlay,
+    /// and all published state back to idle.
+    func forceRecovery() {
+        VocaLogger.warning(.appState, "Force recovery: resetting all state to idle (was appStatus=\(appStatus.rawValue), isRecording=\(isRecording))")
+
+        // Reset audio engine unconditionally
+        audioEngine.forceReset()
+
+        // Reset hotkey tracking state
+        hotKeyManager.resetKeyState()
+
+        // Reset UI state
+        isRecording = false
+        audioLevel = 0.0
+        cursorOverlay.hide()
+        appStatus = .idle
+        errorMessage = nil
+    }
+
     // MARK: - Recording Flow
 
     func startRecording() async {
@@ -302,6 +342,14 @@ final class AppState: ObservableObject {
         }
 
         guard appStatus == .idle else {
+            // If stuck in .processing or .error for too long, force recovery
+            // so the user can start a fresh recording.
+            if appStatus == .error || appStatus == .processing {
+                VocaLogger.warning(.appState, "startRecording called in \(appStatus.rawValue) state — force recovering to allow new recording")
+                forceRecovery()
+                // Don't start recording in the same call — let the user press again
+                return
+            }
             VocaLogger.warning(.appState, "startRecording called in non-idle state: \(appStatus.rawValue) — ignoring")
             return
         }

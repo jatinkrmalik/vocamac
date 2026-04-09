@@ -72,7 +72,7 @@ final class PermissionManager: ObservableObject {
     /// 2. Try creating a fresh `.cghidEventTap` (same type HotKeyManager uses)
     private func checkInputMonitoringPermission() -> Bool {
         // Strategy 1: If HotKeyManager has an active tap, check if macOS disabled it.
-        if hotKeyManager.isListening, let tap = hotKeyManager.activeEventTap {
+        if hotKeyManager.isListening, let tap = hotKeyManager.eventTap {
             return CGEvent.tapIsEnabled(tap: tap)
         }
 

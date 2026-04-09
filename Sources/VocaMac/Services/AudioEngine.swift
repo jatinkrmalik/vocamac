@@ -13,7 +13,7 @@ final class AudioEngine {
 
     private let engine = AVAudioEngine()
     private var audioBuffer: [Float] = []
-    private var isCurrentlyRecording = false
+    private(set) var isCurrentlyRecording = false
     private let bufferQueue = DispatchQueue(label: "com.vocamac.audio-buffer", qos: .userInteractive)
 
     // Silence detection
@@ -45,6 +45,64 @@ final class AudioEngine {
 
     /// Called when max recording duration is reached
     var onMaxDurationReached: (() -> Void)?
+
+    /// Called when the audio device configuration changes (e.g., mic unplugged/replugged).
+    /// The engine is automatically stopped and reset when this happens.
+    /// AppState should use this to recover from a stuck recording state.
+    var onAudioDeviceChanged: (() -> Void)?
+
+    // MARK: - Initialization
+
+    init() {
+        // Listen for audio configuration changes (device plug/unplug, route changes,
+        // Bluetooth disconnects, display sleep changing audio routing, etc.).
+        // AVAudioEngine posts this notification when the underlying hardware changes
+        // and the engine needs to be reconfigured.
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleAudioConfigurationChange),
+            name: .AVAudioEngineConfigurationChange,
+            object: engine
+        )
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+
+    // MARK: - Audio Configuration Change
+
+    /// Called when macOS detects an audio hardware configuration change.
+    /// This happens when a microphone is unplugged/replugged, Bluetooth audio
+    /// disconnects, or the default audio device changes (e.g., after sleep).
+    ///
+    /// When this fires during an active recording, the engine's internal state
+    /// is invalidated — the installed tap references a stale format and no audio
+    /// flows. We must stop, reset, and notify AppState so it can recover.
+    @objc private func handleAudioConfigurationChange(_ notification: Notification) {
+        VocaLogger.info(.audioEngine, "Audio configuration changed (device plug/unplug or route change)")
+
+        let wasRecording = isCurrentlyRecording
+
+        if wasRecording {
+            VocaLogger.warning(.audioEngine, "Configuration changed while recording — forcing stop and reset")
+            // Tear down the stale recording state
+            isCurrentlyRecording = false
+            engine.inputNode.removeTap(onBus: 0)
+            engine.stop()
+        }
+
+        // Reset the engine so it picks up the new audio device/format
+        engine.reset()
+        VocaLogger.info(.audioEngine, "Audio engine reset after configuration change")
+
+        if wasRecording {
+            // Notify AppState on the main queue so it can handle the interrupted recording
+            DispatchQueue.main.async { [weak self] in
+                self?.onAudioDeviceChanged?()
+            }
+        }
+    }
 
     // MARK: - Permission Handling
 
@@ -131,6 +189,29 @@ final class AudioEngine {
         }
 
         return samples
+    }
+
+    /// Forcibly reset the audio engine to a clean state, regardless of current state.
+    /// This is a last-resort recovery mechanism — it unconditionally tears down
+    /// taps, stops the engine, clears buffers, and resets all flags.
+    /// Use when the engine is suspected to be in an inconsistent state.
+    func forceReset() {
+        VocaLogger.warning(.audioEngine, "Force reset requested (wasRecording=\(isCurrentlyRecording))")
+
+        isCurrentlyRecording = false
+        silenceCallbackFired = false
+        maxDurationCallbackFired = false
+
+        // Safely remove tap — may throw if no tap is installed, but that's fine
+        engine.inputNode.removeTap(onBus: 0)
+        engine.stop()
+        engine.reset()
+
+        bufferQueue.sync {
+            audioBuffer.removeAll(keepingCapacity: true)
+        }
+
+        VocaLogger.info(.audioEngine, "Force reset complete — engine is clean")
     }
 
     // MARK: - Audio Processing

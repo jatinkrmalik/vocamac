@@ -210,6 +210,19 @@ struct MenuBarView: View {
             if appState.appStatus == .recording {
                 AudioLevelView(level: appState.audioLevel)
                     .frame(height: 6)
+
+                // Stop/recovery button — visible during recording so the user
+                // can unstick the app if the hotkey isn't responding
+                Button {
+                    Task {
+                        await appState.stopRecordingAndTranscribe()
+                    }
+                } label: {
+                    Label("Stop Recording", systemImage: "stop.circle.fill")
+                        .font(.callout)
+                        .foregroundStyle(.red)
+                }
+                .buttonStyle(.plain)
             }
 
             // Processing indicator
@@ -217,6 +230,18 @@ struct MenuBarView: View {
                 ProgressView()
                     .controlSize(.small)
                     .frame(maxWidth: .infinity, alignment: .center)
+            }
+
+            // Force recovery button — visible in error state
+            if appState.appStatus == .error {
+                Button {
+                    appState.forceRecovery()
+                } label: {
+                    Label("Reset to Idle", systemImage: "arrow.counterclockwise.circle")
+                        .font(.callout)
+                        .foregroundStyle(.orange)
+                }
+                .buttonStyle(.plain)
             }
         }
     }
