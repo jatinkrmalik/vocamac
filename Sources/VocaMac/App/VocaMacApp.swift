@@ -105,9 +105,10 @@ final class OnboardingWindowManager: ObservableObject {
             object: window,
             queue: .main
         ) { [weak self] _ in
-            self?.onboardingWindow = nil
-            // Hide from dock when onboarding closes
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            Task { @MainActor [weak self] in
+                self?.onboardingWindow = nil
+                // Hide from dock when onboarding closes
+                try? await Task.sleep(nanoseconds: 500_000_000)
                 NSApp.setActivationPolicy(.accessory)
             }
         }
@@ -157,7 +158,7 @@ struct VocaMacApp: App {
         .menuBarExtraStyle(.window)
     }
 
-    init() {
+    @MainActor init() {
         // Ensure only one instance of VocaMac is running
         Self.ensureSingleInstance()
 
@@ -173,7 +174,9 @@ struct VocaMacApp: App {
             object: nil,
             queue: .main
         ) { [self] _ in
-            self.onboardingManager.open(appState: self.appState, force: true)
+            Task { @MainActor [self] in
+                self.onboardingManager.open(appState: self.appState, force: true)
+            }
         }
 
         // Show onboarding on first launch
