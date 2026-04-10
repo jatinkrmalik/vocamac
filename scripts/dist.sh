@@ -214,10 +214,65 @@ else
         exit 1
     fi
 
-    echo "   Submitting to Apple Notary Service (this takes 1–5 minutes)..."
-    xcrun notarytool submit "$FINAL_DMG" \
-        --keychain-profile "$NOTARIZE_PROFILE" \
-        --wait
+    echo "   Submitting to Apple Notary Service..."
+    SUBMIT_OUTPUT=$(xcrun notarytool submit "$FINAL_DMG" \
+        --keychain-profile "$NOTARIZE_PROFILE" 2>&1)
+    SUBMISSION_ID=$(echo "$SUBMIT_OUTPUT" | grep "id:" | head -1 | awk '{print $2}')
+
+    if [ -z "$SUBMISSION_ID" ]; then
+        echo "   ❌ Failed to submit for notarization:"
+        echo "$SUBMIT_OUTPUT"
+        exit 1
+    fi
+
+    echo "   Submission ID: $SUBMISSION_ID"
+    echo "   Polling for completion (this typically takes 1–15 minutes)..."
+
+    MAX_ATTEMPTS=60   # 60 × 30s = 30 minutes max
+    ATTEMPT=0
+    NETWORK_RETRIES=0
+    MAX_NETWORK_RETRIES=10
+
+    while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+        ATTEMPT=$((ATTEMPT + 1))
+        sleep 30
+
+        INFO_OUTPUT=$(xcrun notarytool info "$SUBMISSION_ID" \
+            --keychain-profile "$NOTARIZE_PROFILE" 2>&1) || {
+            NETWORK_RETRIES=$((NETWORK_RETRIES + 1))
+            if [ $NETWORK_RETRIES -ge $MAX_NETWORK_RETRIES ]; then
+                echo "   ❌ Too many network failures ($MAX_NETWORK_RETRIES). Giving up."
+                echo "   Check manually: xcrun notarytool info $SUBMISSION_ID --keychain-profile $NOTARIZE_PROFILE"
+                exit 1
+            fi
+            echo "   ⚠️  Network error (retry $NETWORK_RETRIES/$MAX_NETWORK_RETRIES), will try again in 30s..."
+            continue
+        }
+
+        STATUS=$(echo "$INFO_OUTPUT" | grep "status:" | awk '{print $2}')
+
+        case "$STATUS" in
+            Accepted)
+                echo "   ✅ Notarization accepted!"
+                break
+                ;;
+            Invalid|Rejected)
+                echo "   ❌ Notarization failed with status: $STATUS"
+                echo "   Run: xcrun notarytool log $SUBMISSION_ID --keychain-profile $NOTARIZE_PROFILE"
+                exit 1
+                ;;
+            *)
+                # Still "In Progress" — keep polling
+                printf "   … poll %d/%d (status: %s)\r" "$ATTEMPT" "$MAX_ATTEMPTS" "$STATUS"
+                ;;
+        esac
+    done
+
+    if [ "$STATUS" != "Accepted" ]; then
+        echo "   ❌ Notarization timed out after $MAX_ATTEMPTS attempts."
+        echo "   Check manually: xcrun notarytool info $SUBMISSION_ID --keychain-profile $NOTARIZE_PROFILE"
+        exit 1
+    fi
 
     echo "   Stapling notarization ticket..."
     xcrun stapler staple "$FINAL_DMG"
