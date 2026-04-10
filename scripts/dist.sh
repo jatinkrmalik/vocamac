@@ -59,8 +59,9 @@ if [ ! -d "VocaMac.app" ]; then
     exit 1
 fi
 
-# Grab the actual signing identity used by build.sh
-SIGNING_IDENTITY=$(codesign -dv VocaMac.app 2>&1 | grep "^Authority=" | head -1 | sed 's/Authority=//')
+# Grab the actual signing identity from Keychain (same logic as build.sh)
+SIGNING_IDENTITY=$(security find-identity -v -p codesigning \
+    | grep "Developer ID Application" | head -1 | sed 's/.*"\(.*\)"/\1/')
 echo "   Signed with: ${SIGNING_IDENTITY:-ad-hoc}"
 echo ""
 
@@ -85,32 +86,7 @@ if [ -f "Sources/VocaMac/Resources/dmg-background@2x.png" ]; then
     cp "Sources/VocaMac/Resources/dmg-background@2x.png" "$STAGING_DIR/.background/background@2x.png"
 fi
 
-# README with permission instructions
-cat > "$STAGING_DIR/README.txt" << 'README'
-VocaMac — Installation Instructions
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-1. Drag VocaMac.app to the Applications folder.
-
-2. Open VocaMac from your Applications folder or Launchpad.
-
-3. Grant the required permissions when prompted:
-
-   • Microphone — for voice capture
-     System Settings → Privacy & Security → Microphone
-
-   • Accessibility — for typing transcribed text at the cursor
-     System Settings → Privacy & Security → Accessibility
-
-   • Input Monitoring — for the global push-to-talk hotkey
-     System Settings → Privacy & Security → Input Monitoring
-
-4. VocaMac lives in your menu bar (top-right corner).
-   Click the mic icon or press your hotkey to start dictating.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Questions? https://vocamac.com
-README
+# No README.txt — instructions are on the background image and website
 echo "   Staging complete."
 echo ""
 
@@ -126,56 +102,82 @@ hdiutil create -volname "VocaMac" \
     "$TEMP_DMG" > /dev/null
 
 # Mount it
-MOUNT_OUTPUT=$(hdiutil attach "$TEMP_DMG" -readwrite -noverify -noautoopen 2>&1)
-MOUNT_POINT=$(echo "$MOUNT_OUTPUT" | grep -E '^\S+\s+.*\s+/Volumes/' | awk '{print $NF}')
+MOUNT_POINT=$(hdiutil attach "$TEMP_DMG" -readwrite -noverify -noautoopen \
+    | grep -E '\s/Volumes/' | sed 's|.*\(/Volumes/[^\t]*\)|\1|' | tail -1 | xargs)
 
 if [ -z "$MOUNT_POINT" ]; then
-    echo "❌ Failed to mount DMG. Output:"
-    echo "$MOUNT_OUTPUT"
+    echo "❌ Failed to mount DMG."
     exit 1
 fi
 
 echo "   Mounted at: $MOUNT_POINT"
 
-# Set Finder window layout via AppleScript:
-#   - Window size: 660 × 400
-#   - Icon size: 128
-#   - App icon at (165, 170), Applications at (495, 170)
-#   - Show background image
-#   - Hide toolbar, sidebar, status bar
-osascript << APPLESCRIPT
+# Set Finder window layout via AppleScript
+# We run this in a loop because Finder can be slow to register the volume,
+# and we need the .DS_Store to be written before we detach.
+echo "   Configuring Finder layout..."
+
+# Ensure any previous VocaMac volumes are ejected first
+for vol in /Volumes/VocaMac*; do
+    [ -d "$vol" ] && [ "$vol" != "$MOUNT_POINT" ] && hdiutil detach "$vol" 2>/dev/null || true
+done
+
+# Give Finder time to discover the volume
+sleep 2
+
+osascript << 'APPLESCRIPT'
 tell application "Finder"
     tell disk "VocaMac"
         open
+        delay 1
         set current view of container window to icon view
         set toolbar visible of container window to false
         set statusbar visible of container window to false
-        set the bounds of container window to {100, 100, 760, 500}
+        set the bounds of container window to {200, 60, 860, 580}
         set viewOptions to the icon view options of container window
         set arrangement of viewOptions to not arranged
-        set icon size of viewOptions to 128
+        set icon size of viewOptions to 120
         set background picture of viewOptions to file ".background:background.png"
-        set position of item "VocaMac.app" of container window to {165, 185}
-        set position of item "Applications" of container window to {495, 185}
-        set position of item "README.txt" of container window to {330, 320}
+        set position of item "VocaMac.app" of container window to {170, 250}
+        set position of item "Applications" of container window to {490, 250}
         close
         open
+        delay 1
+        -- Force a second pass to ensure settings stick
+        set current view of container window to icon view
+        set toolbar visible of container window to false
+        set statusbar visible of container window to false
+        set the bounds of container window to {200, 60, 860, 580}
+        set viewOptions to the icon view options of container window
+        set arrangement of viewOptions to not arranged
+        set icon size of viewOptions to 120
+        set background picture of viewOptions to file ".background:background.png"
+        set position of item "VocaMac.app" of container window to {170, 250}
+        set position of item "Applications" of container window to {490, 250}
         update without registering applications
-        delay 2
+        delay 3
         close
     end tell
 end tell
 APPLESCRIPT
 
-# Force layout flush
+# Ensure .DS_Store is flushed to disk
 sync
+sleep 1
+
+# Verify .DS_Store was written
+if [ -f "$MOUNT_POINT/.DS_Store" ]; then
+    echo "   Finder layout applied (.DS_Store written)"
+else
+    echo "   ⚠️  .DS_Store not found — Finder layout may not persist"
+fi
 
 # Unmount
-hdiutil detach "$MOUNT_POINT" > /dev/null
+hdiutil detach "$MOUNT_POINT" -quiet || hdiutil detach "$MOUNT_POINT" -force
 
 # Convert to compressed final DMG
 FINAL_DMG="${DIST_DIR}/${DMG_NAME}"
-hdiutil convert "$TEMP_DMG" -format UDZO -imagekey zlib-level=9 -o "$FINAL_DMG" > /dev/null
+hdiutil convert "$TEMP_DMG" -format UDZO -imagekey zlib-level=9 -ov -o "$FINAL_DMG" > /dev/null
 rm -f "$TEMP_DMG"
 
 echo "   DMG created: ${FINAL_DMG}"
@@ -232,7 +234,7 @@ echo "  Size:    $(du -h "${FINAL_DMG}" | cut -f1)"
 echo ""
 echo "  SHA-256: $(shasum -a 256 "${FINAL_DMG}" | awk '{print $1}')"
 echo ""
-echo "  To test: open ${FINAL_DMG}"
+echo "  Path:    $(cd "$(dirname "$FINAL_DMG")" && pwd)/$(basename "$FINAL_DMG")"
 
 # Clean up staging
 rm -rf "$STAGING_DIR"
