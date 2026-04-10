@@ -88,12 +88,10 @@ swift build -c release --arch arm64 --arch x86_64
 
 ## Code Signing
 
-- **Developer ID Application** certificate (Team ID: `92962VK378`)
+- **Developer ID Application** certificate — auto-detected from Keychain locally, imported from secrets in CI
 - **Notarized** with Apple — no Gatekeeper warnings for users
 - DMG is stapled so notarization validates offline
 - Permissions persist across updates (no more manual re-grants)
-
-See `docs/CODE_SIGNING.md` for the full setup guide.
 
 ## CI Workflows
 
