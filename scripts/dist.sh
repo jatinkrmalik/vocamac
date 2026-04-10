@@ -61,7 +61,7 @@ fi
 
 # Grab the actual signing identity from Keychain (same logic as build.sh)
 SIGNING_IDENTITY=$(security find-identity -v -p codesigning \
-    | grep "Developer ID Application" | head -1 | sed 's/.*"\(.*\)"/\1/')
+    | grep "Developer ID Application" | head -1 | sed 's/.*"\(.*\)"/\1/' || true)
 echo "   Signed with: ${SIGNING_IDENTITY:-ad-hoc}"
 echo ""
 

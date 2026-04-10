@@ -33,7 +33,7 @@ ENTITLEMENTS="VocaMac.entitlements"
 # 2. Auto-detect Developer ID Application in the login keychain
 # 3. Fall back to ad-hoc signing (-)
 if [ -z "${CODE_SIGN_IDENTITY+x}" ]; then
-    DETECTED=$(security find-identity -v -p codesigning 2>/dev/null | grep "Developer ID Application" | head -1 | sed 's/.*"\(.*\)"/\1/')
+    DETECTED=$(security find-identity -v -p codesigning 2>/dev/null | grep "Developer ID Application" | head -1 | sed 's/.*"\(.*\)"/\1/' || true)
     if [ -n "$DETECTED" ]; then
         CODE_SIGN_IDENTITY="$DETECTED"
         echo "🔐 Auto-detected signing identity: $CODE_SIGN_IDENTITY"
