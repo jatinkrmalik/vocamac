@@ -59,9 +59,10 @@ if [ ! -d "VocaMac.app" ]; then
     exit 1
 fi
 
-# Grab the actual signing identity from Keychain (same logic as build.sh)
-SIGNING_IDENTITY=$(security find-identity -v -p codesigning \
-    | grep "Developer ID Application" | head -1 | sed 's/.*"\(.*\)"/\1/' || true)
+# Use CODE_SIGN_IDENTITY from environment (set by release workflow),
+# or auto-detect from keychain
+SIGNING_IDENTITY="${CODE_SIGN_IDENTITY:-$(security find-identity -v -p codesigning \
+    | grep "Developer ID Application" | head -1 | sed 's/.*"\(.*\)"/\1/' || true)}"
 echo "   Signed with: ${SIGNING_IDENTITY:-ad-hoc}"
 echo ""
 

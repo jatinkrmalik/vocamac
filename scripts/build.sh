@@ -13,8 +13,8 @@
 #                         Set to "-" to force ad-hoc signing.
 #
 # IMPORTANT: After the first build, grant Accessibility and Input Monitoring
-# permissions to VocaMac.app. These permissions persist as long as you don't
-# delete the app bundle.
+# permissions to VocaMac.app. With Developer ID signing, permissions persist
+# across rebuilds. With ad-hoc signing (no cert), permissions reset on every rebuild.
 
 set -euo pipefail
 

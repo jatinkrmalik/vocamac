@@ -19,7 +19,7 @@ install-cli:
 dmg:
 	@./scripts/dist.sh
 
-## Release to GitHub + Bitbucket (usage: make release VERSION=0.3.0)
+## Release — tag and push to trigger GitHub Actions release workflow (usage: make release VERSION=0.4.0)
 release:
 	@./scripts/release.sh $(VERSION)
 
@@ -48,7 +48,7 @@ help:
 	@echo "  make install      Build + install to /Applications (recommended)"
 	@echo "  make install-cli  Install CLI commands to ~/.local/bin"
 	@echo "  make dmg          Build DMG for distribution (output in dist/)"
-	@echo "  make release VERSION=X.Y.Z  Release to GitHub + Bitbucket"
+	@echo "  make release VERSION=X.Y.Z  Tag and release (triggers CI signing + notarization)"
 	@echo "  make test         Run tests"
 	@echo "  make run          Launch the locally built .app"
 	@echo "  make clean        Remove build artifacts"

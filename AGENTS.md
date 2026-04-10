@@ -199,8 +199,8 @@ Keep dependencies minimal. This app values being lightweight and self-contained.
 
 - **Entitlements** (`VocaMac.entitlements`): App uses microphone access and accessibility APIs
 - **LSUIElement:** App runs as a menu bar agent (no dock icon)
-- **Code signing:** Ad-hoc signing for development; entitlements must be re-applied on each build
-- **Permissions:** Accessibility and Input Monitoring permissions reset on every rebuild when ad-hoc signed
+- **Code signing:** Release builds are Developer ID signed and notarized. Local development builds fall back to ad-hoc signing if no Developer ID cert is in the Keychain.
+- **Permissions:** With Developer ID signing, permissions persist across updates. Ad-hoc (local dev) builds will reset permissions on every rebuild.
 - **MenuBarExtra limitations:** The label only renders `Image` or `Text` — custom SwiftUI views like `Canvas` won't appear. Use `NSImage` with `isTemplate = false` for colored menu bar icons.
 
 ---
@@ -210,5 +210,5 @@ Keep dependencies minimal. This app values being lightweight and self-contained.
 1. **MenuBarExtra ignores SwiftUI colors** — Use `NSImage` with `sourceAtop` tinting and `isTemplate = false` for colored states
 2. **`Canvas` doesn't work in menu bar** — It renders in popovers but not in `MenuBarExtra` labels
 3. **Browser caches SVG/PNG aggressively** — When testing website changes, always hard refresh (`Cmd+Shift+R`)
-4. **Accessibility permission resets on rebuild** — Expected with ad-hoc signing; document this for users
+4. **Accessibility permission resets on rebuild** — Expected with ad-hoc signing; release builds are Developer ID signed so permissions persist
 5. **WhisperKit model download** — First run requires internet to download the whisper model; all subsequent runs are offline
