@@ -171,12 +171,19 @@ EOF
 
 echo "🔏 Code signing (${BUNDLE_ID})..."
 
+# Determine codesign options — enable hardened runtime for Developer ID (required for notarization)
+CODESIGN_OPTIONS=""
+if [ "$CODE_SIGN_IDENTITY" != "-" ]; then
+    CODESIGN_OPTIONS="--options runtime"
+fi
+
 # Sign nested bundles first
 find "${APP_DIR}/Contents/Resources" -name "*.bundle" -exec \
-    codesign --force --sign "$CODE_SIGN_IDENTITY" {} \; 2>/dev/null || true
+    codesign --force --sign "$CODE_SIGN_IDENTITY" $CODESIGN_OPTIONS {} \; 2>/dev/null || true
 
 # Sign the main app
 codesign --force --sign "$CODE_SIGN_IDENTITY" \
+    $CODESIGN_OPTIONS \
     --identifier "$BUNDLE_ID" \
     --entitlements "$ENTITLEMENTS" \
     "${APP_DIR}"
