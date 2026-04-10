@@ -753,10 +753,10 @@ struct DebugTab: View {
                 }
 
                 HStack(alignment: .top, spacing: 8) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.yellow)
+                    Image(systemName: "info.circle.fill")
+                        .foregroundStyle(.blue)
                         .font(.caption)
-                    Text("**Upgrading?** After updating VocaMac, you must remove the old entry (using \"−\") from Accessibility and Input Monitoring in System Settings → Privacy & Security, then re-add the new version. Permissions don't carry over because the app is not signed with a Developer ID.")
+                    Text("**Upgrading?** Permissions now persist across updates since VocaMac is signed with a Developer ID. If permissions ever appear stuck, use the Reset button above.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
