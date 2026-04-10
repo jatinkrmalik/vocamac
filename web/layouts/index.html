@@ -36,8 +36,8 @@
             "Open source (AGPL-3.0 license)"
         ],
         "screenshot": "https://vocamac.com/og-image.png",
-        "softwareVersion": "0.3.0",
-        "softwareRequirements": "macOS 13 (Ventura) or later, Xcode 15+ or Swift 5.9+ toolchain, 8 GB RAM minimum"
+        "softwareVersion": "0.4.0",
+        "softwareRequirements": "macOS 13 (Ventura) or later, Apple Silicon (M1 or later), 8 GB RAM minimum"
     }
     </script>
 {{ end }}
@@ -49,7 +49,7 @@
             <div class="hero__content">
                 <div class="hero__badges">
                     <span class="badge badge--beta">BETA RELEASE</span>
-                    <span class="badge badge--outline" id="version-badge">v0.3.0</span>
+                    <span class="badge badge--outline" id="version-badge">v0.4.0</span>
                 </div>
                 <h1 class="hero__headline">
                     Your Voice,<br>
@@ -369,7 +369,7 @@
             <div class="section-header">
                 <span class="badge badge--beta">BETA</span>
                 <h2>Get Started in Minutes</h2>
-                <p class="text-secondary">Download the DMG or build from source. Now in beta. Stable and ready for daily use.</p>
+                <p class="text-secondary">Download the signed DMG or build from source. No terminal gymnastics required.</p>
             </div>
 
             <!-- Install Options Tabs -->
@@ -384,10 +384,10 @@
                     <div class="install__step visible">
                         <div class="install__step-num">1</div>
                         <div>
-                            <h4>Download</h4>
-                            <p class="text-secondary">Grab the latest DMG from GitHub Releases.</p>
+                            <h4>Download &amp; Install</h4>
+                            <p class="text-secondary">Download the latest DMG, open it, and drag VocaMac to your Applications folder.</p>
                             <a id="dmg-download-link" href="https://github.com/jatinkrmalik/vocamac/releases/latest" class="button button--primary install__download-btn" target="_blank" rel="noopener">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; margin-right: 6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                                 Download Latest DMG
                             </a>
                         </div>
@@ -395,29 +395,8 @@
                     <div class="install__step visible">
                         <div class="install__step-num">2</div>
                         <div>
-                            <h4>Install &amp; Remove Quarantine</h4>
-                            <p class="text-secondary">Open the DMG, drag VocaMac to Applications, then remove the quarantine flag (required until we get <a href="https://github.com/jatinkrmalik/vocamac/issues/27" target="_blank" rel="noopener" style="color: var(--accent);">code signing</a>):</p>
-                            <div class="code-block">
-                                <div class="code-block__titlebar">
-                                    <div class="code-block__dots">
-                                        <span class="code-block__dot code-block__dot--red"></span>
-                                        <span class="code-block__dot code-block__dot--yellow"></span>
-                                        <span class="code-block__dot code-block__dot--green"></span>
-                                    </div>
-                                    <span class="code-block__title">Terminal</span>
-                                    <button class="code-block__copy" onclick="copyCode(this)">📋 Copy</button>
-                                </div>
-                                <div class="code-block__body">
-                                    <code><span class="prompt">$ </span>sudo xattr -cr /Applications/VocaMac.app</code>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="install__step visible">
-                        <div class="install__step-num">3</div>
-                        <div>
                             <h4>Grant Permissions &amp; Dictate</h4>
-                            <p class="text-secondary">Open VocaMac and grant <strong>Microphone</strong>, <strong>Accessibility</strong>, and <strong>Input Monitoring</strong> permissions when prompted. Permissions are detected automatically, no restart needed.</p>
+                            <p class="text-secondary">Open VocaMac from Applications and grant <strong>Microphone</strong>, <strong>Accessibility</strong>, and <strong>Input Monitoring</strong> permissions when prompted.</p>
                             <p class="text-secondary" style="margin-top: 8px;">Hold <strong>Right Option (⌥)</strong> → speak → release. Text appears at your cursor. ✨</p>
                         </div>
                     </div>

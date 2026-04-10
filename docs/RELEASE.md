@@ -52,10 +52,11 @@ Pre-release versions use suffixes: `v0.1.0-alpha`, `v0.1.0-beta.1`
    ```
 
 2. **GitHub Actions automatically**:
-   - Builds the release binary
-   - Creates `VocaMac.app` bundle with ad-hoc signing
-   - Packages as DMG (`VocaMac-0.2.0-arm64.dmg`)
-   - Packages as ZIP (`VocaMac-0.2.0-arm64.zip`)
+   - Imports the Developer ID certificate from repository secrets
+   - Builds the release binary with Developer ID signing
+   - Creates a beautiful branded DMG (`VocaMac-0.4.0-arm64.dmg`)
+   - Notarizes with Apple and staples the ticket
+   - Packages as ZIP (`VocaMac-0.4.0-arm64.zip`)
    - Generates SHA-256 checksums
    - Creates a **draft** GitHub Release with all artifacts
 
@@ -87,21 +88,12 @@ swift build -c release --arch arm64 --arch x86_64
 
 ## Code Signing
 
-### Current (Alpha)
+- **Developer ID Application** certificate (Team ID: `92962VK378`)
+- **Notarized** with Apple — no Gatekeeper warnings for users
+- DMG is stapled so notarization validates offline
+- Permissions persist across updates (no more manual re-grants)
 
-- **Ad-hoc signing** (no Apple Developer certificate)
-- Users must manually grant permissions after each install
-- Gatekeeper will show "unidentified developer" warning
-- Users bypass with: Right-click > Open > Open
-
-### Future (GA Release)
-
-- Sign with Apple Developer ID certificate
-- Notarize with Apple for Gatekeeper clearance
-- No security warnings for end users
-- Permissions persist across updates
-
-See [Issue #27](https://github.com/jatinkrmalik/vocamac/issues/27) for tracking.
+See `docs/CODE_SIGNING.md` for the full setup guide.
 
 ## CI Workflows
 
@@ -128,20 +120,15 @@ See [Issue #27](https://github.com/jatinkrmalik/vocamac/issues/27) for tracking.
 If you need to create a release locally:
 
 ```bash
-# Build the app
-./scripts/build.sh release
+# Build the app, create signed + notarized DMG
+make dmg
+# Output: dist/VocaMac-X.Y.Z-arm64.dmg
 
-# Create DMG
-mkdir -p dmg-staging
-cp -R VocaMac.app dmg-staging/
-ln -s /Applications dmg-staging/Applications
-hdiutil create -volname "VocaMac" -srcfolder dmg-staging -ov -format UDZO "VocaMac-0.2.0-arm64.dmg"
-
-# Create ZIP
-ditto -c -k --sequesterRsrc --keepParent VocaMac.app "VocaMac-0.2.0-arm64.zip"
+# Create ZIP from the signed .app
+ditto -c -k --sequesterRsrc --keepParent VocaMac.app "dist/VocaMac-X.Y.Z-arm64.zip"
 
 # Generate checksums
-shasum -a 256 VocaMac-*.dmg VocaMac-*.zip > checksums.txt
+cd dist && shasum -a 256 VocaMac-*.dmg VocaMac-*.zip > checksums.txt
 ```
 
 Then upload the artifacts manually to the GitHub Release page.

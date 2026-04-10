@@ -5,7 +5,12 @@
 # This script:
 # 1. Builds VocaMac with Swift Package Manager
 # 2. Creates/updates the .app bundle
-# 3. Ad-hoc code signs with a stable identifier + entitlements
+# 3. Code signs — Developer ID if CODE_SIGN_IDENTITY is set, ad-hoc otherwise
+#
+# Environment variables:
+#   CODE_SIGN_IDENTITY  — Signing identity to use. Defaults to auto-detect
+#                         Developer ID Application in the login keychain.
+#                         Set to "-" to force ad-hoc signing.
 #
 # IMPORTANT: After the first build, grant Accessibility and Input Monitoring
 # permissions to VocaMac.app. These permissions persist as long as you don't
@@ -22,6 +27,27 @@ BUNDLE_ID="com.vocamac.app"
 APP_NAME="VocaMac"
 APP_DIR="${APP_NAME}.app"
 ENTITLEMENTS="VocaMac.entitlements"
+
+# Resolve signing identity:
+# 1. Use CODE_SIGN_IDENTITY env var if set
+# 2. Auto-detect Developer ID Application in the login keychain
+# 3. Fall back to ad-hoc signing (-)
+if [ -z "${CODE_SIGN_IDENTITY+x}" ]; then
+    DETECTED=$(security find-identity -v -p codesigning 2>/dev/null | grep "Developer ID Application" | head -1 | sed 's/.*"\(.*\)"/\1/')
+    if [ -n "$DETECTED" ]; then
+        CODE_SIGN_IDENTITY="$DETECTED"
+        echo "🔐 Auto-detected signing identity: $CODE_SIGN_IDENTITY"
+    else
+        CODE_SIGN_IDENTITY="-"
+        echo "⚠️  No Developer ID found — using ad-hoc signing"
+    fi
+fi
+
+if [ "$CODE_SIGN_IDENTITY" = "-" ]; then
+    echo "🔏 Signing mode: ad-hoc (permissions reset on every rebuild)"
+else
+    echo "🔏 Signing mode: Developer ID"
+fi
 
 # Kill any running VocaMac instances before building
 if pgrep -f "VocaMac" > /dev/null 2>&1; then
@@ -147,10 +173,10 @@ echo "🔏 Code signing (${BUNDLE_ID})..."
 
 # Sign nested bundles first
 find "${APP_DIR}/Contents/Resources" -name "*.bundle" -exec \
-    codesign --force --sign - {} \; 2>/dev/null || true
+    codesign --force --sign "$CODE_SIGN_IDENTITY" {} \; 2>/dev/null || true
 
 # Sign the main app
-codesign --force --sign - \
+codesign --force --sign "$CODE_SIGN_IDENTITY" \
     --identifier "$BUNDLE_ID" \
     --entitlements "$ENTITLEMENTS" \
     "${APP_DIR}"
@@ -174,8 +200,10 @@ if [ "$FIRST_TIME" = true ]; then
     echo "   2. System Settings → Privacy & Security → Accessibility → add VocaMac.app → ON"
     echo "   3. System Settings → Privacy & Security → Input Monitoring → add VocaMac.app → ON"
     echo "   4. Restart VocaMac: killall VocaMac && open ${APP_DIR}"
-    echo ""
-    echo "   ⚠️  Permissions reset on every rebuild (ad-hoc signing limitation)."
-    echo "   💡 TIP: To avoid this, add your Terminal app to Accessibility & Input Monitoring"
-    echo "      and run VocaMac directly: .build/arm64-apple-macosx/release/VocaMac"
+    if [ "$CODE_SIGN_IDENTITY" = "-" ]; then
+        echo ""
+        echo "   ⚠️  Permissions reset on every rebuild (ad-hoc signing limitation)."
+        echo "   💡 TIP: To avoid this, add your Terminal app to Accessibility & Input Monitoring"
+        echo "      and run VocaMac directly: .build/arm64-apple-macosx/release/VocaMac"
+    fi
 fi
