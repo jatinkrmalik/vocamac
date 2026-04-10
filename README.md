@@ -127,12 +127,10 @@ VocaMac requires three macOS permissions:
 
 1. **Download** the latest `VocaMac-x.x.x-arm64.dmg` from the [Releases page](https://github.com/jatinkrmalik/vocamac/releases)
 2. **Open** the DMG and drag VocaMac to Applications
-3. **Remove quarantine** (required because VocaMac is not yet notarized with Apple):
-   ```bash
-   xattr -cr /Applications/VocaMac.app
-   ```
-4. **Open** VocaMac from Applications (right-click → Open on first launch)
-5. **Grant permissions**: Microphone, Accessibility, and Input Monitoring when prompted
+3. **Open** VocaMac from Applications
+4. **Grant permissions**: Microphone, Accessibility, and Input Monitoring when prompted
+
+> VocaMac is **Developer ID signed and notarized** by Apple — macOS will open it without any security warnings.
 
 ### Option 2: Build from Source (Recommended)
 
@@ -341,13 +339,13 @@ Then relaunch VocaMac. This only clears the onboarding state; all other preferen
 defaults delete com.vocamac.app
 ```
 
-**Reset permissions after updating:** When updating VocaMac to a newer version, it's recommended to reset permissions first so the new binary gets a clean grant. You can do this from **Settings → Debug → Reset All Permissions**, or manually via Terminal:
+**Reset permissions (troubleshooting):** If permissions appear stuck or aren't being recognized after an update, you can reset them from **Settings → Debug → Reset All Permissions**, or manually via Terminal:
 
 ```bash
 tccutil reset All com.vocamac.app
 ```
 
-This clears all permission entries (Microphone, Accessibility, Input Monitoring) for VocaMac. On next launch, macOS will prompt you to re-grant them for the new version. This avoids stale permission entries that point to an old binary's CDHash.
+This clears all permission entries (Microphone, Accessibility, Input Monitoring) for VocaMac. On next launch, macOS will prompt you to re-grant them. With Developer ID signing, permissions normally persist across updates — this reset is only needed for troubleshooting.
 
 ---
 
@@ -376,26 +374,22 @@ Each platform uses native technologies for the best possible integration, while 
 
 ## ⚠️ Known Limitations
 
-- **Permissions reset on rebuild**: Accessibility and Input Monitoring permissions reset on every rebuild (see below).
 - **First launch requires internet**: WhisperKit downloads the speech recognition model on first run. All subsequent launches work fully offline.
 - **macOS only**: Requires macOS 13 (Ventura) or later.
+- **Permissions reset on rebuild (build-from-source only)**: When building from source without a Developer ID certificate, macOS resets Accessibility and Input Monitoring permissions on every rebuild due to ad-hoc signing. Release builds are Developer ID signed so permissions persist across updates.
 
-### Why Do Permissions Reset on Every Rebuild?
+### Permissions and Code Signing
 
-macOS tracks Accessibility and Input Monitoring permissions using the app's **CDHash** (a cryptographic hash of the code signature), not the bundle identifier. When you rebuild VocaMac with ad-hoc signing (`codesign --sign -`), the binary changes, producing a new CDHash, so macOS treats it as a completely new, untrusted app.
+Release builds of VocaMac are **Developer ID signed and notarized** by Apple. Accessibility and Input Monitoring permissions persist across updates — no manual re-granting required.
 
-This is **not a bug**. It's macOS security by design, preventing modified apps from inheriting sensitive permissions. All open-source macOS apps that use Accessibility (Rectangle, Maccy, AltTab, etc.) have the same limitation.
+**For developers building from source:** If you don't have a Developer ID certificate, `build.sh` falls back to ad-hoc signing. With ad-hoc signing, macOS resets Accessibility and Input Monitoring permissions on every rebuild because the CDHash changes. This is standard macOS security behavior — all open-source apps with Accessibility (Rectangle, Maccy, AltTab, etc.) have the same limitation when ad-hoc signed.
 
-**Why Microphone permission persists:** Microphone access uses AVFoundation's framework-level preference cache with relaxed verification, unlike the strict CDHash checks for Accessibility and Input Monitoring.
-
-**Workarounds:**
+**Workarounds for ad-hoc builds:**
 
 | Approach | How | Permissions Persist |
 |---|---|---|
-| **Reset permissions on update** | Settings → Debug → Reset All Permissions (or `tccutil reset All com.vocamac.app`) | Recommended before each update |
+| **Run from Terminal** | Grant permissions to Terminal.app once, then run `make run` | ✅ Always |
 | **Re-grant manually** | System Settings → Privacy & Security after each rebuild | Per rebuild |
-| **Run from Terminal** | Grant permissions to Terminal.app once, then run `make run` or `.build/arm64-apple-macosx/release/VocaMac` | ✅ Always |
-| **Developer ID signing** | Requires Apple Developer Program ($99/year), planned for future releases | ✅ Always |
 
 > **💡 Developer tip:** Add your Terminal app (Terminal.app or iTerm2) to both Accessibility and Input Monitoring in System Settings. Then run VocaMac directly from Terminal. Permissions are inherited and never reset.
 

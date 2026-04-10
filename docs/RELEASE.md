@@ -27,7 +27,7 @@ Pre-release versions use suffixes: `v0.1.0-alpha`, `v0.1.0-beta.1`
 3. **Update version number** in all locations:
    - `scripts/build.sh` — both `CFBundleVersion` and `CFBundleShortVersionString` in the Info.plist template
    - `Sources/VocaMac/Views/SettingsView.swift` — version label in the About tab
-   - `web/index.html` — `softwareVersion` in JSON-LD schema and hero version badge
+   - `web/layouts/index.html` — `softwareVersion` in JSON-LD schema and hero version badge (two occurrences)
 4. **Test locally**:
    ```bash
    ./scripts/build.sh release

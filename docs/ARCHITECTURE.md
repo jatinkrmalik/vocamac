@@ -211,9 +211,9 @@ Microphone → AVAudioInputNode → Format Converter → Buffer Accumulator
 **Responsibility:** Load WhisperKit models and perform transcription.
 
 **Integration Strategy:**
-- WhisperKit source code is included as a git submodule or vendored dependency
-- C bridging header (`whisper-bridge.h`) exposes WhisperKit's C API to Swift
-- Swift wrapper class provides a clean async API
+- WhisperKit is included as a Swift Package Manager dependency (see Package.swift)
+- Provides a native Swift async/await API — no C bridging required
+- Models are in CoreML format, optimized per-device by Apple's Neural Engine
 
 **Core API:**
 ```swift
@@ -467,10 +467,10 @@ swift build
 swift build -c release
 ```
 
-### 7.3 Distribution Strategy (MVP)
+### 7.3 Distribution Strategy
 
-1. **GitHub Releases** - DMG or ZIP containing the .app bundle
-2. **Homebrew Cask** - `brew install --cask vocamac` (post-MVP)
+1. **GitHub Releases** — Developer ID signed & notarized DMG and ZIP, built by CI
+2. **Homebrew Cask** - `brew install --cask vocamac` (planned)
 3. **Mac App Store** - Future consideration (requires sandbox compliance)
 
 ---
@@ -539,5 +539,5 @@ Platform-Specific:
 3. **Audio data never leaves the device** - processed entirely in-memory
 4. **No persistent audio storage** - audio buffers are discarded after transcription
 5. **Model files verified by checksum** - prevent tampering
-6. **Code signing** - App should be signed with a Developer ID certificate
-7. **Hardened runtime** - Enable for Gatekeeper compatibility
+6. **Code signing** — Release builds are signed with a Developer ID certificate and notarized by Apple
+7. **Hardened runtime** — Enabled for Gatekeeper compatibility and notarization

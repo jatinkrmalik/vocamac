@@ -1,20 +1,18 @@
 #!/bin/bash
-# release.sh — Release VocaMac to GitHub and Bitbucket
+# release.sh — Tag a release and push to trigger GitHub Actions release workflow
 # Usage: ./scripts/release.sh <version>
-# Example: ./scripts/release.sh 0.3.0
+# Example: ./scripts/release.sh 0.4.0
 #
 # This script:
-# 1. Syncs main from GitHub to Bitbucket
-# 2. Rebases Bitbucket's release branch (which has bitbucket-pipelines.yml)
-# 3. Tags on both remotes to trigger CI/CD
+# 1. Validates the version and checks we're on main
+# 2. Creates a git tag (v<version>)
+# 3. Pushes the tag to origin, which triggers .github/workflows/release.yml
 #
-# Prerequisites:
-#   - Two remotes configured: origin (GitHub) and atlassian (Bitbucket)
-#   - Bitbucket 'release' branch exists with bitbucket-pipelines.yml commit
+# The release workflow handles: build → sign → notarize → create GitHub Release
 
 set -euo pipefail
 
-VERSION="${1:?Usage: ./scripts/release.sh <version> (e.g., 0.3.0)}"
+VERSION="${1:?Usage: ./scripts/release.sh <version> (e.g., 0.4.0)}"
 TAG="v${VERSION}"
 
 # Validate we're not already on a tag
@@ -23,59 +21,37 @@ if git rev-parse "$TAG" >/dev/null 2>&1; then
     exit 1
 fi
 
-# Validate remotes exist
-for remote in origin atlassian; do
-    if ! git remote get-url "$remote" >/dev/null 2>&1; then
-        echo "❌ Remote '${remote}' not found. Run: git remote add ${remote} <url>"
-        exit 1
-    fi
-done
+# Validate we're on main
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+if [ "$CURRENT_BRANCH" != "main" ]; then
+    echo "❌ Not on main branch (currently on ${CURRENT_BRANCH}). Switch to main first."
+    exit 1
+fi
+
+# Validate working tree is clean
+if ! git diff --quiet || ! git diff --cached --quiet; then
+    echo "❌ Working tree has uncommitted changes. Commit or stash first."
+    exit 1
+fi
 
 echo "🚀 Releasing VocaMac ${TAG}"
 echo ""
 
-# Step 1: Ensure we're on main and up to date
-echo "📥 Pulling latest main from GitHub..."
-git checkout main
+# Ensure we're up to date
+echo "📥 Pulling latest main..."
 git pull origin main
 
-# Step 2: Sync main to Bitbucket (main-mirror branch)
-echo "📤 Syncing main to Bitbucket..."
-git push atlassian main:main-mirror
-
-# Step 3: Rebase Bitbucket's release branch onto updated main
-echo "🔄 Rebasing Bitbucket release branch..."
-git fetch atlassian release
-git checkout -B bb-release atlassian/release
-git rebase main
-
-# Step 4: Push the rebased release branch to Bitbucket
-git push atlassian bb-release:release --force-with-lease
-
-# Step 5: Tag on main (for GitHub) and push
-git checkout main
+# Tag and push
+echo "🏷️  Creating tag ${TAG}..."
 git tag "${TAG}"
-echo "🏷️  Pushing tag ${TAG} to GitHub..."
+
+echo "📤 Pushing tag to origin..."
 git push origin "${TAG}"
 
-# Step 6: Tag on release branch (for Bitbucket) and push
-git checkout bb-release
-git tag -f "${TAG}"
-echo "🏷️  Pushing tag ${TAG} to Bitbucket..."
-git push atlassian "${TAG}" --force
-
-# Clean up local temp branch
-git checkout main
-git branch -D bb-release
-
 echo ""
-echo "✅ Release ${TAG} triggered on both remotes!"
+echo "✅ Release ${TAG} triggered!"
 echo ""
-echo "   📦 GitHub Actions (ad-hoc signed):"
-echo "      https://github.com/jatinkrmalik/vocamac/actions"
+echo "   GitHub Actions will build, sign, notarize, and create a draft release."
+echo "   Watch progress: https://github.com/jatinkrmalik/vocamac/actions"
 echo ""
-echo "   📦 Bitbucket Pipelines (signed + notarized):"
-echo "      https://bitbucket.org/atlassian/vocamac/pipelines"
-echo ""
-echo "   Once the Bitbucket pipeline completes, download the signed DMG"
-echo "   from the pipeline artifacts and attach it to the GitHub Release."
+echo "   Once complete, review and publish the draft release on GitHub."

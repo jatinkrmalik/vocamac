@@ -13,8 +13,8 @@
 #                         Set to "-" to force ad-hoc signing.
 #
 # IMPORTANT: After the first build, grant Accessibility and Input Monitoring
-# permissions to VocaMac.app. These permissions persist as long as you don't
-# delete the app bundle.
+# permissions to VocaMac.app. With Developer ID signing, permissions persist
+# across rebuilds. With ad-hoc signing (no cert), permissions reset on every rebuild.
 
 set -euo pipefail
 
@@ -148,9 +148,9 @@ cat > "${APP_DIR}/Contents/Info.plist" << EOF
     <key>CFBundleDisplayName</key>
     <string>${APP_NAME}</string>
     <key>CFBundleVersion</key>
-    <string>0.3.0</string>
+    <string>0.4.0</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.3.0</string>
+    <string>0.4.0</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>LSMinimumSystemVersion</key>
