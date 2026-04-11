@@ -106,7 +106,6 @@ final class SoundManager: NSObject, NSSoundDelegate, @unchecked Sendable {
 
     /// Called when sound finishes playing
     nonisolated func sound(_ sound: NSSound, didFinishPlaying FinishedPlaying: Bool) {
-        // Dispatch back to main thread to safely access and resume continuation
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             self.continuationLock.lock()
@@ -118,3 +117,7 @@ final class SoundManager: NSObject, NSSoundDelegate, @unchecked Sendable {
         }
     }
 }
+
+// MARK: - SoundPlaying Conformance
+
+extension SoundManager: SoundPlaying {}

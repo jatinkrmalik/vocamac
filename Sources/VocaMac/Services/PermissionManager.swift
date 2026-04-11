@@ -28,20 +28,18 @@ final class PermissionManager: ObservableObject {
 
     // MARK: - Dependencies
 
-    private let audioEngine: AudioEngine
-    private let hotKeyManager: HotKeyManager
+    private let audioEngine: AudioRecording
+    private let hotKeyManager: HotKeyMonitoring
 
     // MARK: - Private
 
-    /// Timer that periodically polls permissions until all are granted.
     private var permissionPollTimer: Timer?
 
-    /// Called when all permissions are granted and the hotkey listener should start.
     var onAllPermissionsGranted: (() -> Void)?
 
     // MARK: - Initialization
 
-    init(audioEngine: AudioEngine, hotKeyManager: HotKeyManager) {
+    init(audioEngine: AudioRecording, hotKeyManager: HotKeyMonitoring) {
         self.audioEngine = audioEngine
         self.hotKeyManager = hotKeyManager
     }
@@ -59,7 +57,7 @@ final class PermissionManager: ObservableObject {
     func checkPermissions() {
         micPermission = audioEngine.checkPermissionStatus()
 
-        let accessibilityGranted = HotKeyManager.checkAccessibilityPermission(prompt: false)
+        let accessibilityGranted = hotKeyManager.checkAccessibilityPermission(prompt: false)
         accessibilityPermission = accessibilityGranted ? .granted : .denied
 
         let inputMonitoringGranted = checkInputMonitoringPermission()
@@ -181,5 +179,13 @@ final class PermissionManager: ObservableObject {
         VocaLogger.debug(.appState, "Stopping permission polling — all permissions granted")
         permissionPollTimer?.invalidate()
         permissionPollTimer = nil
+    }
+}
+
+// MARK: - PermissionManaging Conformance
+
+extension PermissionManager: PermissionManaging {
+    var objectWillChangePublisher: AnyPublisher<Void, Never> {
+        objectWillChange.eraseToAnyPublisher()
     }
 }

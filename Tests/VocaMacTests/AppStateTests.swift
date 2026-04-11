@@ -13,20 +13,18 @@ final class TranslationToggleTests: XCTestCase {
 
     @MainActor
     func testTranslationEnabledDefaultValue() {
-        // translationEnabled should default to false
-        // Note: @AppStorage defaults are set in AppState initialization
-        let appState = AppState()
+        let (appState, _) = AppState.makeTestState()
         XCTAssertFalse(appState.translationEnabled)
     }
 
     @MainActor
     func testTranslationEnabledCanBeToggled() {
-        let appState = AppState()
+        let (appState, _) = AppState.makeTestState()
         XCTAssertFalse(appState.translationEnabled)
-        
+
         appState.translationEnabled = true
         XCTAssertTrue(appState.translationEnabled)
-        
+
         appState.translationEnabled = false
         XCTAssertFalse(appState.translationEnabled)
     }
@@ -78,72 +76,58 @@ final class LaunchAtLoginTests: XCTestCase {
     }
 
     override func tearDown() {
-        // Clean up: ensure we don't leave the app registered as a login item from tests
         UserDefaults.standard.removeObject(forKey: "vocamac.launchAtLogin")
-        try? SMAppService.mainApp.unregister()
         super.tearDown()
     }
 
     @MainActor
     func testLaunchAtLoginDefaultsToFalse() {
-        let appState = AppState()
+        let (appState, _) = AppState.makeTestState()
         XCTAssertFalse(appState.launchAtLogin)
     }
 
     @MainActor
     func testLaunchAtLoginPersistence() {
         UserDefaults.standard.set(true, forKey: "vocamac.launchAtLogin")
-        let appState = AppState()
+        let (appState, _) = AppState.makeTestState()
         XCTAssertTrue(appState.launchAtLogin)
     }
 
     @MainActor
     func testSetLaunchAtLoginEnableUpdatesPreference() {
-        let appState = AppState()
+        let (appState, _) = AppState.makeTestState()
         XCTAssertFalse(appState.launchAtLogin)
 
         appState.setLaunchAtLogin(true)
 
-        // The preference should reflect the requested state
-        // (SMAppService.mainApp.register() may or may not succeed depending
-        // on the test environment, but the method should not crash)
-        // If registration succeeded, launchAtLogin will be true.
-        // If it failed, launchAtLogin will match the actual system state.
-        // Either way, the value should be consistent with SMAppService.mainApp.status
         let expected = SMAppService.mainApp.status == .enabled
         XCTAssertEqual(appState.launchAtLogin, expected)
     }
 
     @MainActor
     func testSetLaunchAtLoginDisableUpdatesPreference() {
-        let appState = AppState()
+        let (appState, _) = AppState.makeTestState()
         appState.setLaunchAtLogin(true)
         appState.setLaunchAtLogin(false)
 
-        // After disabling, launchAtLogin should match the system state
         let expected = SMAppService.mainApp.status == .enabled
         XCTAssertEqual(appState.launchAtLogin, expected)
     }
 
     @MainActor
     func testSetLaunchAtLoginToggleRoundTrip() {
-        let appState = AppState()
+        let (appState, _) = AppState.makeTestState()
 
-        // Enable
         appState.setLaunchAtLogin(true)
         let afterEnable = appState.launchAtLogin
 
-        // Disable
         appState.setLaunchAtLogin(false)
         let afterDisable = appState.launchAtLogin
 
-        // The states should be different (assuming SMAppService works in this env)
-        // If SMAppService isn't available, both will match the system state
         if SMAppService.mainApp.status != .enabled {
             XCTAssertFalse(afterDisable,
                 "After disabling, launchAtLogin should be false")
         }
-        // Just verify no crashes occurred during the round-trip
         XCTAssertNotNil(afterEnable)
         XCTAssertNotNil(afterDisable)
     }
@@ -155,35 +139,31 @@ final class AppStateOnboardingTests: XCTestCase {
 
     override func setUp() {
         super.setUp()
-        // Clean up any persisted state before each test
         UserDefaults.standard.removeObject(forKey: "vocamac.hasCompletedOnboarding")
     }
 
     @MainActor
     func testOnboardingFlagInitiallyFalse() {
-        let appState = AppState()
+        let (appState, _) = AppState.makeTestState()
         XCTAssertFalse(appState.hasCompletedOnboarding)
     }
 
     @MainActor
     func testCompleteOnboardingSetsFlagTrue() {
-        let appState = AppState()
+        let (appState, _) = AppState.makeTestState()
         XCTAssertFalse(appState.hasCompletedOnboarding)
-        
+
         appState.completeOnboarding()
-        
+
         XCTAssertTrue(appState.hasCompletedOnboarding)
     }
 
     @MainActor
     func testOnboardingFlagPersistence() {
-        // Set the flag
         UserDefaults.standard.set(true, forKey: "vocamac.hasCompletedOnboarding")
-        
-        let appState = AppState()
-        
-        // Verify it was loaded from UserDefaults
+
+        let (appState, _) = AppState.makeTestState()
+
         XCTAssertTrue(appState.hasCompletedOnboarding)
     }
 }
-

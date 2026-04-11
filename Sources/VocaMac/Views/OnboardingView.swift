@@ -881,6 +881,6 @@ extension View {
 #if DEBUG
 #Preview {
     OnboardingView()
-        .environmentObject(AppState())
+        .environmentObject(AppState.production())
 }
 #endif

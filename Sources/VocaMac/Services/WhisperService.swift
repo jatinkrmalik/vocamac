@@ -270,3 +270,11 @@ final class WhisperService: @unchecked Sendable {
         return "WhisperKit not loaded | Device: \(WhisperKit.deviceName())"
     }
 }
+
+// MARK: - SpeechTranscribing Conformance
+
+extension WhisperService: SpeechTranscribing {
+    func _loadModel(name: String?, folder: URL?, onPhaseChange: ((String) -> Void)?) async throws {
+        try await loadModel(name: name, folder: folder, onPhaseChange: onPhaseChange)
+    }
+}

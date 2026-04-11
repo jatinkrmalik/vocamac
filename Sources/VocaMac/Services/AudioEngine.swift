@@ -370,3 +370,7 @@ struct AudioDevice: Identifiable, Hashable {
     let name: String
     let isDefault: Bool
 }
+
+// MARK: - AudioRecording Conformance
+
+extension AudioEngine: AudioRecording {}

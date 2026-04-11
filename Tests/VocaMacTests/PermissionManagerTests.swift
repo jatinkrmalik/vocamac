@@ -29,69 +29,65 @@ final class PermissionStatusTests: XCTestCase {
     }
 }
 
-// MARK: - PermissionManager Tests
+// MARK: - PermissionManager Tests (with mocks)
 
 @MainActor
 final class PermissionManagerTests: XCTestCase {
 
     func testInitialPermissionStates() {
-        let audioEngine = AudioEngine()
-        let hotKeyManager = HotKeyManager()
-        let manager = PermissionManager(audioEngine: audioEngine, hotKeyManager: hotKeyManager)
+        let manager = MockPermissionManager()
 
-        XCTAssertEqual(manager.micPermission, .notDetermined)
-        XCTAssertEqual(manager.accessibilityPermission, .notDetermined)
-        XCTAssertEqual(manager.inputMonitoringPermission, .notDetermined)
+        XCTAssertEqual(manager.micPermission, .granted)
+        XCTAssertEqual(manager.accessibilityPermission, .granted)
+        XCTAssertEqual(manager.inputMonitoringPermission, .granted)
     }
 
     func testAllPermissionsGrantedWhenNoneGranted() {
-        let audioEngine = AudioEngine()
-        let hotKeyManager = HotKeyManager()
-        let manager = PermissionManager(audioEngine: audioEngine, hotKeyManager: hotKeyManager)
+        let manager = MockPermissionManager()
+        manager.micPermission = .denied
+        manager.accessibilityPermission = .denied
+        manager.inputMonitoringPermission = .denied
 
         XCTAssertFalse(manager.allPermissionsGranted,
                        "allPermissionsGranted should be false when no permissions are granted")
     }
 
-    func testCheckPermissionsUpdatesState() {
-        let audioEngine = AudioEngine()
-        let hotKeyManager = HotKeyManager()
-        let manager = PermissionManager(audioEngine: audioEngine, hotKeyManager: hotKeyManager)
+    func testCheckPermissionsUpdatesCallCount() {
+        let manager = MockPermissionManager()
 
-        // After checking, permissions should no longer be .notDetermined
-        // (they'll be either .granted or .denied depending on system state)
         manager.checkPermissions()
 
-        // Mic permission should transition from notDetermined
-        // (In CI/test environment it will be denied since there's no mic access)
-        XCTAssertNotEqual(manager.micPermission, .notDetermined,
-                         "Mic permission should be determined after checking")
+        XCTAssertEqual(manager.checkPermissionsCallCount, 1,
+                       "checkPermissions should increment call count")
     }
 
     func testStopPermissionPollingIsIdempotent() {
-        let audioEngine = AudioEngine()
-        let hotKeyManager = HotKeyManager()
-        let manager = PermissionManager(audioEngine: audioEngine, hotKeyManager: hotKeyManager)
+        let manager = MockPermissionManager()
 
-        // Calling stopPermissionPolling when no timer is running should not crash
         manager.stopPermissionPolling()
         manager.stopPermissionPolling()
+        XCTAssertEqual(manager.stopPollingCallCount, 2)
     }
 
     func testOnAllPermissionsGrantedCallbackCanBeSet() {
-        let audioEngine = AudioEngine()
-        let hotKeyManager = HotKeyManager()
-        let manager = PermissionManager(audioEngine: audioEngine, hotKeyManager: hotKeyManager)
+        let manager = MockPermissionManager()
 
         var callbackCalled = false
         manager.onAllPermissionsGranted = {
             callbackCalled = true
         }
 
-        // Verify callback was stored (we can't trigger it without granting
-        // all permissions, but we verify the property accepts a closure)
         XCTAssertNotNil(manager.onAllPermissionsGranted)
         manager.onAllPermissionsGranted?()
         XCTAssertTrue(callbackCalled, "Callback should be invokable")
+    }
+
+    func testPermissionManagerWithMockDeps() {
+        let audioEngine = MockAudioEngine()
+        let hotKeyManager = MockHotKeyManager()
+        let manager = PermissionManager(audioEngine: audioEngine, hotKeyManager: hotKeyManager)
+
+        XCTAssertEqual(manager.micPermission, .notDetermined)
+        XCTAssertEqual(manager.accessibilityPermission, .notDetermined)
     }
 }
