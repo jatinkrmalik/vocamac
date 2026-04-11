@@ -745,8 +745,10 @@ struct AboutTab: View {
             return "Update available: \(info.tagName)"
         case .error(let message):
             return message
-        case .downloading(let progress):
+        case .downloading(let progress, _, _, _):
             return "Downloading update... \(Int(progress * 100))%"
+        case .verifying:
+            return "Verifying download integrity..."
         case .readyToInstall:
             return "Update downloaded. Open the DMG to install."
         case .checking:

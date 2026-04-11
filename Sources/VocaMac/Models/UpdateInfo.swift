@@ -62,7 +62,8 @@ enum UpdateState: Equatable {
     case checking
     case updateAvailable(UpdateInfo)
     case upToDate
-    case downloading(progress: Double)
+    case downloading(progress: Double, bytesDownloaded: Int64, totalBytes: Int64, estimatedSecondsRemaining: Double)
+    case verifying
     case readyToInstall(dmgPath: URL)
     case error(String)
 }

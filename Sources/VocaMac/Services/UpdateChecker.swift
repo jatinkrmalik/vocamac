@@ -14,6 +14,7 @@ enum UpdateCheckerError: LocalizedError {
     case noDMGAsset
     case failedToMoveDownload
     case checksumMismatch
+    case downloadCancelled
 
     var errorDescription: String? {
         switch self {
@@ -27,6 +28,8 @@ enum UpdateCheckerError: LocalizedError {
             return "Failed to store downloaded update"
         case .checksumMismatch:
             return "Downloaded update failed integrity verification"
+        case .downloadCancelled:
+            return "Download was cancelled"
         }
     }
 }
@@ -79,9 +82,11 @@ final class UpdateChecker: ObservableObject {
     }
 
     func downloadUpdate(_ info: UpdateInfo) async {
+        updateState = .downloading(progress: 0, bytesDownloaded: 0, totalBytes: Int64(info.dmgSize), estimatedSecondsRemaining: 0)
+        VocaLogger.info(.updateChecker, "Starting download: \(info.dmgURL)")
+
         do {
-            updateState = .downloading(progress: 0)
-            let fileURL = try await downloadDMG(from: info.dmgURL, expectedSHA256: info.sha256)
+            let fileURL = try await downloadDMG(from: info.dmgURL, totalSize: Int64(info.dmgSize), expectedSHA256: info.sha256)
             updateState = .readyToInstall(dmgPath: fileURL)
             VocaLogger.info(.updateChecker, "Update downloaded: \(fileURL.lastPathComponent)")
         } catch {
@@ -181,38 +186,66 @@ final class UpdateChecker: ObservableObject {
         )
     }
 
-    private func downloadDMG(from url: URL, expectedSHA256: String?) async throws -> URL {
-        let delegate = DownloadProgressDelegate { [weak self] progress in
-            Task { @MainActor in
-                self?.updateState = .downloading(progress: progress)
+    // MARK: - Download with Progress
+
+    /// Downloads a DMG using AsyncStream-bridged delegate for real-time progress.
+    private func downloadDMG(from url: URL, totalSize: Int64, expectedSHA256: String?) async throws -> URL {
+        let delegate = DownloadDelegate()
+        let session = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
+
+        let task = session.downloadTask(with: url)
+        task.resume()
+
+        let startTime = Date()
+        var fileURL: URL?
+
+        for await event in delegate.events {
+            switch event {
+            case .progress(let bytesWritten, let totalExpected):
+                let total = totalExpected > 0 ? totalExpected : totalSize
+                let fraction = total > 0 ? Double(bytesWritten) / Double(total) : 0
+                let elapsed = Date().timeIntervalSince(startTime)
+                let speed = elapsed > 0 ? Double(bytesWritten) / elapsed : 0
+                let remaining = speed > 0 ? Double(total - bytesWritten) / speed : 0
+                updateState = .downloading(
+                    progress: min(fraction, 1.0),
+                    bytesDownloaded: bytesWritten,
+                    totalBytes: total,
+                    estimatedSecondsRemaining: remaining
+                )
+            case .completed(let url):
+                fileURL = url
+            case .failed(let error):
+                session.finishTasksAndInvalidate()
+                throw error
             }
         }
-        let session = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
-        defer { session.finishTasksAndInvalidate() }
 
-        let (tempFileURL, response) = try await session.download(from: url)
+        session.finishTasksAndInvalidate()
 
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw UpdateCheckerError.invalidResponse
-        }
-        guard httpResponse.statusCode == 200 else {
-            throw UpdateCheckerError.invalidStatusCode(httpResponse.statusCode)
+        guard let downloadedFile = fileURL else {
+            throw UpdateCheckerError.downloadCancelled
         }
 
+        // Verify SHA-256
         if let expectedSHA256 {
-            let data = try Data(contentsOf: tempFileURL, options: .mappedIfSafe)
+            updateState = .verifying
+            VocaLogger.info(.updateChecker, "Verifying SHA-256 checksum...")
+            let data = try Data(contentsOf: downloadedFile, options: .mappedIfSafe)
             let hash = SHA256.hash(data: data)
             let actualSHA256 = hash.compactMap { String(format: "%02x", $0) }.joined()
             guard expectedSHA256.lowercased() == actualSHA256.lowercased() else {
+                try? FileManager.default.removeItem(at: downloadedFile)
                 throw UpdateCheckerError.checksumMismatch
             }
         }
 
+        // Move to final location
         let destinationURL = FileManager.default.temporaryDirectory.appendingPathComponent(url.lastPathComponent)
         try? FileManager.default.removeItem(at: destinationURL)
 
         do {
-            try FileManager.default.moveItem(at: tempFileURL, to: destinationURL)
+            try FileManager.default.moveItem(at: downloadedFile, to: destinationURL)
         } catch {
             throw UpdateCheckerError.failedToMoveDownload
         }
@@ -221,18 +254,59 @@ final class UpdateChecker: ObservableObject {
     }
 }
 
-private final class DownloadProgressDelegate: NSObject, URLSessionDownloadDelegate {
-    private let onProgress: (Double) -> Void
+// MARK: - Download Events
 
-    init(onProgress: @escaping (Double) -> Void) {
-        self.onProgress = onProgress
+private enum DownloadEvent {
+    case progress(bytesWritten: Int64, totalBytes: Int64)
+    case completed(URL)
+    case failed(Error)
+}
+
+/// URLSession download delegate that bridges callbacks to an AsyncStream.
+private final class DownloadDelegate: NSObject, URLSessionDownloadDelegate {
+    let events: AsyncStream<DownloadEvent>
+    private let continuation: AsyncStream<DownloadEvent>.Continuation
+
+    override init() {
+        let (stream, cont) = AsyncStream.makeStream(of: DownloadEvent.self)
+        self.events = stream
+        self.continuation = cont
+        super.init()
     }
 
     func urlSession(
         _ session: URLSession,
         downloadTask: URLSessionDownloadTask,
         didFinishDownloadingTo location: URL
-    ) {}
+    ) {
+        // Move file before URLSession deletes it
+        let savedURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString + ".dmg")
+        do {
+            try FileManager.default.moveItem(at: location, to: savedURL)
+
+            if let httpResponse = downloadTask.response as? HTTPURLResponse,
+               httpResponse.statusCode != 200 {
+                continuation.yield(.failed(UpdateCheckerError.invalidStatusCode(httpResponse.statusCode)))
+            } else {
+                continuation.yield(.completed(savedURL))
+            }
+        } catch {
+            continuation.yield(.failed(UpdateCheckerError.failedToMoveDownload))
+        }
+        continuation.finish()
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        didCompleteWithError error: Error?
+    ) {
+        if let error {
+            continuation.yield(.failed(error))
+            continuation.finish()
+        }
+    }
 
     func urlSession(
         _ session: URLSession,
@@ -241,8 +315,6 @@ private final class DownloadProgressDelegate: NSObject, URLSessionDownloadDelega
         totalBytesWritten: Int64,
         totalBytesExpectedToWrite: Int64
     ) {
-        guard totalBytesExpectedToWrite > 0 else { return }
-        let progress = Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
-        onProgress(progress)
+        continuation.yield(.progress(bytesWritten: totalBytesWritten, totalBytes: totalBytesExpectedToWrite))
     }
 }
