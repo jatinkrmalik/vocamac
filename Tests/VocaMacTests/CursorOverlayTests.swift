@@ -63,14 +63,11 @@ final class CursorOverlayManagerTests: XCTestCase {
 
     func testInitialState() {
         let manager = CursorOverlayManager()
-        // Should initialize without crashing
         XCTAssertNotNil(manager)
     }
 
     func testHideIsIdempotent() {
         let manager = CursorOverlayManager()
-
-        // Calling hide when not shown should not crash
         manager.hide()
         manager.hide()
         manager.hide()
@@ -78,15 +75,11 @@ final class CursorOverlayManagerTests: XCTestCase {
 
     func testTransitionToProcessingWithoutShow() {
         let manager = CursorOverlayManager()
-
-        // Should be safe to call without show() first
         manager.transitionToProcessing()
     }
 
     func testUpdateAudioLevelWithoutShow() {
         let manager = CursorOverlayManager()
-
-        // Should be safe to update audio level when not visible
         manager.updateAudioLevel(0.5)
         manager.updateAudioLevel(0.0)
         manager.updateAudioLevel(1.0)
