@@ -103,8 +103,11 @@ final class ModelManager {
     /// Check if a model size is supported on this device
     func isModelSupported(_ size: ModelSize) -> Bool {
         let rec = WhisperKit.recommendedModels()
-        // A model is supported if it's not in the disabled list
-        return !rec.disabled.contains(where: { $0.contains(size.rawValue) })
+        // A model is supported if any variant of its size appears in the supported list.
+        // We check the supported list (not disabled) to avoid false positives from
+        // substring matching — e.g. "large-v3" matching "large-v3_turbo" in disabled.
+        let modelPrefix = whisperKitModelName(for: size)
+        return rec.supported.contains(where: { $0.hasPrefix(modelPrefix) })
     }
 
     // MARK: - Model Download
