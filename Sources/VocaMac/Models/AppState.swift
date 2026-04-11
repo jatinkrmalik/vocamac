@@ -197,9 +197,19 @@ final class AppState: ObservableObject {
         // Detect system capabilities
         systemCapabilities = SystemInfo.detect()
 
-        // Get WhisperKit's device recommendation
+        // Get WhisperKit's device recommendation.
+        // WhisperKit's `.default` is its global best pick and may be in the
+        // disabled list for this device (e.g. large-v3 on a low-RAM Mac).
+        // If so, fall back to the best supported model instead.
         let recommendation = modelManager.deviceRecommendation()
-        deviceRecommendedModel = recommendation.defaultModel
+        let defaultIsDisabled = recommendation.disabled.contains(
+            where: { $0.contains(recommendation.defaultModel) || recommendation.defaultModel.contains($0) }
+        )
+        if defaultIsDisabled, let bestSupported = recommendation.supported.last {
+            deviceRecommendedModel = bestSupported
+        } else {
+            deviceRecommendedModel = recommendation.defaultModel
+        }
 
         // Initialize available models list
         availableModels = ModelSize.allCases.map { size in

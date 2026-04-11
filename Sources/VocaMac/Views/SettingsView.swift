@@ -337,7 +337,7 @@ struct ModelSettingsTab: View {
                     HStack {
                         Image(systemName: "sparkles")
                             .foregroundStyle(.blue)
-                        Text("WhisperKit recommends: **\(recommended)**")
+                        Text("Recommended for your device: **\(recommended)**")
                             .font(.callout)
                     }
                 }
