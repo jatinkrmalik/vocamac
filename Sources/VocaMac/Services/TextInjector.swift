@@ -153,3 +153,7 @@ final class TextInjector {
         VocaLogger.info(.textInjector, "Cmd+V posted")
     }
 }
+
+// MARK: - TextInjecting Conformance
+
+extension TextInjector: TextInjecting {}

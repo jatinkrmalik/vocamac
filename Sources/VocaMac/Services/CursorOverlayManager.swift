@@ -189,6 +189,10 @@ final class CursorOverlayManager {
     }
 }
 
+// MARK: - CursorOverlayManaging Conformance
+
+extension CursorOverlayManager: CursorOverlayManaging {}
+
 // MARK: - IndicatorPhase
 
 enum IndicatorPhase {

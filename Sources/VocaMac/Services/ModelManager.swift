@@ -220,3 +220,7 @@ final class ModelManager {
         return formatter.string(fromByteCount: totalDiskUsage())
     }
 }
+
+// MARK: - ModelManaging Conformance
+
+extension ModelManager: ModelManaging {}

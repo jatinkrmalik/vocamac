@@ -425,6 +425,18 @@ final class HotKeyManager {
     }
 }
 
+// MARK: - HotKeyMonitoring Conformance
+
+extension HotKeyManager: HotKeyMonitoring {
+    func checkAccessibilityPermission(prompt: Bool) -> Bool {
+        Self.checkAccessibilityPermission(prompt: prompt)
+    }
+
+    func _updateConfiguration(keyCode: Int?, mode: ActivationMode?, doubleTapThreshold: Double?, safetyTimeout: Double?) {
+        updateConfiguration(keyCode: keyCode, mode: mode, doubleTapThreshold: doubleTapThreshold, safetyTimeout: safetyTimeout)
+    }
+}
+
 // MARK: - Common Key Codes Reference
 
 /// Reference for common macOS virtual key codes

@@ -110,35 +110,59 @@ final class AppState: ObservableObject {
 
     // MARK: - Services
 
-    let audioEngine = AudioEngine()
-    let whisperService = WhisperService()
-    let textInjector = TextInjector()
-    let hotKeyManager = HotKeyManager()
-    let modelManager = ModelManager()
-    let soundManager = SoundManager()
-    let cursorOverlay = CursorOverlayManager()
-    let permissionManager: PermissionManager
+    let audioEngine: AudioRecording
+    let whisperService: SpeechTranscribing
+    let textInjector: TextInjecting
+    let hotKeyManager: HotKeyMonitoring
+    let modelManager: ModelManaging
+    let soundManager: SoundPlaying
+    let cursorOverlay: CursorOverlayManaging
+    let permissionManager: any PermissionManaging
 
     // MARK: - Private
 
     private var cancellables = Set<AnyCancellable>()
+    private var hasStarted = false
+
+    /// Whether to skip system integration calls (SMAppService, etc.) during init.
+    /// Set to `true` in tests to avoid side effects.
+    let skipSystemIntegration: Bool
 
     // MARK: - Initialization
 
-    /// Whether `performStartup()` has already run. Guards against duplicate calls
-    /// if SwiftUI re-evaluates the body of the `App` struct.
-    private var hasStarted = false
+    init(
+        audioEngine: AudioRecording = AudioEngine(),
+        whisperService: SpeechTranscribing = WhisperService(),
+        textInjector: TextInjecting = TextInjector(),
+        hotKeyManager: HotKeyMonitoring = HotKeyManager(),
+        modelManager: ModelManaging = ModelManager(),
+        soundManager: SoundPlaying = SoundManager(),
+        cursorOverlay: CursorOverlayManaging,
+        permissionManager: (any PermissionManaging)? = nil,
+        skipSystemIntegration: Bool = false
+    ) {
+        self.audioEngine = audioEngine
+        self.whisperService = whisperService
+        self.textInjector = textInjector
+        self.hotKeyManager = hotKeyManager
+        self.modelManager = modelManager
+        self.soundManager = soundManager
+        self.cursorOverlay = cursorOverlay
+        self.permissionManager = permissionManager ?? PermissionManager(audioEngine: audioEngine, hotKeyManager: hotKeyManager)
+        self.skipSystemIntegration = skipSystemIntegration
 
-    init() {
-        self.permissionManager = PermissionManager(audioEngine: audioEngine, hotKeyManager: hotKeyManager)
         VocaLogger.info(.appState, "Initializing...")
-        syncLaunchAtLogin()
+        if !skipSystemIntegration {
+            syncLaunchAtLogin()
+        }
         setupServices()
-        // NOTE: performStartup() is NOT called here. SwiftUI may instantiate
-        // AppState more than once (the discarded instance's deinit tears down
-        // the event tap that the surviving instance just created). Instead,
-        // startup is triggered from onAppear/task in VocaMacApp to ensure it
-        // only runs on the instance SwiftUI actually keeps.
+    }
+
+    /// Convenience factory for creating AppState with all real services.
+    /// Needed because CursorOverlayManager is @MainActor and can't be a default parameter.
+    @MainActor
+    static func production() -> AppState {
+        AppState(cursorOverlay: CursorOverlayManager())
     }
 
     /// Called once from the SwiftUI lifecycle to complete initialization.
@@ -294,8 +318,8 @@ final class AppState: ObservableObject {
         }
 
         // Forward PermissionManager state changes to trigger SwiftUI updates
-        permissionManager.objectWillChange
-            .sink { [weak self] in self?.objectWillChange.send() }
+        permissionManager.objectWillChangePublisher
+            .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &cancellables)
 
         // Check permissions
@@ -478,7 +502,7 @@ final class AppState: ObservableObject {
 
         do {
             // If model is downloaded locally, use the local folder
-            let folder = targetSize.flatMap { modelManager.modelFolder(for: $0) }
+            let folderURL = targetSize.flatMap { modelManager.modelFolder(for: $0) }
 
             // Update status: unpacking
             if let targetSize = targetSize, let idx = availableModels.firstIndex(where: { $0.size == targetSize }) {
@@ -486,7 +510,7 @@ final class AppState: ObservableObject {
             }
 
             // Load model with status callback
-            try await whisperService.loadModel(name: modelName, folder: folder) { [weak self] phase in
+            try await whisperService.loadModel(name: modelName, folder: folderURL) { [weak self] phase in
                 Task { @MainActor in
                     guard let self = self else { return }
                     if let targetSize = targetSize,
