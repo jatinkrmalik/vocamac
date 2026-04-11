@@ -117,6 +117,7 @@ final class AppState: ObservableObject {
     let modelManager: ModelManaging
     let soundManager: SoundPlaying
     let cursorOverlay: CursorOverlayManaging
+    let updateChecker = UpdateChecker()
     let permissionManager: any PermissionManaging
 
     // MARK: - Private
@@ -668,6 +669,8 @@ final class AppState: ObservableObject {
         } else {
             VocaLogger.warning(.appState, "Hotkey listener failed to start. Check Accessibility & Input Monitoring permissions.")
         }
+
+        await updateChecker.checkOnLaunchIfNeeded()
 
         VocaLogger.info(.appState, "Startup complete!")
     }

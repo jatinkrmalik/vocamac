@@ -69,6 +69,7 @@ VocaMac is a native macOS menu bar application built with Swift and SwiftUI. It 
 | Acceleration | Metal | macOS 13+ | GPU-accelerated inference on Apple Silicon |
 | Build | Swift Package Manager | 5.9+ | Dependency management and build |
 | Min OS | macOS 13 Ventura | - | Minimum supported macOS version |
+| Update Checks | GitHub Releases API | v3 | In-app release detection and DMG download |
 
 ---
 
@@ -84,6 +85,7 @@ VocaMacApp (entry point)
     │     ├── WhisperService
     │     │     └── ModelManager
     │     │           └── SystemInfo
+    │     ├── UpdateChecker
     │     └── TextInjector
     │     └── SoundManager
     ├── MenuBarView
@@ -331,6 +333,29 @@ CGEventSource(stateID: .hidSystemState)
 - If clipboard contains non-text content (images, files), save and restore the full pasteboard items
 - Add configurable delay between paste simulation events for slower apps
 - Handle the case where the user's clipboard is empty
+
+#### 3.2.9 `UpdateChecker` - GitHub Release Updates
+
+**Responsibility:** Detect new stable releases from GitHub, download the latest signed DMG, verify integrity, and guide the user through drag-to-replace installation.
+
+**Update Flow:**
+```
+On launch (max once every 24h)
+  → GET /repos/jatinkrmalik/vocamac/releases/latest
+  → Compare tag_name vs CFBundleShortVersionString
+  → If newer: show update banner in MenuBarView
+  → User opens update sheet and starts download
+  → Download DMG with progress
+  → Verify SHA-256 using assets[].digest
+  → Open DMG in Finder (user drags app to /Applications)
+```
+
+**Manual Check:**
+- Settings → About includes **Check for Updates...**
+
+**Key Constraints:**
+- Uses GitHub API unauthenticated (rate-limited), so checks are throttled to once per day automatically
+- Works with existing DMG release artifacts and current release workflow
 
 ---
 
