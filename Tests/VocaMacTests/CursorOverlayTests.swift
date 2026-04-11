@@ -56,6 +56,25 @@ final class MicIndicatorViewModelTests: XCTestCase {
     }
 }
 
+// MARK: - PositionSource Tests
+
+final class PositionSourceTests: XCTestCase {
+
+    func testAllSourcesExist() {
+        let sources: [CursorOverlayManager.PositionSource] = [
+            .caret, .focusedElement, .focusedWindow, .mouseCursor
+        ]
+        XCTAssertEqual(sources.count, 4, "Should have exactly 4 position sources")
+    }
+
+    func testRawValues() {
+        XCTAssertEqual(CursorOverlayManager.PositionSource.caret.rawValue, "caret")
+        XCTAssertEqual(CursorOverlayManager.PositionSource.focusedElement.rawValue, "focused_element")
+        XCTAssertEqual(CursorOverlayManager.PositionSource.focusedWindow.rawValue, "focused_window")
+        XCTAssertEqual(CursorOverlayManager.PositionSource.mouseCursor.rawValue, "mouse_cursor")
+    }
+}
+
 // MARK: - CursorOverlayManager Tests
 
 @MainActor
@@ -90,5 +109,39 @@ final class CursorOverlayManagerTests: XCTestCase {
         manager.updateAudioLevel(0.5)
         manager.updateAudioLevel(0.0)
         manager.updateAudioLevel(1.0)
+    }
+
+    func testDetectIndicatorPositionReturnsResult() {
+        let manager = CursorOverlayManager()
+
+        // In a CI/test environment without accessibility permissions,
+        // this should gracefully fall back to mouse cursor position
+        let result = manager.detectIndicatorPosition()
+
+        // The result should always produce a valid position
+        XCTAssertFalse(result.point.x.isNaN, "X coordinate should not be NaN")
+        XCTAssertFalse(result.point.y.isNaN, "Y coordinate should not be NaN")
+
+        // Without accessibility permissions in test, we expect mouse cursor fallback
+        // (but don't assert the exact source since it depends on system state)
+        let validSources: [CursorOverlayManager.PositionSource] = [
+            .caret, .focusedElement, .focusedWindow, .mouseCursor
+        ]
+        XCTAssertTrue(
+            validSources.contains(result.source),
+            "Position source should be one of the known sources"
+        )
+    }
+
+    func testPositionResultStoresValues() {
+        let point = NSPoint(x: 100, y: 200)
+        let result = CursorOverlayManager.PositionResult(
+            point: point,
+            source: .focusedElement
+        )
+
+        XCTAssertEqual(result.point.x, 100)
+        XCTAssertEqual(result.point.y, 200)
+        XCTAssertEqual(result.source, .focusedElement)
     }
 }

@@ -103,89 +103,243 @@ final class CursorOverlayManager {
     // MARK: - Caret Position Detection
 
     /// Position the panel near the text caret using the Accessibility API.
-    /// Falls back to positioning near the mouse cursor if the caret can't be found.
+    ///
+    /// Uses a tiered fallback strategy:
+    /// 1. Exact caret position via AX text attributes (works in native AppKit/SwiftUI apps)
+    /// 2. Focused element position/size (works in apps with partial AX support)
+    /// 3. Focused window position (works in almost all apps)
+    /// 4. Mouse cursor on the focused app's screen (last resort)
     private func positionNearCaret(_ panel: NSPanel) {
-        if let caretRect = getCaretRect() {
-            // Place the indicator just above and to the right of the caret
-            let screenPoint = NSPoint(
-                x: caretRect.origin.x + caretRect.width + 4,
-                y: caretRect.origin.y + caretRect.height + 4
-            )
-            panel.setFrameOrigin(screenPoint)
-        } else {
-            // Fallback: position near the mouse cursor
-            let mouseLocation = NSEvent.mouseLocation
-            panel.setFrameOrigin(NSPoint(
-                x: mouseLocation.x + 16,
-                y: mouseLocation.y - 40
-            ))
-        }
+        let result = detectIndicatorPosition()
+        panel.setFrameOrigin(result.point)
     }
 
-    /// Use the Accessibility API to get the bounding rect of the text caret
-    /// in the currently focused application.
+    /// The method used to determine the indicator position, for logging/debugging.
+    enum PositionSource: String {
+        case caret = "caret"
+        case focusedElement = "focused_element"
+        case focusedWindow = "focused_window"
+        case mouseCursor = "mouse_cursor"
+    }
+
+    /// Result of indicator position detection.
+    struct PositionResult {
+        let point: NSPoint
+        let source: PositionSource
+    }
+
+    /// Detect the best position for the indicator using tiered fallback.
     ///
-    /// The Accessibility API returns coordinates in the macOS global coordinate
-    /// system (top-left origin, with (0,0) at the top-left of the primary screen).
-    /// NSWindow/NSPanel uses the AppKit coordinate system (bottom-left origin).
-    /// We must convert between these systems using the *primary screen's height*
-    /// — not NSScreen.main — to handle multi-monitor setups properly.
-    private func getCaretRect() -> CGRect? {
-        // Get the focused application
+    /// This is extracted as a separate method (returning a result struct) to
+    /// make the fallback strategy testable and debuggable.
+    func detectIndicatorPosition() -> PositionResult {
         let systemWide = AXUIElementCreateSystemWide()
 
+        // Step 1: Get the focused application
         var focusedApp: AnyObject?
-        guard AXUIElementCopyAttributeValue(systemWide, kAXFocusedApplicationAttribute as CFString, &focusedApp) == .success else {
-            return nil
+        guard AXUIElementCopyAttributeValue(
+            systemWide,
+            kAXFocusedApplicationAttribute as CFString,
+            &focusedApp
+        ) == .success else {
+            VocaLogger.debug(.cursorOverlay, "AX step 1 failed: no focused application")
+            return mousePosition()
         }
 
-        // Get the focused UI element (usually a text field)
+        let app = focusedApp as! AXUIElement
+
+        // Step 2: Get the focused UI element
         var focusedElement: AnyObject?
-        guard AXUIElementCopyAttributeValue(focusedApp as! AXUIElement, kAXFocusedUIElementAttribute as CFString, &focusedElement) == .success else {
-            return nil
+        let step2Result = AXUIElementCopyAttributeValue(
+            app,
+            kAXFocusedUIElementAttribute as CFString,
+            &focusedElement
+        )
+
+        if step2Result == .success, let element = focusedElement {
+            let axElement = element as! AXUIElement
+
+            // Step 3: Try exact caret position (full AX text support)
+            if let caretRect = getCaretRectFromElement(axElement) {
+                return PositionResult(
+                    point: NSPoint(
+                        x: caretRect.origin.x + caretRect.width + 4,
+                        y: caretRect.origin.y + caretRect.height + 4
+                    ),
+                    source: .caret
+                )
+            }
+
+            // Step 4: Try focused element's position + size
+            // (better than mouse cursor — at least near the text field)
+            if let elementRect = getElementRect(axElement) {
+                VocaLogger.debug(.cursorOverlay, "Using focused element position fallback")
+                let appKitRect = convertAXRectToAppKit(elementRect)
+                // Position at the top-right corner of the focused element
+                return PositionResult(
+                    point: NSPoint(
+                        x: appKitRect.origin.x + appKitRect.width + 4,
+                        y: appKitRect.origin.y + appKitRect.height - 4
+                    ),
+                    source: .focusedElement
+                )
+            }
+        } else {
+            VocaLogger.debug(.cursorOverlay, "AX step 2 failed: no focused element (code: \(step2Result.rawValue))")
         }
 
-        let element = focusedElement as! AXUIElement
+        // Step 5: Try the focused app's main/focused window position
+        if let windowRect = getFocusedWindowRect(app) {
+            VocaLogger.debug(.cursorOverlay, "Using focused window position fallback")
+            let appKitRect = convertAXRectToAppKit(windowRect)
+            // Position at the top-right area of the window's content area
+            // Offset inward so it doesn't overlap window chrome
+            return PositionResult(
+                point: NSPoint(
+                    x: appKitRect.origin.x + appKitRect.width - 60,
+                    y: appKitRect.origin.y + appKitRect.height - 50
+                ),
+                source: .focusedWindow
+            )
+        }
 
+        // Step 6: Last resort — mouse cursor
+        VocaLogger.debug(.cursorOverlay, "All AX fallbacks failed, using mouse cursor position")
+        return mousePosition()
+    }
+
+    /// Try to get the exact caret bounding rect from a focused text element.
+    /// Requires the element to support kAXSelectedTextRangeAttribute and
+    /// kAXBoundsForRangeParameterizedAttribute.
+    private func getCaretRectFromElement(_ element: AXUIElement) -> CGRect? {
         // Get the selected text range (caret position)
         var selectedRange: AnyObject?
-        guard AXUIElementCopyAttributeValue(element, kAXSelectedTextRangeAttribute as CFString, &selectedRange) == .success else {
+        let rangeResult = AXUIElementCopyAttributeValue(
+            element,
+            kAXSelectedTextRangeAttribute as CFString,
+            &selectedRange
+        )
+        guard rangeResult == .success else {
+            VocaLogger.debug(.cursorOverlay, "AX step 3 failed: kAXSelectedTextRangeAttribute not supported (code: \(rangeResult.rawValue))")
             return nil
         }
 
-        // Get the bounds of the selected range (caret position on screen)
+        // Get the bounds of the selected range
         var bounds: AnyObject?
-        guard AXUIElementCopyParameterizedAttributeValue(
+        let boundsResult = AXUIElementCopyParameterizedAttributeValue(
             element,
             kAXBoundsForRangeParameterizedAttribute as CFString,
             selectedRange!,
             &bounds
-        ) == .success else {
+        )
+        guard boundsResult == .success else {
+            VocaLogger.debug(.cursorOverlay, "AX step 4 failed: kAXBoundsForRangeParameterizedAttribute not supported (code: \(boundsResult.rawValue))")
             return nil
         }
 
         // Convert AXValue to CGRect
         var rect = CGRect.zero
         guard AXValueGetValue(bounds as! AXValue, .cgRect, &rect) else {
+            VocaLogger.debug(.cursorOverlay, "AX step 4 failed: could not extract CGRect from AXValue")
             return nil
         }
 
-        // Convert from AX (top-left origin) to AppKit (bottom-left origin).
-        //
-        // The AX global coordinate system places (0,0) at the top-left corner
-        // of the primary display, with Y increasing downward. AppKit places
-        // (0,0) at the bottom-left of the primary display with Y going up.
-        //
-        // To convert correctly on multi-monitor setups we must use the
-        // *primary* screen's height (NSScreen.screens.first) — not
-        // NSScreen.main (the screen with the current key window). The AX
-        // coordinate space is always anchored to the primary display, so
-        // using any other screen's dimensions produces wrong results when
-        // the caret is on a secondary monitor.
-        let primaryScreenHeight = NSScreen.screens.first?.frame.height ?? 0
-        rect.origin.y = primaryScreenHeight - rect.origin.y - rect.height
+        return convertAXRectToAppKit(rect)
+    }
 
-        return rect
+    /// Get the position and size of an AXUIElement via kAXPositionAttribute
+    /// and kAXSizeAttribute. Works for many elements that don't support
+    /// the full text caret attributes (e.g., Electron text areas, terminal views).
+    private func getElementRect(_ element: AXUIElement) -> CGRect? {
+        var positionValue: AnyObject?
+        guard AXUIElementCopyAttributeValue(
+            element,
+            kAXPositionAttribute as CFString,
+            &positionValue
+        ) == .success else {
+            VocaLogger.debug(.cursorOverlay, "Focused element fallback failed: kAXPositionAttribute not available")
+            return nil
+        }
+
+        var sizeValue: AnyObject?
+        guard AXUIElementCopyAttributeValue(
+            element,
+            kAXSizeAttribute as CFString,
+            &sizeValue
+        ) == .success else {
+            VocaLogger.debug(.cursorOverlay, "Focused element fallback failed: kAXSizeAttribute not available")
+            return nil
+        }
+
+        var position = CGPoint.zero
+        var size = CGSize.zero
+        guard AXValueGetValue(positionValue as! AXValue, .cgPoint, &position),
+              AXValueGetValue(sizeValue as! AXValue, .cgSize, &size) else {
+            return nil
+        }
+
+        return CGRect(origin: position, size: size)
+    }
+
+    /// Get the focused (or main) window's position and size from the app element.
+    private func getFocusedWindowRect(_ app: AXUIElement) -> CGRect? {
+        // Try the focused window first
+        var window: AnyObject?
+        var result = AXUIElementCopyAttributeValue(
+            app,
+            kAXFocusedWindowAttribute as CFString,
+            &window
+        )
+
+        // Fall back to the main window
+        if result != .success {
+            result = AXUIElementCopyAttributeValue(
+                app,
+                kAXMainWindowAttribute as CFString,
+                &window
+            )
+        }
+
+        guard result == .success, let windowElement = window else {
+            VocaLogger.debug(.cursorOverlay, "Window fallback failed: no focused/main window (code: \(result.rawValue))")
+            return nil
+        }
+
+        return getElementRect(windowElement as! AXUIElement)
+    }
+
+    // MARK: - Coordinate Conversion
+
+    /// Convert a rect from AX coordinates (top-left origin) to AppKit coordinates
+    /// (bottom-left origin).
+    ///
+    /// The AX global coordinate system places (0,0) at the top-left corner
+    /// of the primary display, with Y increasing downward. AppKit places
+    /// (0,0) at the bottom-left of the primary display with Y going up.
+    ///
+    /// To convert correctly on multi-monitor setups we must use the
+    /// *primary* screen's height (NSScreen.screens.first) — not
+    /// NSScreen.main (the screen with the current key window). The AX
+    /// coordinate space is always anchored to the primary display, so
+    /// using any other screen's dimensions produces wrong results when
+    /// the caret is on a secondary monitor.
+    private func convertAXRectToAppKit(_ rect: CGRect) -> CGRect {
+        let primaryScreenHeight = NSScreen.screens.first?.frame.height ?? 0
+        var converted = rect
+        converted.origin.y = primaryScreenHeight - rect.origin.y - rect.height
+        return converted
+    }
+
+    /// Mouse cursor fallback — positions the indicator near the mouse cursor.
+    private func mousePosition() -> PositionResult {
+        let mouseLocation = NSEvent.mouseLocation
+        return PositionResult(
+            point: NSPoint(
+                x: mouseLocation.x + 16,
+                y: mouseLocation.y - 40
+            ),
+            source: .mouseCursor
+        )
     }
 }
 
