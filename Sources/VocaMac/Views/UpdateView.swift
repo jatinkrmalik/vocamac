@@ -4,7 +4,6 @@
 // Update banner and detail sheet for GitHub release updates.
 
 import SwiftUI
-import AppKit
 
 struct UpdateBannerView: View {
     let info: UpdateInfo
@@ -72,9 +71,14 @@ struct UpdateDetailView: View {
 
             Divider()
 
-            MarkdownReleaseNotesView(markdown: info.releaseNotes.isEmpty ? "No release notes provided." : info.releaseNotes)
-                .frame(height: 280)
-                .padding(20)
+            ScrollView {
+                Text(info.releaseNotes.isEmpty ? "No release notes provided." : info.releaseNotes)
+                    .font(.callout)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(20)
+            }
+            .frame(maxHeight: 280)
 
             Divider()
 
@@ -183,211 +187,5 @@ struct UpdateDetailView: View {
             return "\(mins)m \(secs)s remaining"
         }
         return "\(secs)s remaining"
-    }
-}
-
-private struct MarkdownReleaseNotesView: NSViewRepresentable {
-    let markdown: String
-
-    func makeNSView(context: Context) -> NSScrollView {
-        let textView = NSTextView(frame: .zero)
-        textView.isEditable = false
-        textView.isSelectable = true
-        textView.drawsBackground = false
-        textView.textContainerInset = NSSize(width: 0, height: 0)
-        textView.textContainer?.lineFragmentPadding = 0
-        textView.isHorizontallyResizable = false
-        textView.isVerticallyResizable = true
-        textView.textContainer?.widthTracksTextView = true
-        textView.textContainer?.containerSize = NSSize(width: 0, height: 10_000_000)
-
-        let scrollView = NSScrollView(frame: .zero)
-        scrollView.drawsBackground = false
-        scrollView.hasVerticalScroller = true
-        scrollView.hasHorizontalScroller = false
-        scrollView.borderType = .noBorder
-        scrollView.documentView = textView
-
-        return scrollView
-    }
-
-    func updateNSView(_ nsView: NSScrollView, context: Context) {
-        guard let textView = nsView.documentView as? NSTextView else { return }
-        textView.textStorage?.setAttributedString(renderedMarkdown())
-    }
-
-    /// Converts GitHub-flavored Markdown to HTML, then renders via NSAttributedString.
-    private func renderedMarkdown() -> NSAttributedString {
-        let htmlBody = markdownToHTML(markdown)
-        let isDark = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-        let textColor = isDark ? "#e0e0e0" : "#1d1d1f"
-        let mutedColor = isDark ? "#999" : "#666"
-
-        let fullHTML = """
-        <html><head><style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-            font-size: 12px;
-            color: \(textColor);
-            line-height: 1.5;
-            margin: 0;
-            padding: 0;
-        }
-        h1, h2, h3, h4 {
-            font-weight: 600;
-            margin: 12px 0 6px 0;
-        }
-        h2 { font-size: 15px; }
-        h3 { font-size: 13px; }
-        ul, ol { padding-left: 20px; margin: 4px 0; }
-        li { margin: 2px 0; }
-        code {
-            font-family: Menlo, monospace;
-            font-size: 11px;
-            background: \(isDark ? "#333" : "#f0f0f0");
-            padding: 1px 4px;
-            border-radius: 3px;
-        }
-        p { margin: 6px 0; }
-        a { color: #007AFF; }
-        strong { font-weight: 600; }
-        em { font-style: italic; }
-        hr { border: none; border-top: 1px solid \(mutedColor); margin: 10px 0; }
-        </style></head><body>\(htmlBody)</body></html>
-        """
-
-        guard let data = fullHTML.data(using: String.Encoding.utf8),
-              let attributed = NSAttributedString(
-                html: data,
-                options: [
-                    .documentType: NSAttributedString.DocumentType.html,
-                    .characterEncoding: String.Encoding.utf8.rawValue
-                ],
-                documentAttributes: nil
-              ) else {
-            return NSAttributedString(string: markdown)
-        }
-
-        return attributed
-    }
-
-    /// Basic Markdown to HTML converter for GitHub release notes.
-    private func markdownToHTML(_ md: String) -> String {
-        let lines = md.components(separatedBy: "\n")
-        var html = ""
-        var inList = false
-
-        for i in 0..<lines.count {
-            let line = lines[i]
-
-            // Close list if we leave a list context
-            if inList && !line.hasPrefix("- ") && !line.hasPrefix("* ") && !line.trimmingCharacters(in: .whitespaces).isEmpty {
-                html += "</ul>\n"
-                inList = false
-            }
-
-            // Headings
-            if line.hasPrefix("#### ") {
-                html += "<h4>\(inlineMarkdown(String(line.dropFirst(5))))</h4>\n"
-                continue
-            }
-            if line.hasPrefix("### ") {
-                html += "<h3>\(inlineMarkdown(String(line.dropFirst(4))))</h3>\n"
-                continue
-            }
-            if line.hasPrefix("## ") {
-                html += "<h2>\(inlineMarkdown(String(line.dropFirst(3))))</h2>\n"
-                continue
-            }
-            if line.hasPrefix("# ") {
-                html += "<h1>\(inlineMarkdown(String(line.dropFirst(2))))</h1>\n"
-                continue
-            }
-
-            // Horizontal rule
-            if line.trimmingCharacters(in: .whitespaces) == "---" ||
-               line.trimmingCharacters(in: .whitespaces) == "***" {
-                html += "<hr>\n"
-                continue
-            }
-
-            // Unordered list items
-            if line.hasPrefix("- ") || line.hasPrefix("* ") {
-                if !inList {
-                    html += "<ul>\n"
-                    inList = true
-                }
-                let content = String(line.dropFirst(2))
-                html += "<li>\(inlineMarkdown(content))</li>\n"
-                continue
-            }
-
-            // Empty lines = paragraph break
-            if line.trimmingCharacters(in: .whitespaces).isEmpty {
-                html += "<br>\n"
-                continue
-            }
-
-            // Regular paragraph
-            html += "<p>\(inlineMarkdown(line))</p>\n"
-        }
-
-        if inList {
-            html += "</ul>\n"
-        }
-
-        return html
-    }
-
-    /// Handles inline markdown: bold, italic, code, links.
-    private func inlineMarkdown(_ text: String) -> String {
-        var result = text
-
-        // Escape HTML entities (but preserve existing tags we might add)
-        result = result.replacingOccurrences(of: "&", with: "&amp;")
-        result = result.replacingOccurrences(of: "<", with: "&lt;")
-        result = result.replacingOccurrences(of: ">", with: "&gt;")
-
-        // Inline code: `code`
-        result = result.replacingOccurrences(
-            of: "`([^`]+)`",
-            with: "<code>$1</code>",
-            options: .regularExpression
-        )
-
-        // Bold: **text** or __text__
-        result = result.replacingOccurrences(
-            of: "\\*\\*(.+?)\\*\\*",
-            with: "<strong>$1</strong>",
-            options: .regularExpression
-        )
-        result = result.replacingOccurrences(
-            of: "__(.+?)__",
-            with: "<strong>$1</strong>",
-            options: .regularExpression
-        )
-
-        // Italic: *text* or _text_
-        result = result.replacingOccurrences(
-            of: "(?<!\\w)\\*(.+?)\\*(?!\\w)",
-            with: "<em>$1</em>",
-            options: .regularExpression
-        )
-
-        // Links: [text](url)
-        result = result.replacingOccurrences(
-            of: "\\[([^\\]]+)\\]\\(([^)]+)\\)",
-            with: "<a href=\"$2\">$1</a>",
-            options: .regularExpression
-        )
-
-        // GitHub issue/PR references: #123
-        result = result.replacingOccurrences(
-            of: "#(\\d+)",
-            with: "<a href=\"https://github.com/jatinkrmalik/vocamac/issues/$1\">#$1</a>",
-            options: .regularExpression
-        )
-
-        return result
     }
 }

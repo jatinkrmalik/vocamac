@@ -20,6 +20,8 @@ The check is lightweight and rate-limit friendly:
 
 When an update is found, VocaMac shows a clear, non-intrusive banner in the menu bar popover. From there, you can open update details, review release notes, and start the download.
 
+![VocaMac update sheet showing release notes and Download & Install button](/screenshots/update-ux.png)
+
 The app then:
 
 1. downloads the latest `arm64` DMG from the GitHub Release asset

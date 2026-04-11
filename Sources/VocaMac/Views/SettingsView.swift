@@ -610,6 +610,7 @@ struct AudioSettingsTab: View {
 struct AboutTab: View {
     @EnvironmentObject var appState: AppState
     @State private var showingUpdateSheet = false
+    @State private var updateInfoForSheet: UpdateInfo?
 
     var body: some View {
         VStack(spacing: 16) {
@@ -638,7 +639,8 @@ struct AboutTab: View {
             Button {
                 Task {
                     await appState.updateChecker.checkForUpdates()
-                    if case .updateAvailable = appState.updateChecker.updateState {
+                    if case .updateAvailable(let info) = appState.updateChecker.updateState {
+                        updateInfoForSheet = info
                         showingUpdateSheet = true
                     }
                 }
@@ -726,7 +728,7 @@ struct AboutTab: View {
         .frame(maxWidth: .infinity)
         .padding()
         .sheet(isPresented: $showingUpdateSheet) {
-            if case .updateAvailable(let info) = appState.updateChecker.updateState {
+            if let info = updateInfoForSheet {
                 UpdateDetailView(info: info)
                     .environmentObject(appState)
             }

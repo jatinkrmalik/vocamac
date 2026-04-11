@@ -38,6 +38,21 @@ enum UpdateCheckerError: LocalizedError {
 final class UpdateChecker: ObservableObject {
     @Published var updateState: UpdateState = .idle
 
+    /// Returns the UpdateInfo if the checker is in any active update flow
+    /// (available, downloading, verifying, ready to install, or error after a download attempt).
+    /// Used to keep banners and sheets visible during the entire update process.
+    var activeUpdateInfo: UpdateInfo? {
+        switch updateState {
+        case .updateAvailable(let info):
+            return info
+        default:
+            return lastKnownUpdateInfo
+        }
+    }
+
+    /// Stored when an update is found so views can reference it across state transitions.
+    private(set) var lastKnownUpdateInfo: UpdateInfo?
+
     private let apiURL = URL(string: "https://api.github.com/repos/jatinkrmalik/vocamac/releases/latest")!
     private let checkInterval: TimeInterval = 24 * 60 * 60
     private let lastCheckKey = "vocamac.update.lastCheck"
@@ -70,6 +85,7 @@ final class UpdateChecker: ObservableObject {
                 guard let info = buildUpdateInfo(from: release) else {
                     throw UpdateCheckerError.noDMGAsset
                 }
+                lastKnownUpdateInfo = info
                 updateState = .updateAvailable(info)
                 VocaLogger.info(.updateChecker, "Update available: \(info.tagName)")
             } else {
@@ -82,6 +98,8 @@ final class UpdateChecker: ObservableObject {
     }
 
     func downloadUpdate(_ info: UpdateInfo) async {
+        // Clean up any previously downloaded VocaMac DMGs in temp
+        cleanupStaleDMGs()
         updateState = .downloading(progress: 0, bytesDownloaded: 0, totalBytes: Int64(info.dmgSize), estimatedSecondsRemaining: 0)
         VocaLogger.info(.updateChecker, "Starting download: \(info.dmgURL)")
 
@@ -101,10 +119,12 @@ final class UpdateChecker: ObservableObject {
 
     func skipVersion(_ version: String) {
         UserDefaults.standard.set(version, forKey: skippedVersionKey)
+        lastKnownUpdateInfo = nil
         updateState = .upToDate
     }
 
     func dismiss() {
+        lastKnownUpdateInfo = nil
         updateState = .idle
     }
 
@@ -187,6 +207,17 @@ final class UpdateChecker: ObservableObject {
     }
 
     // MARK: - Download with Progress
+
+    /// Remove any leftover VocaMac DMG files from the temp directory.
+    private func cleanupStaleDMGs() {
+        let tmpDir = FileManager.default.temporaryDirectory
+        if let contents = try? FileManager.default.contentsOfDirectory(at: tmpDir, includingPropertiesForKeys: nil) {
+            for file in contents where file.pathExtension == "dmg" && file.lastPathComponent.contains("VocaMac") {
+                try? FileManager.default.removeItem(at: file)
+                VocaLogger.debug(.updateChecker, "Cleaned up stale DMG: \(file.lastPathComponent)")
+            }
+        }
+    }
 
     /// Downloads a DMG using AsyncStream-bridged delegate for real-time progress.
     private func downloadDMG(from url: URL, totalSize: Int64, expectedSHA256: String?) async throws -> URL {

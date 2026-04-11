@@ -157,6 +157,13 @@ final class AppState: ObservableObject {
             syncLaunchAtLogin()
         }
         setupServices()
+
+        // Forward updateChecker changes so SwiftUI views observing AppState
+        // re-render when updateState changes (nested ObservableObject fix).
+        updateChecker.objectWillChange
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &cancellables)
     }
 
     /// Convenience factory for creating AppState with all real services.

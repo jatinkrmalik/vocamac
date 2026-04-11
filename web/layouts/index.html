@@ -218,11 +218,6 @@
                     <h3>Clipboard Preservation</h3>
                     <p>Your clipboard is saved and restored after text injection. Nothing gets overwritten.</p>
                 </a>
-                <a href="/features/github-release-updates/" class="feature-card">
-                    <div class="feature-card__icon">⬇️</div>
-                    <h3>GitHub Release Updates</h3>
-                    <p>Checks for new releases, downloads the signed DMG with progress, and guides drag-to-replace updates.</p>
-                </a>
             </div>
         </div>
     </section>
@@ -406,14 +401,20 @@
                         </div>
                     </div>
                 </div>
-                <div class="install__requirements">
-                    <h4>Requirements</h4>
-                    <ul>
-                        <li>macOS 13 (Ventura) or later</li>
-                        <li>Apple Silicon (M1/M2/M3/M4)</li>
-                        <li>8 GB RAM (16 GB+ recommended)</li>
-                        <li>Microphone</li>
-                    </ul>
+                <div class="install__sidebar">
+                    <div class="install__requirements">
+                        <h4>Requirements</h4>
+                        <ul>
+                            <li>macOS 13 (Ventura) or later</li>
+                            <li>Apple Silicon (M1/M2/M3/M4)</li>
+                            <li>8 GB RAM (16 GB+ recommended)</li>
+                            <li>Microphone</li>
+                        </ul>
+                    </div>
+                    <div class="install__updating">
+                        <h4>Staying Up to Date</h4>
+                        <p>VocaMac has built-in update checking. <a href="/features/github-release-updates/">Learn how updates work →</a></p>
+                    </div>
                 </div>
             </div>
 
@@ -541,6 +542,10 @@
                 <details class="faq__item">
                     <summary>Is VocaMac free?</summary>
                     <p>Yes, completely free and open source under the AGPL-3.0 license. No premium tiers, no subscriptions, no tracking. Just free software.</p>
+                </details>
+                <details class="faq__item">
+                    <summary>How do I update to the latest version?</summary>
+                    <p>VocaMac checks for updates automatically once every 24 hours, or you can check manually from Settings → About → Check for Updates. When a new version is available, a banner appears in the menu bar popover. Click it to see release notes, download the signed DMG with progress tracking, and open it for drag-to-replace installation.</p>
                 </details>
                 <details class="faq__item">
                     <summary>What's the difference between WhisperKit and whisper.cpp?</summary>

@@ -82,7 +82,7 @@ struct MenuBarView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            if case .updateAvailable(let info) = appState.updateChecker.updateState {
+            if let info = appState.updateChecker.activeUpdateInfo {
                 UpdateBannerView(info: info)
                 Divider()
             }
