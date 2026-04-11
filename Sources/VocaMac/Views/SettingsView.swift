@@ -396,7 +396,8 @@ struct ModelRow: View {
                         .font(.callout)
                         .fontWeight(model.isActive ? .semibold : .regular)
 
-                    if let recommended = appState.deviceRecommendedModel,
+                    if model.isSupported,
+                       let recommended = appState.deviceRecommendedModel,
                        recommended.contains(model.size.rawValue) {
                         Text("Recommended")
                             .font(.caption2)
