@@ -117,6 +117,7 @@ final class AppState: ObservableObject {
     let modelManager: ModelManaging
     let soundManager: SoundPlaying
     let cursorOverlay: CursorOverlayManaging
+    let updateChecker = UpdateChecker()
     let permissionManager: any PermissionManaging
 
     // MARK: - Private
@@ -156,6 +157,13 @@ final class AppState: ObservableObject {
             syncLaunchAtLogin()
         }
         setupServices()
+
+        // Forward updateChecker changes so SwiftUI views observing AppState
+        // re-render when updateState changes (nested ObservableObject fix).
+        updateChecker.objectWillChange
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &cancellables)
     }
 
     /// Convenience factory for creating AppState with all real services.
@@ -668,6 +676,8 @@ final class AppState: ObservableObject {
         } else {
             VocaLogger.warning(.appState, "Hotkey listener failed to start. Check Accessibility & Input Monitoring permissions.")
         }
+
+        await updateChecker.checkOnLaunchIfNeeded()
 
         VocaLogger.info(.appState, "Startup complete!")
     }

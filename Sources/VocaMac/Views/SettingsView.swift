@@ -609,6 +609,8 @@ struct AudioSettingsTab: View {
 
 struct AboutTab: View {
     @EnvironmentObject var appState: AppState
+    @State private var showingUpdateSheet = false
+    @State private var updateInfoForSheet: UpdateInfo?
 
     var body: some View {
         VStack(spacing: 16) {
@@ -630,9 +632,37 @@ struct AboutTab: View {
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
 
-            Text("Version 0.4.0 (Beta)")
+            Text("Version \(appVersionDisplay) (Beta)")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
+
+            Button {
+                Task {
+                    await appState.updateChecker.checkForUpdates()
+                    if case .updateAvailable(let info) = appState.updateChecker.updateState {
+                        updateInfoForSheet = info
+                        showingUpdateSheet = true
+                    }
+                }
+            } label: {
+                if case .checking = appState.updateChecker.updateState {
+                    HStack(spacing: 6) {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Checking for Updates...")
+                    }
+                    .font(.caption)
+                } else {
+                    Label("Check for Updates...", systemImage: "arrow.triangle.2.circlepath")
+                        .font(.caption)
+                }
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.blue)
+
+            Text(updateStatusText)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
 
             Divider()
                 .frame(width: 200)
@@ -697,6 +727,37 @@ struct AboutTab: View {
         }
         .frame(maxWidth: .infinity)
         .padding()
+        .sheet(isPresented: $showingUpdateSheet) {
+            if let info = updateInfoForSheet {
+                UpdateDetailView(info: info)
+                    .environmentObject(appState)
+            }
+        }
+    }
+
+    private var appVersionDisplay: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
+    }
+
+    private var updateStatusText: String {
+        switch appState.updateChecker.updateState {
+        case .upToDate:
+            return "You are on the latest version."
+        case .updateAvailable(let info):
+            return "Update available: \(info.tagName)"
+        case .error(let message):
+            return message
+        case .downloading(let progress, _, _, _):
+            return "Downloading update... \(Int(progress * 100))%"
+        case .verifying:
+            return "Verifying download integrity..."
+        case .readyToInstall:
+            return "Update downloaded. Open the DMG to install."
+        case .checking:
+            return "Checking for updates..."
+        case .idle:
+            return ""
+        }
     }
 }
 

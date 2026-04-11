@@ -67,6 +67,18 @@ Pre-release versions use suffixes: `v0.1.0-alpha`, `v0.1.0-beta.1`
 
 4. **Website auto-deploys** when the release is published (via `deploy-website.yml`)
 
+## In-App Update Integration
+
+VocaMac includes an in-app update checker powered by GitHub Releases:
+
+- Automatic check on launch (throttled to once every 24 hours)
+- Manual check via **Settings -> About -> Check for Updates...**
+- If a new version is available, VocaMac downloads the latest `arm64` DMG with progress
+- Downloaded DMG integrity is verified using GitHub's SHA-256 release digest
+- App opens the DMG and guides users to drag/replace in Applications
+
+This implementation reuses existing release artifacts and does not require extra appcast or Sparkle infrastructure.
+
 ## Release Artifacts
 
 Each release produces:

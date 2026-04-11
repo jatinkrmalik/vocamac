@@ -30,6 +30,7 @@ VocaMac is a stateful desktop application with no database. All state is held in
 │  accessibilityPermission ► PermissionStatus (enum)              │
 │  selectedLanguage: String                                        │
 │  selectedAudioDevice ───► AudioDevice?                          │
+│  updateChecker ─────────► UpdateChecker                          │
 └──────────┬──────────────────────────┬───────────────────────────┘
            │                          │
            ▼                          ▼
@@ -76,8 +77,41 @@ VocaMac is a stateful desktop application with no database. All state is held in
                                    │ name: String                 │
                                    │ isDefault: Bool              │
                                    │ sampleRate: Double           │
-                                   │ channelCount: Int            │
-                                   └─────────────────────────────┘
+                                    │ channelCount: Int            │
+                                    └─────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────┐
+│                       Update Checker Domain                      │
+│                                                                  │
+│  GitHubRelease                                                   │
+│    - tagName: String                                             │
+│    - name: String                                                │
+│    - body: String                                                │
+│    - htmlURL: URL                                                │
+│    - assets: [GitHubAsset]                                       │
+│                                                                  │
+│  GitHubAsset                                                     │
+│    - name: String                                                │
+│    - browserDownloadURL: URL                                     │
+│    - size: Int                                                   │
+│    - digest: String?  // "sha256:..."                           │
+│                                                                  │
+│  UpdateInfo                                                      │
+│    - version: String                                             │
+│    - tagName: String                                             │
+│    - releaseNotes: String                                        │
+│    - releasePageURL: URL                                         │
+│    - dmgURL: URL                                                 │
+│    - dmgSize: Int                                                │
+│    - sha256: String?                                             │
+│                                                                  │
+│  UpdateState (enum)                                              │
+│    - idle | checking | upToDate                                  │
+│    - updateAvailable(UpdateInfo)                                 │
+│    - downloading(progress)                                        │
+│    - readyToInstall(dmgPath)                                     │
+│    - error(message)                                              │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -315,6 +349,61 @@ struct AudioDevice: Identifiable, Hashable {
 }
 ```
 
+### 3.10 `GitHubRelease` — Latest Release API Payload
+
+```swift
+struct GitHubRelease: Codable {
+    let tagName: String
+    let name: String
+    let body: String
+    let htmlURL: URL
+    let prerelease: Bool
+    let draft: Bool
+    let publishedAt: String
+    let assets: [GitHubAsset]
+}
+```
+
+### 3.11 `GitHubAsset` — Release Asset Metadata
+
+```swift
+struct GitHubAsset: Codable {
+    let name: String
+    let size: Int
+    let browserDownloadURL: URL
+    let contentType: String
+    let digest: String?
+}
+```
+
+### 3.12 `UpdateInfo` — Processed Update Candidate
+
+```swift
+struct UpdateInfo: Equatable {
+    let version: String
+    let tagName: String
+    let releaseNotes: String
+    let releasePageURL: URL
+    let dmgURL: URL
+    let dmgSize: Int
+    let sha256: String?
+}
+```
+
+### 3.13 `UpdateState` — Update UI/Service State
+
+```swift
+enum UpdateState: Equatable {
+    case idle
+    case checking
+    case updateAvailable(UpdateInfo)
+    case upToDate
+    case downloading(progress: Double)
+    case readyToInstall(dmgPath: URL)
+    case error(String)
+}
+```
+
 ---
 
 ## 4. Persistence Strategy
@@ -327,6 +416,7 @@ struct AudioDevice: Identifiable, Hashable {
 | Transcription results | In-memory (MVP) | Lost on app restart (MVP) |
 | App state | In-memory `AppState` | Rebuilt on each launch |
 | System capabilities | Computed at launch | Rebuilt on each launch |
+| Update check cache | `UserDefaults` (`vocamac.update.*`) | Persisted across launches |
 
 ### 4.1 File System Layout
 

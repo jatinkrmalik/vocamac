@@ -708,19 +708,33 @@ a.feature-card:hover::after {
     color: #78dce8;
     user-select: none;
 }
+.install__sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    height: fit-content;
+    position: sticky;
+    top: 100px;
+}
 .install__requirements {
     padding: 28px;
     background: rgba(59, 130, 246, 0.04);
     border-radius: var(--radius-md);
     border: 1px solid var(--border-color);
-    height: fit-content;
-    position: sticky;
-    top: 100px;
 }
 .install__requirements h4 { margin-bottom: 16px; font-size: 16px; }
 .install__requirements ul { display: flex; flex-direction: column; gap: 12px; }
 .install__requirements li { color: var(--text-secondary); font-size: 14px; padding-left: 20px; position: relative; }
 .install__requirements li::before { content: "✓"; position: absolute; left: 0; color: var(--green); font-weight: 600; }
+.install__updating {
+    padding: 24px;
+    background: rgba(59, 130, 246, 0.04);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
+}
+.install__updating h4 { margin-bottom: 10px; font-size: 15px; }
+.install__updating p { color: var(--text-secondary); font-size: 13px; line-height: 1.6; }
+.install__updating a { color: var(--accent); font-weight: 500; }
 
 /* ========== Family ========== */
 .family__grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
