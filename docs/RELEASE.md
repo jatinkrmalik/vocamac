@@ -54,9 +54,9 @@ Pre-release versions use suffixes: `v0.1.0-alpha`, `v0.1.0-beta.1`
 2. **GitHub Actions automatically**:
    - Imports the Developer ID certificate from repository secrets
    - Builds the release binary with Developer ID signing
-   - Creates a beautiful branded DMG (`VocaMac-0.4.0-arm64.dmg`)
+   - Creates a beautiful branded DMG (`VocaMac-0.5.0-arm64.dmg`)
    - Notarizes with Apple and staples the ticket
-   - Packages as ZIP (`VocaMac-0.4.0-arm64.zip`)
+   - Packages as ZIP (`VocaMac-0.5.0-arm64.zip`)
    - Generates SHA-256 checksums
    - Creates a **draft** GitHub Release with all artifacts
 
