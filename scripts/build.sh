@@ -148,9 +148,9 @@ cat > "${APP_DIR}/Contents/Info.plist" << EOF
     <key>CFBundleDisplayName</key>
     <string>${APP_NAME}</string>
     <key>CFBundleVersion</key>
-    <string>0.4.0</string>
+    <string>0.5.0</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.4.0</string>
+    <string>0.5.0</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>LSMinimumSystemVersion</key>
