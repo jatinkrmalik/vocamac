@@ -31,6 +31,7 @@ enum LogLevel: String {
 
 /// Unified logging framework for VocaMac
 /// Combines os.Logger (Console.app integration) with persistent file logging
+/// with automatic size-based rotation.
 final class VocaLogger {
     // MARK: - Singleton
 
@@ -43,30 +44,31 @@ final class VocaLogger {
     private let fileQueue = DispatchQueue(label: "com.vocamac.logger.file", attributes: .initiallyInactive)
     private let osLogger: os.Logger
     private var logFileHandle: FileHandle?
-    private let logMaxSize = 5_000_000  // 5 MB
+    private let logMaxSize = 1_000_000
     private let maxRotatedFiles = 3
     private var currentLogLevel: LogLevel = .info
+    private var bytesWrittenSinceLastCheck: Int = 0
+    private let rotationCheckInterval = 10_000
+    private let dateFormatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
 
     // MARK: - Initialization
 
     private init() {
-        // Setup log directory
         let appSupportURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         self.logDirectory = appSupportURL.appendingPathComponent("VocaMac/logs", isDirectory: true)
-
         self.logFileURL = logDirectory.appendingPathComponent("vocamac.log")
-
-        // Ensure log directory exists
-        try? FileManager.default.createDirectory(at: logDirectory, withIntermediateDirectories: true, attributes: nil)
-
-        // Initialize os.Logger
         self.osLogger = os.Logger(subsystem: "com.vocamac", category: "general")
 
-        // Activate file queue
+        try? FileManager.default.createDirectory(at: logDirectory, withIntermediateDirectories: true, attributes: nil)
+
         fileQueue.activate()
 
-        // Open or create log file
         fileQueue.async {
+            self.cleanupOrphanedRotatedFiles()
             self.setupLogFile()
         }
     }
@@ -119,6 +121,10 @@ final class VocaLogger {
     /// Clear all log entries from the current log file
     static func clearLogs() {
         try? "".write(to: VocaLogger.shared.logFileURL, atomically: true, encoding: .utf8)
+        VocaLogger.shared.fileQueue.async {
+            VocaLogger.shared.bytesWrittenSinceLastCheck = 0
+            VocaLogger.shared.logFileHandle?.seekToEndOfFile()
+        }
         VocaLogger.info(.general, "Logs cleared")
     }
 
@@ -135,20 +141,17 @@ final class VocaLogger {
     // MARK: - Private Methods
 
     private func log(_ message: String, level: LogLevel, category: LogCategory) {
-        // Check log level filter
         guard shouldLog(level: level) else { return }
 
-        // Format the log message
-        let timestamp = ISO8601DateFormatter().string(from: Date())
+        let timestamp = dateFormatter.string(from: Date())
         let formattedMessage = "[\(timestamp)] [\(level.rawValue)] [\(category.rawValue)] \(message)"
 
-        // Write to os.Logger
         let osLogType: OSLogType = level == .error ? .error : (level == .warning ? .default : .info)
         osLogger.log(level: osLogType, "\(formattedMessage)")
 
-        // Write to persistent file
+        let data = (formattedMessage + "\n").data(using: .utf8)
         fileQueue.async {
-            self.writeToFile(formattedMessage)
+            self.writeToFile(data)
         }
     }
 
@@ -172,32 +175,26 @@ final class VocaLogger {
     }
 
     private func setupLogFile() {
-        // Create file if it doesn't exist
         if !FileManager.default.fileExists(atPath: logFileURL.path) {
             FileManager.default.createFile(atPath: logFileURL.path, contents: nil, attributes: nil)
         }
 
-        // Open file handle for appending
         logFileHandle = FileHandle(forWritingAtPath: logFileURL.path)
-        if logFileHandle == nil {
-            logFileHandle = FileHandle(forWritingAtPath: logFileURL.path)
-        }
         logFileHandle?.seekToEndOfFile()
 
-        // Check if rotation is needed
         checkAndRotateIfNeeded()
     }
 
-    private func writeToFile(_ message: String) {
-        guard let data = (message + "\n").data(using: .utf8) else { return }
+    private func writeToFile(_ data: Data?) {
+        guard let data, let handle = logFileHandle else { return }
 
-        if let handle = logFileHandle {
-            handle.write(data)
-            handle.synchronizeFile()
+        handle.write(data)
+        bytesWrittenSinceLastCheck += data.count
+
+        if bytesWrittenSinceLastCheck >= rotationCheckInterval {
+            bytesWrittenSinceLastCheck = 0
+            checkAndRotateIfNeeded()
         }
-
-        // Check if rotation is needed
-        checkAndRotateIfNeeded()
     }
 
     private func checkAndRotateIfNeeded() {
@@ -212,43 +209,58 @@ final class VocaLogger {
     }
 
     private func performRotation() {
-        // Close current file handle
         logFileHandle?.closeFile()
         logFileHandle = nil
 
-        // Rotate existing log files
         for i in stride(from: maxRotatedFiles - 1, through: 1, by: -1) {
-            let oldName = "vocamac.\(i).log"
-            let newName = "vocamac.\(i + 1).log"
-            let oldURL = logDirectory.appendingPathComponent(oldName)
-            let newURL = logDirectory.appendingPathComponent(newName)
+            let oldURL = logDirectory.appendingPathComponent("vocamac.\(i).log")
+            let newURL = logDirectory.appendingPathComponent("vocamac.\(i + 1).log")
 
             if FileManager.default.fileExists(atPath: oldURL.path) {
-                try? FileManager.default.moveItem(at: oldURL, to: newURL)
+                do {
+                    try FileManager.default.moveItem(at: oldURL, to: newURL)
+                } catch {
+                    osLogger.error("Log rotation: failed to move \(oldURL.lastPathComponent) to \(newURL.lastPathComponent): \(error.localizedDescription)")
+                }
             }
         }
 
-        // Move current log to vocamac.1.log
         let rotatedURL = logDirectory.appendingPathComponent("vocamac.1.log")
-        try? FileManager.default.moveItem(at: logFileURL, to: rotatedURL)
+        do {
+            try FileManager.default.moveItem(at: logFileURL, to: rotatedURL)
+        } catch {
+            osLogger.error("Log rotation: failed to rotate current log: \(error.localizedDescription)")
+            logFileHandle = FileHandle(forWritingAtPath: logFileURL.path)
+            logFileHandle?.seekToEndOfFile()
+            return
+        }
 
-        // Remove oldest rotated file if it exceeds max count
         let oldestURL = logDirectory.appendingPathComponent("vocamac.\(maxRotatedFiles + 1).log")
         try? FileManager.default.removeItem(at: oldestURL)
 
-        // Setup new log file
+        bytesWrittenSinceLastCheck = 0
         setupLogFile()
+    }
+
+    private func cleanupOrphanedRotatedFiles() {
+        let fm = FileManager.default
+        for i in (maxRotatedFiles + 1)...100 {
+            let url = logDirectory.appendingPathComponent("vocamac.\(i).log")
+            if fm.fileExists(atPath: url.path) {
+                try? fm.removeItem(at: url)
+            } else {
+                break
+            }
+        }
     }
 
     private func getLastLines(_ count: Int) -> [String] {
         var allLines: [String] = []
 
-        // Read current log file
         if let currentContent = try? String(contentsOf: logFileURL, encoding: .utf8) {
             allLines.append(contentsOf: currentContent.split(separator: "\n", omittingEmptySubsequences: false).map(String.init))
         }
 
-        // Read rotated log files in reverse order (newest first)
         for i in 1...maxRotatedFiles {
             let rotatedURL = logDirectory.appendingPathComponent("vocamac.\(i).log")
             if let content = try? String(contentsOf: rotatedURL, encoding: .utf8) {
@@ -256,32 +268,27 @@ final class VocaLogger {
             }
         }
 
-        // Return last N lines
         return Array(allLines.suffix(count))
     }
 
     private func formatExportedLogs(lastLines: Int = 500) -> String {
         var result = ""
 
-        // Add system info header
         result += "=== VocaMac Debug Log Export ===\n"
-        result += "Generated: \(ISO8601DateFormatter().string(from: Date()))\n"
+        result += "Generated: \(dateFormatter.string(from: Date()))\n"
 
-        // Add system information
         let capabilities = SystemInfo.detect()
         result += "Device: \(capabilities.processorName)\n"
         result += "Architecture: \(capabilities.isAppleSilicon ? "Apple Silicon (ARM64)" : "Intel (x86_64)")\n"
         result += "RAM: \(capabilities.physicalMemoryGB) GB\n"
         result += "CPU Cores: \(capabilities.coreCount)\n"
 
-        // App version
         if let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String {
             result += "App Version: \(appVersion)\n"
         }
 
         result += "================================\n\n"
 
-        // Add log lines
         let lines = getLastLines(lastLines)
         for line in lines {
             if !line.isEmpty {
