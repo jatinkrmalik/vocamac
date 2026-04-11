@@ -197,9 +197,16 @@ final class AppState: ObservableObject {
         // Detect system capabilities
         systemCapabilities = SystemInfo.detect()
 
-        // Get WhisperKit's device recommendation
+        // Get WhisperKit's device recommendation.
+        // WhisperKit's `.default` may not be in the supported list for some
+        // devices. If so, fall back to the best supported model instead.
         let recommendation = modelManager.deviceRecommendation()
-        deviceRecommendedModel = recommendation.defaultModel
+        let defaultIsSupported = recommendation.supported.contains(recommendation.defaultModel)
+        if !defaultIsSupported, let bestSupported = recommendation.supported.last {
+            deviceRecommendedModel = bestSupported
+        } else {
+            deviceRecommendedModel = recommendation.defaultModel
+        }
 
         // Initialize available models list
         availableModels = ModelSize.allCases.map { size in

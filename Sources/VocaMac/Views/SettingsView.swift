@@ -337,7 +337,7 @@ struct ModelSettingsTab: View {
                     HStack {
                         Image(systemName: "sparkles")
                             .foregroundStyle(.blue)
-                        Text("WhisperKit recommends: **\(recommended)**")
+                        Text("Recommended for your device: **\(recommended)**")
                             .font(.callout)
                     }
                 }
@@ -396,7 +396,8 @@ struct ModelRow: View {
                         .font(.callout)
                         .fontWeight(model.isActive ? .semibold : .regular)
 
-                    if let recommended = appState.deviceRecommendedModel,
+                    if model.isSupported,
+                       let recommended = appState.deviceRecommendedModel,
                        recommended.contains(model.size.rawValue) {
                         Text("Recommended")
                             .font(.caption2)
