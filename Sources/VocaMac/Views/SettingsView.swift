@@ -418,12 +418,12 @@ struct ModelRow: View {
                     }
 
                     if !model.isSupported {
-                        Text("Unsupported")
+                        Text("Unoptimized")
                             .font(.caption2)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 1)
-                            .background(.red.opacity(0.2))
-                            .foregroundStyle(.red)
+                            .background(.orange.opacity(0.2))
+                            .foregroundStyle(.orange)
                             .cornerRadius(4)
                     }
                 }
@@ -508,7 +508,7 @@ struct ModelRow: View {
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 4)
-        .alert("Use Unsupported Model?", isPresented: $showForceDownloadAlert) {
+        .alert("Use Unoptimized Model?", isPresented: $showForceDownloadAlert) {
             Button("Cancel", role: .cancel) {}
             Button(model.isDownloaded ? "Load Anyway" : "Download & Load", role: .destructive) {
                 Task {

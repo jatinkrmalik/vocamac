@@ -585,7 +585,7 @@ struct ModelSelectionCard: View {
             RoundedRectangle(cornerRadius: 8)
                 .stroke(isRecommended ? Color.orange : Color.clear, lineWidth: 1.5)
         )
-        .alert("Use Unsupported Model?", isPresented: $showForceDownloadAlert) {
+        .alert("Use Unoptimized Model?", isPresented: $showForceDownloadAlert) {
             Button("Cancel", role: .cancel) {}
             Button("Download Anyway", role: .destructive) {
                 onDownload()
