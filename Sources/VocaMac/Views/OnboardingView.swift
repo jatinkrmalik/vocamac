@@ -453,6 +453,7 @@ struct ModelSelectionCard: View {
     let isRecommended: Bool
     let onSelect: () -> Void
     let onDownload: () -> Void
+    @State private var showForceDownloadAlert = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -543,9 +544,21 @@ struct ModelSelectionCard: View {
                         .buttonStyle(.plain)
                     }
                 } else if !modelInfo.isSupported {
-                    Text("Not supported on this device")
+                    Button {
+                        showForceDownloadAlert = true
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "exclamationmark.triangle")
+                            Text("Try Anyway")
+                        }
                         .font(.caption)
-                        .foregroundStyle(.red)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.gray.opacity(0.2))
+                        .foregroundStyle(.secondary)
+                        .cornerRadius(6)
+                    }
+                    .buttonStyle(.plain)
                 } else {
                     Button(action: onDownload) {
                         HStack(spacing: 4) {
@@ -572,6 +585,14 @@ struct ModelSelectionCard: View {
             RoundedRectangle(cornerRadius: 8)
                 .stroke(isRecommended ? Color.orange : Color.clear, lineWidth: 1.5)
         )
+        .alert("Use Unsupported Model?", isPresented: $showForceDownloadAlert) {
+            Button("Cancel", role: .cancel) {}
+            Button("Download Anyway", role: .destructive) {
+                onDownload()
+            }
+        } message: {
+            Text("This model may exceed your device's capabilities. It could cause slow performance, high memory usage, or crashes. Are you sure you want to continue?")
+        }
     }
 }
 

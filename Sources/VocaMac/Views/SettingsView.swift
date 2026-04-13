@@ -385,6 +385,7 @@ struct SystemInfoPill: View {
 struct ModelRow: View {
     let model: WhisperModelInfo
     @ObservedObject var appState: AppState
+    @State private var showForceDownloadAlert = false
 
     var body: some View {
         HStack {
@@ -469,9 +470,21 @@ struct ModelRow: View {
                     .font(.caption)
                     .foregroundStyle(.green)
             } else if !model.isSupported {
-                Text("Too Large")
-                    .font(.caption)
+                if model.isLoading || model.downloadProgress != nil {
+                    EmptyView()
+                } else if model.isDownloaded {
+                    Button("Load Anyway") {
+                        showForceDownloadAlert = true
+                    }
+                    .controlSize(.small)
                     .foregroundStyle(.secondary)
+                } else {
+                    Button("Try Anyway") {
+                        showForceDownloadAlert = true
+                    }
+                    .controlSize(.small)
+                    .foregroundStyle(.secondary)
+                }
             } else if model.isLoading || model.downloadProgress != nil {
                 // Show nothing - progress indicator handles the feedback
                 EmptyView()
@@ -495,6 +508,21 @@ struct ModelRow: View {
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 4)
+        .alert("Use Unsupported Model?", isPresented: $showForceDownloadAlert) {
+            Button("Cancel", role: .cancel) {}
+            Button(model.isDownloaded ? "Load Anyway" : "Download & Load", role: .destructive) {
+                Task {
+                    if !model.isDownloaded {
+                        await appState.downloadModel(model.size)
+                    }
+                    if model.isDownloaded || appState.availableModels.first(where: { $0.size == model.size })?.isDownloaded == true {
+                        await appState.loadModel(model.size)
+                    }
+                }
+            }
+        } message: {
+            Text("This model may exceed your device's capabilities. It could cause slow performance, high memory usage, or crashes. Are you sure you want to continue?")
+        }
     }
 }
 
