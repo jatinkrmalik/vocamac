@@ -26,7 +26,7 @@
 
 </div>
 
-Speak. It types. 100% offline, open-source voice-to-text for macOS - powered by [WhisperKit](https://github.com/argmaxinc/WhisperKit). No cloud, no subscriptions, no data leaves your device. Just hold a hotkey, speak, and your words appear wherever your cursor is.
+<p align="center">Speak. It types. 100% offline, open-source voice-to-text for macOS - powered by WhisperKit. No cloud, no subscriptions, no data leaves your device. Just hold a hotkey, speak, and your words appear wherever your cursor is.</p>
 
 ---
 
