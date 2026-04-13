@@ -100,14 +100,42 @@ final class ModelManager {
         ModelSize.allCases.filter { isModelDownloaded($0) }
     }
 
-    /// Check if a model size is supported on this device
+    /// Check if a model size is supported on this device.
+    ///
+    /// Uses exact prefix boundary matching: "openai_whisper-large-v3" matches
+    /// versioned variants like "openai_whisper-large-v3-v20240930_626MB" but NOT
+    /// different models like "openai_whisper-large-v3_turbo-v20240930_626MB".
+    /// Also checks the disabled list — if any exact variant is disabled, the model
+    /// is considered unsupported to avoid recommending models the device can't run.
     func isModelSupported(_ size: ModelSize) -> Bool {
         let rec = WhisperKit.recommendedModels()
-        // A model is supported if any variant of its size appears in the supported list.
-        // We check the supported list (not disabled) to avoid false positives from
-        // substring matching — e.g. "large-v3" matching "large-v3_turbo" in disabled.
         let modelPrefix = whisperKitModelName(for: size)
-        return rec.supported.contains(where: { $0.hasPrefix(modelPrefix) })
+
+        // Match exact model name or versioned variants (prefix + "-")
+        // but not different models that share a prefix (e.g. large-v3_turbo)
+        let matchesModel: (String) -> Bool = { name in
+            name == modelPrefix || name.hasPrefix(modelPrefix + "-")
+        }
+
+        // If any exact variant of this model is in the disabled list, it's unsupported
+        if rec.disabled.contains(where: matchesModel) {
+            return false
+        }
+
+        return rec.supported.contains(where: matchesModel)
+    }
+
+    /// Map a WhisperKit model name back to a ModelSize, if it matches one of our known sizes.
+    ///
+    /// Uses exact prefix boundary matching, same as `isModelSupported`.
+    func modelSize(from whisperKitName: String) -> ModelSize? {
+        for size in ModelSize.allCases {
+            let prefix = whisperKitModelName(for: size)
+            if whisperKitName == prefix || whisperKitName.hasPrefix(prefix + "-") {
+                return size
+            }
+        }
+        return nil
     }
 
     // MARK: - Model Download

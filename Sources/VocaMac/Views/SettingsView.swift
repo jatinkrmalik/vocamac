@@ -333,11 +333,15 @@ struct ModelSettingsTab: View {
                         .foregroundStyle(.secondary)
                 }
 
-                if let recommended = appState.deviceRecommendedModel {
+                if let recommended = appState.deviceRecommendedModel,
+                   let recommendedSize = ModelSize.allCases.first(where: { size in
+                       let prefix = "openai_whisper-\(size.rawValue)"
+                       return recommended == prefix || recommended.hasPrefix(prefix + "-")
+                   }) {
                     HStack {
                         Image(systemName: "sparkles")
                             .foregroundStyle(.blue)
-                        Text("Recommended for your device: **\(recommended)**")
+                        Text("Recommended for your device: **\(recommendedSize.displayName)**")
                             .font(.callout)
                     }
                 }
@@ -381,6 +385,7 @@ struct SystemInfoPill: View {
 struct ModelRow: View {
     let model: WhisperModelInfo
     @ObservedObject var appState: AppState
+    @State private var showForceDownloadAlert = false
 
     var body: some View {
         HStack {
@@ -397,24 +402,28 @@ struct ModelRow: View {
                         .fontWeight(model.isActive ? .semibold : .regular)
 
                     if model.isSupported,
-                       let recommended = appState.deviceRecommendedModel,
-                       recommended.contains(model.size.rawValue) {
-                        Text("Recommended")
-                            .font(.caption2)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 1)
-                            .background(.blue.opacity(0.2))
-                            .foregroundStyle(.blue)
-                            .cornerRadius(4)
+                       let recommended = appState.deviceRecommendedModel {
+                        // Use exact prefix boundary matching to avoid cross-model
+                        // false positives (e.g. "large-v3" matching "large-v3_turbo")
+                        let prefix = "openai_whisper-\(model.size.rawValue)"
+                        if recommended == prefix || recommended.hasPrefix(prefix + "-") {
+                            Text("Recommended")
+                                .font(.caption2)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 1)
+                                .background(.blue.opacity(0.2))
+                                .foregroundStyle(.blue)
+                                .cornerRadius(4)
+                        }
                     }
 
                     if !model.isSupported {
-                        Text("Unsupported")
+                        Text("Unoptimized")
                             .font(.caption2)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 1)
-                            .background(.red.opacity(0.2))
-                            .foregroundStyle(.red)
+                            .background(.orange.opacity(0.2))
+                            .foregroundStyle(.orange)
                             .cornerRadius(4)
                     }
                 }
@@ -461,9 +470,21 @@ struct ModelRow: View {
                     .font(.caption)
                     .foregroundStyle(.green)
             } else if !model.isSupported {
-                Text("Too Large")
-                    .font(.caption)
+                if model.isLoading || model.downloadProgress != nil {
+                    EmptyView()
+                } else if model.isDownloaded {
+                    Button("Load Anyway") {
+                        showForceDownloadAlert = true
+                    }
+                    .controlSize(.small)
                     .foregroundStyle(.secondary)
+                } else {
+                    Button("Try Anyway") {
+                        showForceDownloadAlert = true
+                    }
+                    .controlSize(.small)
+                    .foregroundStyle(.secondary)
+                }
             } else if model.isLoading || model.downloadProgress != nil {
                 // Show nothing - progress indicator handles the feedback
                 EmptyView()
@@ -487,6 +508,21 @@ struct ModelRow: View {
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 4)
+        .alert("Use Unoptimized Model?", isPresented: $showForceDownloadAlert) {
+            Button("Cancel", role: .cancel) {}
+            Button(model.isDownloaded ? "Load Anyway" : "Download & Load", role: .destructive) {
+                Task {
+                    if !model.isDownloaded {
+                        await appState.downloadModel(model.size)
+                    }
+                    if model.isDownloaded || appState.availableModels.first(where: { $0.size == model.size })?.isDownloaded == true {
+                        await appState.loadModel(model.size)
+                    }
+                }
+            }
+        } message: {
+            Text("This model may exceed your device's capabilities. It could cause slow performance, high memory usage, or crashes. Are you sure you want to continue?")
+        }
     }
 }
 
