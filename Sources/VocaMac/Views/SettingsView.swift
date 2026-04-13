@@ -333,11 +333,15 @@ struct ModelSettingsTab: View {
                         .foregroundStyle(.secondary)
                 }
 
-                if let recommended = appState.deviceRecommendedModel {
+                if let recommended = appState.deviceRecommendedModel,
+                   let recommendedSize = ModelSize.allCases.first(where: { size in
+                       let prefix = "openai_whisper-\(size.rawValue)"
+                       return recommended == prefix || recommended.hasPrefix(prefix + "-")
+                   }) {
                     HStack {
                         Image(systemName: "sparkles")
                             .foregroundStyle(.blue)
-                        Text("Recommended for your device: **\(recommended)**")
+                        Text("Recommended for your device: **\(recommendedSize.displayName)**")
                             .font(.callout)
                     }
                 }
@@ -397,15 +401,19 @@ struct ModelRow: View {
                         .fontWeight(model.isActive ? .semibold : .regular)
 
                     if model.isSupported,
-                       let recommended = appState.deviceRecommendedModel,
-                       recommended.contains(model.size.rawValue) {
-                        Text("Recommended")
-                            .font(.caption2)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 1)
-                            .background(.blue.opacity(0.2))
-                            .foregroundStyle(.blue)
-                            .cornerRadius(4)
+                       let recommended = appState.deviceRecommendedModel {
+                        // Use exact prefix boundary matching to avoid cross-model
+                        // false positives (e.g. "large-v3" matching "large-v3_turbo")
+                        let prefix = "openai_whisper-\(model.size.rawValue)"
+                        if recommended == prefix || recommended.hasPrefix(prefix + "-") {
+                            Text("Recommended")
+                                .font(.caption2)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 1)
+                                .background(.blue.opacity(0.2))
+                                .foregroundStyle(.blue)
+                                .cornerRadius(4)
+                        }
                     }
 
                     if !model.isSupported {

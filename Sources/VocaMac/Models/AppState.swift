@@ -251,6 +251,39 @@ final class AppState: ObservableObject {
             )
         }
 
+        // Enforce monotonic support ordering: if a smaller model is unsupported,
+        // all larger models must also be unsupported. This prevents contradictory
+        // UI states like Medium="Too Large" but Large v3="Recommended".
+        var foundUnsupported = false
+        for i in availableModels.indices {
+            if !availableModels[i].isSupported {
+                foundUnsupported = true
+            }
+            if foundUnsupported {
+                availableModels[i].isSupported = false
+            }
+        }
+
+        // Validate that the recommended model maps to a supported ModelSize.
+        // If the recommendation points to an unsupported model, fall back to
+        // the largest supported model instead.
+        if let recommended = deviceRecommendedModel {
+            let recommendedSize = modelManager.modelSize(from: recommended)
+            let isRecommendedSupported = recommendedSize.map { size in
+                availableModels.first(where: { $0.size == size })?.isSupported == true
+            } ?? false
+
+            if !isRecommendedSupported {
+                // Fall back to the largest supported model
+                if let bestSupported = availableModels.last(where: { $0.isSupported }) {
+                    deviceRecommendedModel = modelManager.whisperKitModelName(for: bestSupported.size)
+                } else {
+                    // No models are supported — clear the recommendation
+                    deviceRecommendedModel = nil
+                }
+            }
+        }
+
         // Setup audio level reporting
         audioEngine.onAudioLevel = { [weak self] level in
             Task { @MainActor in

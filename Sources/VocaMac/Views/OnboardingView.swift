@@ -398,7 +398,10 @@ struct ModelSelectionStep: View {
                 .padding(.horizontal)
 
             if let recommended = appState.deviceRecommendedModel,
-               let recommendedSize = ModelSize.allCases.first(where: { recommended.contains($0.rawValue) }) {
+               let recommendedSize = ModelSize.allCases.first(where: { size in
+                   let prefix = "openai_whisper-\(size.rawValue)"
+                   return recommended == prefix || recommended.hasPrefix(prefix + "-")
+               }) {
                 HStack(spacing: 12) {
                     Image(systemName: "lightbulb.fill")
                         .font(.caption)
@@ -416,7 +419,11 @@ struct ModelSelectionStep: View {
                     ForEach(appState.availableModels) { modelInfo in
                         ModelSelectionCard(
                             modelInfo: modelInfo,
-                            isRecommended: appState.deviceRecommendedModel?.contains(modelInfo.size.rawValue) == true,
+                            isRecommended: {
+                                guard let recommended = appState.deviceRecommendedModel else { return false }
+                                let prefix = "openai_whisper-\(modelInfo.size.rawValue)"
+                                return recommended == prefix || recommended.hasPrefix(prefix + "-")
+                            }(),
                             onSelect: {
                                 Task {
                                     await appState.loadModel(modelInfo.size)

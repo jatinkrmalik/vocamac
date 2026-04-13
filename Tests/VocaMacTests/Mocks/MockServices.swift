@@ -238,6 +238,16 @@ final class MockModelManager: ModelManaging {
         "openai_whisper-\(size.rawValue)"
     }
 
+    func modelSize(from whisperKitName: String) -> ModelSize? {
+        for size in ModelSize.allCases {
+            let prefix = whisperKitModelName(for: size)
+            if whisperKitName == prefix || whisperKitName.hasPrefix(prefix + "-") {
+                return size
+            }
+        }
+        return nil
+    }
+
     func downloadModel(size: ModelSize, onProgress: @escaping (Double) -> Void) async throws {
         downloadedModels.insert(size)
     }
