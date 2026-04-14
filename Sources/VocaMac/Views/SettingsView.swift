@@ -668,7 +668,7 @@ struct AboutTab: View {
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
 
-            Text("Version \(appVersionDisplay) (Beta)")
+            Text("Version \(appVersionDisplay) (\(buildChannelLabel))")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
 
@@ -773,6 +773,10 @@ struct AboutTab: View {
 
     private var appVersionDisplay: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
+    }
+
+    private var buildChannelLabel: String {
+        appVersionDisplay.contains("nightly") ? "Nightly" : "Beta"
     }
 
     private var updateStatusText: String {
