@@ -36,8 +36,8 @@ for arg in "$@"; do
     esac
 done
 
-# Get version from build.sh's Info.plist template
-VERSION=$(grep -A1 'CFBundleShortVersionString' scripts/build.sh | grep '<string>' | sed 's/.*<string>\(.*\)<\/string>/\1/' | head -1)
+# Get version from APP_VERSION env var (if set) or from build.sh's Info.plist template
+VERSION="${APP_VERSION:-$(grep -A1 'CFBundleShortVersionString' scripts/build.sh | grep '<string>' | sed 's/.*<string>\(.*\)<\/string>/\1/' | head -1)}"
 ARCH=$(uname -m)
 APP_NAME="VocaMac"
 DMG_NAME="${APP_NAME}-${VERSION}-${ARCH}.dmg"
