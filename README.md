@@ -13,6 +13,7 @@
 [![Platform: macOS](https://img.shields.io/badge/Platform-macOS%2013%2B-lightgrey.svg)](https://github.com/jatinkrmalik/vocamac)
 [![Swift 5.9+](https://img.shields.io/badge/Swift-5.9%2B-orange.svg)](https://swift.org)
 [![Release](https://img.shields.io/github/v/release/jatinkrmalik/vocamac?include_prereleases&label=Release)](https://github.com/jatinkrmalik/vocamac/releases)
+[![Nightly](https://img.shields.io/badge/Nightly-download-blueviolet)](https://github.com/jatinkrmalik/vocamac/releases/tag/nightly)
 
 [![Powered by WhisperKit](https://img.shields.io/badge/Powered%20by-WhisperKit-blueviolet.svg)](https://github.com/argmaxinc/WhisperKit)
 [![Apple Silicon](https://img.shields.io/badge/Apple%20Silicon-Optimized-black.svg?logo=apple&logoColor=white)](https://github.com/jatinkrmalik/vocamac)
@@ -162,6 +163,46 @@ This installs two commands to `~/.local/bin`:
 2. **Grant permissions**: Microphone, Accessibility, and Input Monitoring (see [Permissions](#permissions) above)
 3. **First model download**: WhisperKit automatically downloads the recommended model for your device (~40–500 MB depending on hardware)
 4. **Start dictating**: Hold the **Right Option** key, speak, and release. Your words appear at the cursor!
+
+---
+
+## 🌙 Nightly Builds
+
+Nightly builds are automated builds from the latest `main` branch, published every day at midnight UTC when there are new commits. They let you try the latest features, fixes, and improvements before they land in a stable release.
+
+**Why use a nightly build?**
+
+- **Early access** — Test new features days or weeks before the next stable release
+- **Help improve VocaMac** — Your feedback on nightly builds catches bugs before they reach everyone
+- **Fully signed & notarized** — Nightly builds are Developer ID signed and notarized by Apple, just like stable releases. No Gatekeeper warnings, no right-click workarounds
+
+**How to install:**
+
+1. Download the latest `VocaMac-nightly-*.dmg` from the [Nightly Release](https://github.com/jatinkrmalik/vocamac/releases/tag/nightly)
+2. Open the DMG and drag VocaMac to Applications
+3. Grant permissions when prompted (same as a stable release)
+
+**How to identify your build:**
+
+Nightly builds embed the date and commit SHA in the version string. Open **Settings → About** to see something like:
+
+```
+Version 0.5.0-nightly.20260414+abc1234 (Nightly)
+```
+
+This helps us pinpoint the exact code you're running if you report an issue.
+
+**Cadence & stability:**
+
+| | Stable Release | Nightly Build |
+|---|---|---|
+| **Frequency** | When ready (manual tag) | Daily at midnight UTC |
+| **Source** | Tagged commit | Latest `main` branch |
+| **Signed & notarized** | ✅ Yes | ✅ Yes |
+| **Stability** | Production-ready | May contain incomplete features or bugs |
+| **Best for** | Daily use | Testing & early feedback |
+
+> ⚠️ **Nightly builds may be unstable.** If you encounter issues, please [open a bug report](https://github.com/jatinkrmalik/vocamac/issues/new) — your feedback helps us ship better stable releases!
 
 ---
 
