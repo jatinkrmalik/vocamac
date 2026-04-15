@@ -11,8 +11,16 @@ final class TextInjector {
 
     // MARK: - Constants
 
-    /// Delay before restoring clipboard (seconds)
-    private let clipboardRestoreDelay: Double = 2.0
+    /// Delay after simulating Cmd+V before restoring the clipboard.
+    /// This must be long enough for the target application to read the
+    /// pasteboard in response to the paste event. 50 ms is sufficient
+    /// for all mainstream macOS apps (most read the pasteboard
+    /// synchronously on the main thread).
+    private let clipboardRestoreDelay: Double = 0.05
+
+    /// Delay before simulating the Cmd+V keystroke, giving the
+    /// pasteboard a moment to settle after we write to it.
+    private let prePasteDelay: Double = 0.05
 
     /// Virtual key code for the V key
     private let kVK_V: CGKeyCode = 9
@@ -63,14 +71,27 @@ final class TextInjector {
         pasteboard.setString(text, forType: .string)
         VocaLogger.debug(.textInjector, "Set clipboard: '\(String(text.prefix(80)))'")
 
+        // Record the changeCount right after we write the transcribed text.
+        // We check this before restoring so we don't clobber a newer clipboard
+        // entry if the user (or another app) copies something in the meantime.
+        let changeCountAfterWrite = pasteboard.changeCount
+
         // Delay to let clipboard settle, then simulate Cmd+V
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + prePasteDelay) { [self] in
             VocaLogger.debug(.textInjector, "Simulating Cmd+V...")
             simulatePaste()
 
-            // Restore clipboard after paste completes
+            // Restore clipboard as soon as the paste event has been dispatched.
+            // The short delay gives the target app time to read the pasteboard.
             if preserveClipboard {
                 DispatchQueue.main.asyncAfter(deadline: .now() + clipboardRestoreDelay) {
+                    // Guard: only restore if the pasteboard hasn't been modified
+                    // by the user or another app since we wrote the transcribed text.
+                    guard pasteboard.changeCount == changeCountAfterWrite else {
+                        VocaLogger.debug(.textInjector, "Clipboard was modified externally — skipping restore")
+                        return
+                    }
+
                     if let snapshot = snapshot {
                         self.restoreSnapshot(snapshot, to: pasteboard)
                     } else {
