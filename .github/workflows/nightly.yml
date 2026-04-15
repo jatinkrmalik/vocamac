@@ -226,10 +226,9 @@ jobs:
         run: |
           NIGHTLY_DATE=$(date -u +%Y%m%d)
           SHORT_SHA="${{ needs.check-for-changes.outputs.short_sha }}"
-          BASE_VERSION=$(grep -A1 'CFBundleShortVersionString' scripts/build.sh \
-            | grep 'APP_VERSION' | sed 's/.*:-\(.*\)}.*/\1/' || echo "0.5.0")
-          # Fallback: extract the default value from APP_VERSION="${APP_VERSION:-X.Y.Z}"
-          if [ -z "$BASE_VERSION" ] || [ "$BASE_VERSION" = "0.5.0" ]; then
+          # Extract the default version from APP_VERSION="${APP_VERSION:-X.Y.Z}" in build.sh
+          BASE_VERSION=$(grep '^APP_VERSION=' scripts/build.sh | sed 's/.*:-\(.*\)}.*/\1/')
+          if [ -z "$BASE_VERSION" ]; then
             BASE_VERSION="0.5.0"
           fi
           APP_VERSION="${BASE_VERSION}-nightly.${NIGHTLY_DATE}+${SHORT_SHA}"
