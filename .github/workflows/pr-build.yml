@@ -1,0 +1,235 @@
+name: PR Build
+
+# Triggered by commenting "/build" on a pull request.
+# Builds a signed, notarized DMG from the PR branch and posts
+# a download link as a comment on the PR.
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: write
+  actions: read
+
+concurrency:
+  # One build per PR — re-commenting /build cancels any in-progress build
+  group: pr-build-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  pr-build:
+    name: Build PR
+    # Only run when:
+    # 1. The comment is on a pull request (not a plain issue)
+    # 2. The comment body is exactly "/build" (trimmed)
+    if: >-
+      github.event.issue.pull_request &&
+      contains(github.event.comment.body, '/build')
+    runs-on: macos-15
+    timeout-minutes: 45
+
+    steps:
+      # ── Setup ─────────────────────────────────────────────────────────────
+      - name: React to comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.reactions.createForIssueComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: context.payload.comment.id,
+              content: 'rocket'
+            });
+
+      - name: Get PR branch info
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+            core.setOutput('ref', pr.data.head.ref);
+            core.setOutput('sha', pr.data.head.sha);
+            core.setOutput('short_sha', pr.data.head.sha.substring(0, 7));
+            core.setOutput('pr_number', context.issue.number);
+            core.setOutput('pr_title', pr.data.title);
+
+      - name: Post "build started" comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `⏳ **PR Build started** for \`${{ steps.pr.outputs.short_sha }}\`\n\nBuilding signed & notarized DMG... this usually takes 10–20 minutes.\n\n[Watch the build →](${runUrl})`
+            });
+
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.pr.outputs.ref }}
+
+      - name: Cache SPM dependencies
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: spm-${{ runner.os }}-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            spm-${{ runner.os }}-
+
+      # ── Test ──────────────────────────────────────────────────────────────
+      - name: Run tests
+        run: swift test
+
+      - name: Initialize Xcode tools
+        run: sudo xcodebuild -runFirstLaunch
+
+      # ── Code Signing Setup ──────────────────────────────────────────────────
+      - name: Import Developer ID certificate
+        env:
+          DEVELOPER_ID_CERT_P12:      ${{ secrets.DEVELOPER_ID_CERT_P12 }}
+          DEVELOPER_ID_CERT_PASSWORD: ${{ secrets.DEVELOPER_ID_CERT_PASSWORD }}
+        run: |
+          KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain"
+          KEYCHAIN_PASSWORD="$(openssl rand -hex 16)"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          echo "$DEVELOPER_ID_CERT_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" \
+            -k "$KEYCHAIN_PATH" \
+            -P "$DEVELOPER_ID_CERT_PASSWORD" \
+            -T /usr/bin/codesign \
+            -T /usr/bin/security
+
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: \
+            -s -k "$KEYCHAIN_PASSWORD" \
+            "$KEYCHAIN_PATH"
+
+          security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | xargs)
+
+          echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
+          echo "KEYCHAIN_PASSWORD=$KEYCHAIN_PASSWORD" >> "$GITHUB_ENV"
+
+          IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" \
+            | grep "Developer ID Application" | head -1 | sed 's/.*"\(.*\)"/\1/')
+          if [ -z "$IDENTITY" ]; then
+            echo "❌ Developer ID certificate not found after import"
+            exit 1
+          fi
+          echo "✅ Imported: $IDENTITY"
+          echo "CODE_SIGN_IDENTITY=$IDENTITY" >> "$GITHUB_ENV"
+
+      - name: Store notarization credentials
+        env:
+          NOTARIZE_APPLE_ID: ${{ secrets.NOTARIZE_APPLE_ID }}
+          NOTARIZE_TEAM_ID:  ${{ secrets.NOTARIZE_TEAM_ID }}
+          NOTARIZE_PASSWORD: ${{ secrets.NOTARIZE_PASSWORD }}
+        run: |
+          xcrun notarytool store-credentials "AC_PASSWORD" \
+            --apple-id  "$NOTARIZE_APPLE_ID" \
+            --team-id   "$NOTARIZE_TEAM_ID" \
+            --password  "$NOTARIZE_PASSWORD"
+
+      # ── Build & Package ─────────────────────────────────────────────────────
+      - name: Set PR build version
+        run: |
+          # Tag the build so it's identifiable (e.g., 0.5.0-pr.106+abc1234)
+          BASE_VERSION="${APP_VERSION:-0.5.0}"
+          PR_VERSION="${BASE_VERSION}-pr.${{ steps.pr.outputs.pr_number }}+${{ steps.pr.outputs.short_sha }}"
+          echo "APP_VERSION=$PR_VERSION" >> "$GITHUB_ENV"
+          echo "📦 Build version: $PR_VERSION"
+
+      - name: Build signed, notarized DMG
+        run: ./scripts/dist.sh
+
+      - name: Gather artifacts
+        id: artifacts
+        run: |
+          DMG_FILE=$(ls dist/VocaMac-*.dmg | head -1)
+          DMG_NAME=$(basename "$DMG_FILE")
+          DMG_SIZE=$(du -h "$DMG_FILE" | cut -f1)
+          DMG_SHA=$(shasum -a 256 "$DMG_FILE" | awk '{print $1}')
+
+          echo "dmg_path=$DMG_FILE" >> "$GITHUB_OUTPUT"
+          echo "dmg_name=$DMG_NAME" >> "$GITHUB_OUTPUT"
+          echo "dmg_size=$DMG_SIZE" >> "$GITHUB_OUTPUT"
+          echo "dmg_sha=$DMG_SHA" >> "$GITHUB_OUTPUT"
+
+      # ── Upload & Notify ─────────────────────────────────────────────────────
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        id: upload
+        with:
+          name: ${{ steps.artifacts.outputs.dmg_name }}
+          path: ${{ steps.artifacts.outputs.dmg_path }}
+          retention-days: 14
+
+      - name: Post download comment on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const artifactUrl = `${runUrl}/artifacts/${{ steps.upload.outputs.artifact-id }}`;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: [
+                `✅ **PR Build ready!**`,
+                ``,
+                `| | |`,
+                `|---|---|`,
+                `| **DMG** | [\`${{ steps.artifacts.outputs.dmg_name }}\`](${artifactUrl}) |`,
+                `| **Size** | ${{ steps.artifacts.outputs.dmg_size }} |`,
+                `| **Branch** | \`${{ steps.pr.outputs.ref }}\` |`,
+                `| **Commit** | \`${{ steps.pr.outputs.short_sha }}\` |`,
+                `| **Signed** | ✅ Developer ID |`,
+                `| **Notarized** | ✅ Apple |`,
+                ``,
+                `### 📥 Install`,
+                `1. Click the DMG link above to download`,
+                `2. Open the DMG and drag VocaMac to Applications (replace existing)`,
+                `3. Open VocaMac — no Gatekeeper warnings, no permission resets`,
+                ``,
+                `<details><summary>SHA-256 checksum</summary>`,
+                ``,
+                `\`\`\``,
+                `${{ steps.artifacts.outputs.dmg_sha }}  ${{ steps.artifacts.outputs.dmg_name }}`,
+                `\`\`\``,
+                `</details>`,
+                ``,
+                `> 💡 Comment \`/build\` again to rebuild with the latest changes.`
+              ].join('\n')
+            });
+
+      # ── Cleanup ─────────────────────────────────────────────────────────────
+      - name: Delete temporary keychain
+        if: always()
+        run: |
+          security delete-keychain "$KEYCHAIN_PATH" 2>/dev/null || true
+
+      # ── Failure notification ────────────────────────────────────────────────
+      - name: Post failure comment
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `❌ **PR Build failed** for \`${{ steps.pr.outputs.short_sha }}\`\n\n[View build logs →](${runUrl})\n\n> 💡 Fix the issue and comment \`/build\` to retry.`
+            });
