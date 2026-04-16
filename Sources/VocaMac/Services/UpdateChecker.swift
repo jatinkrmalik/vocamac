@@ -58,6 +58,16 @@ final class UpdateChecker: ObservableObject {
     private let lastCheckKey = "vocamac.update.lastCheck"
     private let skippedVersionKey = "vocamac.update.skippedVersion"
 
+    // MARK: - ETag Cache Keys
+    /// Persisted ETag from the last successful GitHub API response.
+    /// Sent as `If-None-Match` on subsequent requests so GitHub returns
+    /// 304 Not Modified (free — doesn't count against the 60 req/hr limit)
+    /// when the latest release hasn't changed.
+    private let etagKey = "vocamac.update.etag"
+    /// Raw JSON body of the last successful GitHub API response, stored so
+    /// we can serve a cached result on 304 without a second network call.
+    private let cachedResponseKey = "vocamac.update.cachedResponse"
+
     func checkOnLaunchIfNeeded() async {
         let lastCheckTime = UserDefaults.standard.double(forKey: lastCheckKey)
         let shouldCheck = Date().timeIntervalSince1970 - lastCheckTime > checkInterval
@@ -164,11 +174,18 @@ final class UpdateChecker: ObservableObject {
     }
 
     private func fetchLatestRelease() async throws -> GitHubRelease {
+        let appVersion = currentAppVersion()
         var request = URLRequest(url: apiURL)
         request.httpMethod = "GET"
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        request.setValue("VocaMac", forHTTPHeaderField: "User-Agent")
+        request.setValue("VocaMac/\(appVersion)", forHTTPHeaderField: "User-Agent")
         request.timeoutInterval = 15
+
+        // Send cached ETag so GitHub returns 304 Not Modified (rate-limit free)
+        // when the release hasn't changed since our last check.
+        if let cachedETag = UserDefaults.standard.string(forKey: etagKey) {
+            request.setValue(cachedETag, forHTTPHeaderField: "If-None-Match")
+        }
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
@@ -176,11 +193,32 @@ final class UpdateChecker: ObservableObject {
             throw UpdateCheckerError.invalidResponse
         }
 
-        guard httpResponse.statusCode == 200 else {
+        switch httpResponse.statusCode {
+        case 200:
+            // Fresh response — persist ETag and body for future conditional requests
+            if let newETag = httpResponse.value(forHTTPHeaderField: "ETag") {
+                UserDefaults.standard.set(newETag, forKey: etagKey)
+            }
+            if let jsonString = String(data: data, encoding: .utf8) {
+                UserDefaults.standard.set(jsonString, forKey: cachedResponseKey)
+            }
+            VocaLogger.debug(.updateChecker, "GitHub API: 200 OK — fresh release data received")
+            return try JSONDecoder().decode(GitHubRelease.self, from: data)
+
+        case 304:
+            // Not Modified — serve from cache, no rate-limit cost
+            VocaLogger.debug(.updateChecker, "GitHub API: 304 Not Modified — serving cached release")
+            guard let cachedJSON = UserDefaults.standard.string(forKey: cachedResponseKey),
+                  let cachedData = cachedJSON.data(using: .utf8) else {
+                // Cache miss despite 304 (e.g. UserDefaults cleared) — clear ETag and retry next time
+                UserDefaults.standard.removeObject(forKey: etagKey)
+                throw UpdateCheckerError.invalidResponse
+            }
+            return try JSONDecoder().decode(GitHubRelease.self, from: cachedData)
+
+        default:
             throw UpdateCheckerError.invalidStatusCode(httpResponse.statusCode)
         }
-
-        return try JSONDecoder().decode(GitHubRelease.self, from: data)
     }
 
     private func buildUpdateInfo(from release: GitHubRelease) -> UpdateInfo? {
