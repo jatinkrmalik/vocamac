@@ -175,8 +175,12 @@ final class AppStateOnboardingTests: XCTestCase {
 
         await appState.performStartup()
 
+        // Bundled model should have been installed
         XCTAssertEqual(mocks.modelManager.installedBundledModels, [.tiny])
-        XCTAssertEqual(mocks.modelManager.ensuredTokenizerSizes, [.tiny])
+        // WhisperKit handles tokenizer fetching internally — we no longer
+        // pre-validate tokenizer assets before loading. Asserting that
+        // ensuredTokenizerSizes is empty confirms we removed the incorrect check.
+        XCTAssertEqual(mocks.modelManager.ensuredTokenizerSizes, [])
         XCTAssertEqual(mocks.whisperService.loadedModelName, "openai_whisper-tiny")
     }
 }
