@@ -179,6 +179,11 @@ final class AppStateRecordingTests: XCTestCase {
     }
 
     func testTriggerStartupIdempotent() {
+        // Reset the global flag so this test is self-contained regardless of
+        // test execution order.
+        AppState.hasStartedGlobally = false
+        defer { AppState.hasStartedGlobally = false }
+
         let (appState, _) = AppState.makeTestState()
 
         appState.triggerStartupIfNeeded()

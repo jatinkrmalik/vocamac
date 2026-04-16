@@ -125,6 +125,14 @@ final class AppState: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private var hasStarted = false
 
+    /// Process-level flag that prevents performStartup from running more than
+    /// once even when SwiftUI instantiates multiple AppState objects (which it
+    /// does during MenuBarExtra scene setup). Instance-level `hasStarted` guards
+    /// re-entry on the same object; this static flag guards across all instances.
+    ///
+    /// Internal (not private) so test teardown can reset it between test cases.
+    static var hasStartedGlobally = false
+
     /// Whether to skip system integration calls (SMAppService, etc.) during init.
     /// Set to `true` in tests to avoid side effects.
     let skipSystemIntegration: Bool
@@ -174,13 +182,15 @@ final class AppState: ObservableObject {
     }
 
     /// Called once from the SwiftUI lifecycle to complete initialization.
-    /// Safe to call multiple times — only the first call takes effect.
+    /// Safe to call multiple times and across multiple instances — only the
+    /// first call across the entire process takes effect.
     func triggerStartupIfNeeded() {
-        guard !hasStarted else {
+        guard !hasStarted, !AppState.hasStartedGlobally else {
             VocaLogger.debug(.appState, "triggerStartupIfNeeded called again — skipping (already started)")
             return
         }
         hasStarted = true
+        AppState.hasStartedGlobally = true
         Task {
             await performStartup()
         }
