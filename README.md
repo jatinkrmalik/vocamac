@@ -33,13 +33,14 @@
 
 ## ✨ Features
 
-- **🔒 100% Local** - All audio processing happens on your machine. No internet required (except for one-time model downloads).
+- **🔒 100% Local** - All audio processing happens on your machine. No internet required — the Tiny model ships bundled and works out of the box offline.
 - **⌨️ System-Wide Text Injection** - Transcribed text is typed wherever your cursor is: browsers, Slack, VS Code, spreadsheets, terminals - everywhere.
 - **🎯 Push-to-Talk** - Hold a hotkey (default: Right Option) to record. Release to transcribe.
 - **👆 Double-Tap Toggle** - Double-tap the hotkey to start/stop recording.
 - **🧠 Smart Model Selection** - Auto-detects your hardware (Apple Silicon/Intel, RAM) and recommends the best whisper model via WhisperKit.
 - **⚡ Native Apple Acceleration** - CoreML + Metal + Neural Engine acceleration on Apple Silicon. No manual setup.
 - **📊 Visual Feedback** - Menu bar icon changes color during recording and processing. Audio level indicator shows input.
+- **🔄 Auto-Updates** - Built-in update checker queries GitHub Releases on launch and lets you download and install the latest version in one click from within the app.
 - **⚙️ Configurable** - Choose hotkeys, models, languages, silence detection thresholds, and more.
 
 ---
@@ -415,7 +416,7 @@ Each platform uses native technologies for the best possible integration, while 
 
 ## ⚠️ Known Limitations
 
-- **First launch requires internet**: WhisperKit downloads the speech recognition model on first run. All subsequent launches work fully offline.
+- **Larger models require a one-time download**: VocaMac ships with the Whisper Tiny model bundled — you can dictate immediately with no internet connection. Switching to a larger model (Small, Medium, Large) requires a one-time download; all subsequent launches work fully offline.
 - **macOS only**: Requires macOS 13 (Ventura) or later.
 - **Permissions reset on rebuild (build-from-source only)**: When building from source without a Developer ID certificate, macOS resets Accessibility and Input Monitoring permissions on every rebuild due to ad-hoc signing. Release builds are Developer ID signed so permissions persist across updates.
 
