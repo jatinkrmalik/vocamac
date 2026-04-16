@@ -13,6 +13,8 @@ enum ModelManagerError: LocalizedError {
     case modelNotAvailable(String)
     case downloadFailed(reason: String)
     case deviceNotSupported(model: String)
+    case missingModelDirectory(String)
+    case tokenizerAssetsUnavailable(String)
 
     var errorDescription: String? {
         switch self {
@@ -22,6 +24,10 @@ enum ModelManagerError: LocalizedError {
             return "Model download failed: \(reason)"
         case .deviceNotSupported(let model):
             return "Model '\(model)' is too large for this device."
+        case .missingModelDirectory(let path):
+            return "Model files are missing at: \(path)"
+        case .tokenizerAssetsUnavailable(let model):
+            return "Tokenizer assets are missing for model '\(model)'."
         }
     }
 }
@@ -34,6 +40,129 @@ final class ModelManager {
 
     /// HuggingFace repository for WhisperKit CoreML models
     private let modelRepo = "argmaxinc/whisperkit-coreml"
+    private let bundledModelsDirectory = "BundledModels/whisperkit-coreml"
+    private let requiredTokenizerFiles = ["tokenizer.json", "tokenizer_config.json"]
+    private let requiredModelDirectories = [
+        "MelSpectrogram.mlmodelc",
+        "AudioEncoder.mlmodelc",
+        "TextDecoder.mlmodelc"
+    ]
+
+    private var fileManager: FileManager { .default }
+
+    private var bundledModelsBase: URL? {
+        Bundle.main.resourceURL?.appendingPathComponent(bundledModelsDirectory, isDirectory: true)
+    }
+
+    private func installedModelDirectory(for size: ModelSize) -> URL {
+        modelStorageBase.appendingPathComponent(whisperKitModelName(for: size), isDirectory: true)
+    }
+
+    private func hasRequiredModelAssets(at directory: URL) -> Bool {
+        requiredModelDirectories.allSatisfy { fileManager.fileExists(atPath: directory.appendingPathComponent($0).path) }
+    }
+
+    private func hasRequiredTokenizerAssets(at directory: URL) -> Bool {
+        requiredTokenizerFiles.allSatisfy { fileManager.fileExists(atPath: directory.appendingPathComponent($0).path) }
+    }
+
+    private func createParentDirectoryIfNeeded(for directory: URL) throws {
+        try fileManager.createDirectory(at: directory.deletingLastPathComponent(), withIntermediateDirectories: true)
+    }
+
+    private func replaceDirectory(at destination: URL, with source: URL) throws {
+        if fileManager.fileExists(atPath: destination.path) {
+            try fileManager.removeItem(at: destination)
+        }
+        try fileManager.copyItem(at: source, to: destination)
+    }
+
+    private func tokenizerAssetSourceDirectory(for modelDirectory: URL) -> URL? {
+        let snapshotsDirectory = modelDirectory.appendingPathComponent("snapshots", isDirectory: true)
+        guard let snapshotDirectories = try? fileManager.contentsOfDirectory(
+            at: snapshotsDirectory,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        ) else {
+            return nil
+        }
+
+        return snapshotDirectories.first(where: { snapshotURL in
+            (try? snapshotURL.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
+        })
+    }
+
+    private func repairTokenizerAssetsIfNeeded(in modelDirectory: URL, modelName: String) throws {
+        guard !hasRequiredTokenizerAssets(at: modelDirectory) else { return }
+        guard let sourceDirectory = tokenizerAssetSourceDirectory(for: modelDirectory),
+              hasRequiredTokenizerAssets(at: sourceDirectory) else {
+            throw ModelManagerError.tokenizerAssetsUnavailable(modelName)
+        }
+
+        for fileName in requiredTokenizerFiles {
+            let sourceURL = sourceDirectory.appendingPathComponent(fileName)
+            let destinationURL = modelDirectory.appendingPathComponent(fileName)
+            if fileManager.fileExists(atPath: destinationURL.path) {
+                try fileManager.removeItem(at: destinationURL)
+            }
+            try fileManager.copyItem(at: sourceURL, to: destinationURL)
+        }
+
+        VocaLogger.info(.modelManager, "Repaired tokenizer assets for \(modelName)")
+    }
+
+    private func validateModelDirectory(_ directory: URL, modelName: String) throws {
+        guard hasRequiredModelAssets(at: directory) else {
+            throw ModelManagerError.missingModelDirectory(directory.path)
+        }
+        try repairTokenizerAssetsIfNeeded(in: directory, modelName: modelName)
+    }
+
+    private func installBundledModel(from sourceDirectory: URL, to destinationDirectory: URL, modelName: String) throws {
+        try createParentDirectoryIfNeeded(for: destinationDirectory)
+        try replaceDirectory(at: destinationDirectory, with: sourceDirectory)
+        try validateModelDirectory(destinationDirectory, modelName: modelName)
+        VocaLogger.info(.modelManager, "Installed bundled model: \(modelName)")
+    }
+
+    private func bundledModelDirectory(forModelNamed modelName: String) -> URL? {
+        guard let bundledModelsBase else { return nil }
+        let directory = bundledModelsBase.appendingPathComponent(modelName, isDirectory: true)
+        return fileManager.fileExists(atPath: directory.path) ? directory : nil
+    }
+
+    private func isBundledModelSupported(_ size: ModelSize) -> Bool {
+        size == .tiny
+    }
+
+    private func ensureInstalledModelReady(for size: ModelSize) throws -> URL {
+        let modelName = whisperKitModelName(for: size)
+        let installedDirectory = installedModelDirectory(for: size)
+        guard fileManager.fileExists(atPath: installedDirectory.path) else {
+            throw ModelManagerError.missingModelDirectory(installedDirectory.path)
+        }
+        try validateModelDirectory(installedDirectory, modelName: modelName)
+        return installedDirectory
+    }
+
+    func bundledModelFolder(for size: ModelSize) -> URL? {
+        guard isBundledModelSupported(size) else { return nil }
+        return bundledModelDirectory(forModelNamed: whisperKitModelName(for: size))
+    }
+
+    @discardableResult
+    func installBundledModelIfAvailable(for size: ModelSize) throws -> Bool {
+        guard let sourceDirectory = bundledModelFolder(for: size) else { return false }
+        let modelName = whisperKitModelName(for: size)
+        let destinationDirectory = installedModelDirectory(for: size)
+        try installBundledModel(from: sourceDirectory, to: destinationDirectory, modelName: modelName)
+        return true
+    }
+
+    func ensureTokenizerAssets(for size: ModelSize) throws -> URL {
+        try ensureInstalledModelReady(for: size)
+    }
+
 
     /// Local base directory passed to WhisperKit's downloadBase config.
     /// WhisperKit creates its own subdirectory structure under this path.
@@ -80,16 +209,14 @@ final class ModelManager {
 
     /// Check if a model is downloaded locally
     func isModelDownloaded(_ size: ModelSize) -> Bool {
-        let modelName = whisperKitModelName(for: size)
-        let modelDir = modelStorageBase.appendingPathComponent(modelName)
-        return FileManager.default.fileExists(atPath: modelDir.path)
+        guard let modelDir = modelFolder(for: size) else { return false }
+        return hasRequiredModelAssets(at: modelDir)
     }
 
-    /// Get the local folder path for a downloaded model
+    /// Get the local folder path for a downloaded or installed model
     func modelFolder(for size: ModelSize) -> URL? {
-        let modelName = whisperKitModelName(for: size)
-        let modelDir = modelStorageBase.appendingPathComponent(modelName)
-        if FileManager.default.fileExists(atPath: modelDir.path) {
+        let modelDir = installedModelDirectory(for: size)
+        if fileManager.fileExists(atPath: modelDir.path) {
             return modelDir
         }
         return nil

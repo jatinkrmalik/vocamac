@@ -542,8 +542,9 @@ final class AppState: ObservableObject {
         }
 
         do {
-            // If model is downloaded locally, use the local folder
-            let folderURL = targetSize.flatMap { modelManager.modelFolder(for: $0) }
+            // If model is downloaded locally, validate/repair tokenizer assets
+            // before WhisperKit initializes.
+            let folderURL = try targetSize.map { try modelManager.ensureTokenizerAssets(for: $0) }
 
             // Update status: unpacking
             if let targetSize = targetSize, let idx = availableModels.firstIndex(where: { $0.size == targetSize }) {
@@ -686,8 +687,18 @@ final class AppState: ObservableObject {
         let preferredSize = ModelSize(rawValue: selectedModelSize) ?? .tiny
 
         if !modelManager.isModelDownloaded(preferredSize) {
-            VocaLogger.info(.appState, "Preferred model \(preferredSize.displayName) not downloaded — downloading now...")
-            await downloadModel(preferredSize)
+            do {
+                if try modelManager.installBundledModelIfAvailable(for: preferredSize) {
+                    VocaLogger.info(.appState, "Installed bundled model for \(preferredSize.displayName)")
+                    refreshModelStatuses()
+                } else {
+                    VocaLogger.info(.appState, "Preferred model \(preferredSize.displayName) not downloaded — downloading now...")
+                    await downloadModel(preferredSize)
+                }
+            } catch {
+                VocaLogger.warning(.appState, "Bundled model install failed for \(preferredSize.displayName): \(error.localizedDescription)")
+                await downloadModel(preferredSize)
+            }
         }
 
         VocaLogger.info(.appState, "Loading model: \(preferredSize.displayName)...")
