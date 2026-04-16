@@ -235,6 +235,28 @@ jobs:
           echo "APP_VERSION=${APP_VERSION}" >> "$GITHUB_ENV"
           echo "📌 Nightly version: ${APP_VERSION}"
 
+      # ── Bundled Tiny Model ─────────────────────────────────────────────────
+      - name: Set up Python for huggingface-cli
+        run: pip3 install -U huggingface_hub
+
+      - name: Fetch bundled tiny model from Hugging Face
+        run: |
+          MODEL_STAGE="$RUNNER_TEMP/whisperkit-coreml"
+          hf download argmaxinc/whisperkit-coreml \
+            --include "openai_whisper-tiny/*" \
+            --local-dir "$MODEL_STAGE"
+          hf download openai/whisper-tiny \
+            tokenizer.json tokenizer_config.json \
+            --local-dir "$MODEL_STAGE/openai_whisper-tiny"
+          rm -rf "$MODEL_STAGE/.cache" "$MODEL_STAGE/openai_whisper-tiny/.cache"
+          test -d "$MODEL_STAGE/openai_whisper-tiny"
+          test -f "$MODEL_STAGE/openai_whisper-tiny/tokenizer.json"
+          test -f "$MODEL_STAGE/openai_whisper-tiny/tokenizer_config.json"
+          test -d "$MODEL_STAGE/openai_whisper-tiny/MelSpectrogram.mlmodelc"
+          test -d "$MODEL_STAGE/openai_whisper-tiny/AudioEncoder.mlmodelc"
+          test -d "$MODEL_STAGE/openai_whisper-tiny/TextDecoder.mlmodelc"
+          echo "VOCAMAC_BUNDLED_MODEL_SOURCE=$MODEL_STAGE" >> "$GITHUB_ENV"
+
       # ── Build & Package ─────────────────────────────────────────────────────
       - name: Build signed, notarized DMG via dist.sh
         run: |
@@ -245,6 +267,7 @@ jobs:
           ./scripts/dist.sh $DIST_FLAGS
         env:
           APP_VERSION: ${{ env.APP_VERSION }}
+          VOCAMAC_BUNDLED_MODEL_SOURCE: ${{ env.VOCAMAC_BUNDLED_MODEL_SOURCE }}
 
       - name: Verify code signature
         run: codesign -v --deep --strict VocaMac.app

@@ -217,13 +217,36 @@ final class MockModelManager: ModelManaging {
     var defaultModel: String = "openai_whisper-tiny"
     var downloadedModels: Set<ModelSize> = []
     var diskUsage: String = "100 MB"
+    var bundledModels: Set<ModelSize> = []
+    var installedBundledModels: [ModelSize] = []
+    var ensuredTokenizerSizes: [ModelSize] = []
+    var installBundledModelError: Error?
 
     func deviceRecommendation() -> (defaultModel: String, supported: [String], disabled: [String]) {
-        (defaultModel: defaultModel, supported: supportedModels.map(\.rawValue), disabled: [])
+        (defaultModel: defaultModel, supported: supportedModels.map(whisperKitModelName(for:)), disabled: [])
     }
 
     func modelFolder(for size: ModelSize) -> URL? {
         downloadedModels.contains(size) ? URL(fileURLWithPath: "/mock/path/\(size.rawValue)") : nil
+    }
+
+    func bundledModelFolder(for size: ModelSize) -> URL? {
+        bundledModels.contains(size) ? URL(fileURLWithPath: "/mock/bundled/\(size.rawValue)") : nil
+    }
+
+    func installBundledModelIfAvailable(for size: ModelSize) throws -> Bool {
+        if let installBundledModelError {
+            throw installBundledModelError
+        }
+        guard bundledModels.contains(size) else { return false }
+        installedBundledModels.append(size)
+        downloadedModels.insert(size)
+        return true
+    }
+
+    func ensureTokenizerAssets(for size: ModelSize) throws -> URL {
+        ensuredTokenizerSizes.append(size)
+        return URL(fileURLWithPath: "/mock/path/\(size.rawValue)")
     }
 
     func isModelDownloaded(_ size: ModelSize) -> Bool {
@@ -235,7 +258,13 @@ final class MockModelManager: ModelManaging {
     }
 
     func whisperKitModelName(for size: ModelSize) -> String {
-        "openai_whisper-\(size.rawValue)"
+        switch size {
+        case .tiny:    return "openai_whisper-tiny"
+        case .base:    return "openai_whisper-base"
+        case .small:   return "openai_whisper-small"
+        case .medium:  return "openai_whisper-medium"
+        case .largeV3: return "openai_whisper-large-v3"
+        }
     }
 
     func modelSize(from whisperKitName: String) -> ModelSize? {

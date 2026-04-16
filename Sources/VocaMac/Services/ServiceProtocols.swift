@@ -90,12 +90,32 @@ protocol CursorOverlayManaging: AnyObject {
 protocol ModelManaging: AnyObject {
     func deviceRecommendation() -> (defaultModel: String, supported: [String], disabled: [String])
     func modelFolder(for size: ModelSize) -> URL?
+    func bundledModelFolder(for size: ModelSize) -> URL?
+    func installBundledModelIfAvailable(for size: ModelSize) throws -> Bool
+    func ensureTokenizerAssets(for size: ModelSize) throws -> URL
     func isModelDownloaded(_ size: ModelSize) -> Bool
     func isModelSupported(_ size: ModelSize) -> Bool
     func whisperKitModelName(for size: ModelSize) -> String
     func modelSize(from whisperKitName: String) -> ModelSize?
     func downloadModel(size: ModelSize, onProgress: @escaping (Double) -> Void) async throws
     func diskUsageDescription() -> String
+}
+
+extension ModelManaging {
+    func bundledModelFolder(for size: ModelSize) -> URL? { nil }
+}
+
+extension ModelManaging {
+    func installBundledModelIfAvailable(for size: ModelSize) throws -> Bool { false }
+}
+
+extension ModelManaging {
+    func ensureTokenizerAssets(for size: ModelSize) throws -> URL {
+        guard let folder = modelFolder(for: size) else {
+            throw NSError(domain: "VocaMac.ModelManaging", code: 1, userInfo: [NSLocalizedDescriptionKey: "Model folder unavailable for \(size.rawValue)"])
+        }
+        return folder
+    }
 }
 
 // MARK: - SpeechTranscribing

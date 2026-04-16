@@ -166,4 +166,17 @@ final class AppStateOnboardingTests: XCTestCase {
 
         XCTAssertTrue(appState.hasCompletedOnboarding)
     }
+
+    @MainActor
+    func testPerformStartupInstallsBundledTinyModelBeforeDownload() async {
+        let (appState, mocks) = AppState.makeTestState()
+        mocks.modelManager.bundledModels = [.tiny]
+        appState.selectedModelSize = ModelSize.tiny.rawValue
+
+        await appState.performStartup()
+
+        XCTAssertEqual(mocks.modelManager.installedBundledModels, [.tiny])
+        XCTAssertEqual(mocks.modelManager.ensuredTokenizerSizes, [.tiny])
+        XCTAssertEqual(mocks.whisperService.loadedModelName, "openai_whisper-tiny")
+    }
 }

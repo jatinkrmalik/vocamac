@@ -542,8 +542,15 @@ final class AppState: ObservableObject {
         }
 
         do {
-            // If model is downloaded locally, use the local folder
-            let folderURL = targetSize.flatMap { modelManager.modelFolder(for: $0) }
+            // If model is downloaded locally, validate/repair tokenizer assets
+            // before WhisperKit initializes. If validation fails (e.g. partial
+            // download), pass nil and let WhisperKit handle it.
+            let folderURL: URL?
+            if let targetSize = targetSize, modelManager.isModelDownloaded(targetSize) {
+                folderURL = try? modelManager.ensureTokenizerAssets(for: targetSize)
+            } else {
+                folderURL = nil
+            }
 
             // Update status: unpacking
             if let targetSize = targetSize, let idx = availableModels.firstIndex(where: { $0.size == targetSize }) {
@@ -636,11 +643,13 @@ final class AppState: ObservableObject {
 
             // Refresh all model statuses to ensure previously downloaded models are preserved
             refreshModelStatuses()
+            VocaLogger.info(.appState, "Download complete for \(size.displayName), isDownloaded=\(modelManager.isModelDownloaded(size))")
         } catch {
             if let idx = availableModels.firstIndex(where: { $0.size == size }) {
                 availableModels[idx].downloadProgress = nil
             }
             errorMessage = "Download failed: \(error.localizedDescription)"
+            VocaLogger.error(.appState, "Download failed for \(size.displayName): \(error.localizedDescription)")
         }
     }
 
@@ -656,6 +665,17 @@ final class AppState: ObservableObject {
     }
 
     // MARK: - Startup
+
+    private func installBundledOrFallback(preferred: ModelSize) async -> Bool {
+        do {
+            return try await Task.detached {
+                try self.modelManager.installBundledModelIfAvailable(for: preferred)
+            }.value
+        } catch {
+            VocaLogger.warning(.appState, "Bundled model install failed for \(preferred.displayName): \(error.localizedDescription)")
+            return false
+        }
+    }
 
     func performStartup() async {
         VocaLogger.info(.appState, "performStartup beginning...")
@@ -683,15 +703,31 @@ final class AppState: ObservableObject {
         // downloaded yet. We download it explicitly so the UI can show real
         // progress, rather than delegating to WhisperKit's opaque auto-select
         // which provides no progress callbacks and may pick a different model.
-        let preferredSize = ModelSize(rawValue: selectedModelSize) ?? .tiny
+        var modelToLoad = ModelSize(rawValue: selectedModelSize) ?? .tiny
 
-        if !modelManager.isModelDownloaded(preferredSize) {
-            VocaLogger.info(.appState, "Preferred model \(preferredSize.displayName) not downloaded — downloading now...")
-            await downloadModel(preferredSize)
+        if !modelManager.isModelDownloaded(modelToLoad) {
+            // Try bundled model for the preferred size first
+            let installedPreferred = await installBundledOrFallback(preferred: modelToLoad)
+            if installedPreferred {
+                refreshModelStatuses()
+            } else {
+                VocaLogger.info(.appState, "Preferred model \(modelToLoad.displayName) not downloaded — downloading now...")
+                await downloadModel(modelToLoad)
+            }
+
+            // If preferred model still isn't ready, try bundled tiny as a last resort
+            if !modelManager.isModelDownloaded(modelToLoad), modelToLoad != .tiny {
+                let installedTiny = await installBundledOrFallback(preferred: .tiny)
+                if installedTiny {
+                    modelToLoad = .tiny
+                    refreshModelStatuses()
+                    VocaLogger.info(.appState, "Falling back to bundled Tiny model")
+                }
+            }
         }
 
-        VocaLogger.info(.appState, "Loading model: \(preferredSize.displayName)...")
-        await loadModel(preferredSize)
+        VocaLogger.info(.appState, "Loading model: \(modelToLoad.displayName)...")
+        await loadModel(modelToLoad)
         VocaLogger.info(.appState, "Model loaded: \(whisperService.loadedModelName ?? "none")")
 
         // 4. Always attempt to start hotkey listener
