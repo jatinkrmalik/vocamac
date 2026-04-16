@@ -542,8 +542,10 @@ final class AppState: ObservableObject {
         }
 
         do {
-            // If model is downloaded locally, use the local folder
-            let folderURL = targetSize.flatMap { modelManager.modelFolder(for: $0) }
+            // If model is downloaded locally, validate/repair tokenizer assets
+            // before WhisperKit initializes. This avoids first-run crashes in
+            // swift-transformers when it falls back to a missing bundled tokenizer.
+            let folderURL = try targetSize.map { try modelManager.ensureTokenizerAssets(for: $0) }
 
             // Update status: unpacking
             if let targetSize = targetSize, let idx = availableModels.firstIndex(where: { $0.size == targetSize }) {

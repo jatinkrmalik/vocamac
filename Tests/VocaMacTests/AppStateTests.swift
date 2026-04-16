@@ -166,4 +166,16 @@ final class AppStateOnboardingTests: XCTestCase {
 
         XCTAssertTrue(appState.hasCompletedOnboarding)
     }
+
+    @MainActor
+    func testLoadModelEnsuresTokenizerAssetsBeforeWhisperInit() async {
+        let (appState, mocks) = AppState.makeTestState()
+        mocks.modelManager.downloadedModels = [.tiny]
+        mocks.modelManager.ensuredTokenizerFolder = URL(fileURLWithPath: "/mock/path/preflight")
+
+        await appState.loadModel(.tiny)
+
+        XCTAssertEqual(mocks.modelManager.ensuredTokenizerSizes, [.tiny])
+        XCTAssertEqual(mocks.whisperService.loadedModelName, "openai_whisper-tiny")
+    }
 }

@@ -115,6 +115,22 @@ final class ModelSizeTests: XCTestCase {
 
 final class ModelManagerTests: XCTestCase {
 
+    private var tempDirectory: URL!
+
+    override func setUpWithError() throws {
+        try super.setUpWithError()
+        tempDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
+    }
+
+    override func tearDownWithError() throws {
+        if let tempDirectory {
+            try? FileManager.default.removeItem(at: tempDirectory)
+        }
+        try super.tearDownWithError()
+    }
+
     func testWhisperKitModelNames() {
         let manager = ModelManager()
         XCTAssertEqual(manager.whisperKitModelName(for: .tiny), "openai_whisper-tiny")
@@ -138,6 +154,53 @@ final class ModelManagerTests: XCTestCase {
     func testTotalDiskUsageNonNegative() {
         let manager = ModelManager()
         XCTAssertGreaterThanOrEqual(manager.totalDiskUsage(), 0)
+    }
+
+    func testEnsureTokenizerAssetsUsesExistingTopLevelFiles() throws {
+        let manager = ModelManager()
+        let modelDirectory = try createModelDirectory(for: .tiny)
+        try createTokenizerFiles(in: modelDirectory)
+
+        let resolvedDirectory = try manager.ensureTokenizerAssets(for: .tiny)
+
+        XCTAssertEqual(resolvedDirectory.lastPathComponent, modelDirectory.lastPathComponent)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: resolvedDirectory.appendingPathComponent("tokenizer.json").path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: resolvedDirectory.appendingPathComponent("tokenizer_config.json").path))
+    }
+
+    func testEnsureTokenizerAssetsRepairsFromSnapshotDirectory() throws {
+        let manager = ModelManager()
+        let modelDirectory = try createModelDirectory(for: .base)
+        let snapshotDirectory = modelDirectory
+            .appendingPathComponent("snapshots", isDirectory: true)
+            .appendingPathComponent("12345", isDirectory: true)
+        try FileManager.default.createDirectory(at: snapshotDirectory, withIntermediateDirectories: true)
+        try createTokenizerFiles(in: snapshotDirectory)
+
+        let resolvedDirectory = try manager.ensureTokenizerAssets(for: .base)
+
+        XCTAssertEqual(resolvedDirectory.lastPathComponent, modelDirectory.lastPathComponent)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: resolvedDirectory.appendingPathComponent("tokenizer.json").path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: resolvedDirectory.appendingPathComponent("tokenizer_config.json").path))
+    }
+
+    private func createModelDirectory(for size: ModelSize) throws -> URL {
+        let manager = ModelManager()
+        let modelDirectory = tempDirectory
+            .appendingPathComponent("models/models/argmaxinc/whisperkit-coreml", isDirectory: true)
+            .appendingPathComponent(manager.whisperKitModelName(for: size), isDirectory: true)
+        try FileManager.default.createDirectory(at: modelDirectory, withIntermediateDirectories: true)
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let liveBase = appSupport.appendingPathComponent("VocaMac/models/models/argmaxinc/whisperkit-coreml", isDirectory: true)
+        try? FileManager.default.removeItem(at: liveBase)
+        try FileManager.default.createDirectory(at: liveBase.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? FileManager.default.createSymbolicLink(at: liveBase, withDestinationURL: tempDirectory.appendingPathComponent("models/models/argmaxinc/whisperkit-coreml", isDirectory: true))
+        return modelDirectory
+    }
+
+    private func createTokenizerFiles(in directory: URL) throws {
+        try "{}".write(to: directory.appendingPathComponent("tokenizer.json"), atomically: true, encoding: .utf8)
+        try "{}".write(to: directory.appendingPathComponent("tokenizer_config.json"), atomically: true, encoding: .utf8)
     }
 }
 

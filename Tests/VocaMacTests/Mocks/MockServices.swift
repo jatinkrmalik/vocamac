@@ -217,9 +217,16 @@ final class MockModelManager: ModelManaging {
     var defaultModel: String = "openai_whisper-tiny"
     var downloadedModels: Set<ModelSize> = []
     var diskUsage: String = "100 MB"
+    var ensuredTokenizerSizes: [ModelSize] = []
+    var ensuredTokenizerFolder: URL?
+    var ensureTokenizerAssetsError: Error?
 
     func deviceRecommendation() -> (defaultModel: String, supported: [String], disabled: [String]) {
-        (defaultModel: defaultModel, supported: supportedModels.map(\.rawValue), disabled: [])
+        let supported = supportedModels.map(whisperKitModelName(for:))
+        let disabled = ModelSize.allCases
+            .filter { !supportedModels.contains($0) }
+            .map(whisperKitModelName(for:))
+        return (defaultModel: defaultModel, supported: supported, disabled: disabled)
     }
 
     func modelFolder(for size: ModelSize) -> URL? {
@@ -235,7 +242,13 @@ final class MockModelManager: ModelManaging {
     }
 
     func whisperKitModelName(for size: ModelSize) -> String {
-        "openai_whisper-\(size.rawValue)"
+        switch size {
+        case .tiny:    return "openai_whisper-tiny"
+        case .base:    return "openai_whisper-base"
+        case .small:   return "openai_whisper-small"
+        case .medium:  return "openai_whisper-medium"
+        case .largeV3: return "openai_whisper-large-v3"
+        }
     }
 
     func modelSize(from whisperKitName: String) -> ModelSize? {
@@ -246,6 +259,14 @@ final class MockModelManager: ModelManaging {
             }
         }
         return nil
+    }
+
+    func ensureTokenizerAssets(for size: ModelSize) throws -> URL {
+        ensuredTokenizerSizes.append(size)
+        if let ensureTokenizerAssetsError {
+            throw ensureTokenizerAssetsError
+        }
+        return ensuredTokenizerFolder ?? URL(fileURLWithPath: "/mock/path/\(size.rawValue)")
     }
 
     func downloadModel(size: ModelSize, onProgress: @escaping (Double) -> Void) async throws {

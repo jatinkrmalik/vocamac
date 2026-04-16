@@ -13,6 +13,8 @@ enum ModelManagerError: LocalizedError {
     case modelNotAvailable(String)
     case downloadFailed(reason: String)
     case deviceNotSupported(model: String)
+    case missingModelDirectory(String)
+    case tokenizerAssetsUnavailable(String)
 
     var errorDescription: String? {
         switch self {
@@ -22,6 +24,10 @@ enum ModelManagerError: LocalizedError {
             return "Model download failed: \(reason)"
         case .deviceNotSupported(let model):
             return "Model '\(model)' is too large for this device."
+        case .missingModelDirectory(let path):
+            return "Model files are missing at: \(path)"
+        case .tokenizerAssetsUnavailable(let model):
+            return "Tokenizer assets are missing for model '\(model)'."
         }
     }
 }
@@ -98,6 +104,67 @@ final class ModelManager {
     /// List all downloaded models
     func downloadedModels() -> [ModelSize] {
         ModelSize.allCases.filter { isModelDownloaded($0) }
+    }
+
+    /// Ensure the local model directory contains tokenizer assets before loading.
+    ///
+    /// On first launch, WhisperKit may finish downloading model weights before the
+    /// tokenizer assets are visible at the exact model folder we pass back into a
+    /// later `WhisperKit(config)` load. If those files are missing, swift-transformers
+    /// falls back to a bundled tokenizer config and crashes because its SPM resource
+    /// bundle accessor resolves the wrong path inside the packaged `.app`.
+    ///
+    /// This method validates the model directory eagerly and repairs a common nested
+    /// layout by copying tokenizer files from the HuggingFace snapshot directory into
+    /// the top-level model folder expected by local loads.
+    func ensureTokenizerAssets(for size: ModelSize) throws -> URL {
+        let modelName = whisperKitModelName(for: size)
+        guard let modelDirectory = modelFolder(for: size) else {
+            throw ModelManagerError.missingModelDirectory(modelStorageBase.appendingPathComponent(modelName).path)
+        }
+
+        let fileManager = FileManager.default
+        let requiredFiles = ["tokenizer.json", "tokenizer_config.json"]
+
+        let hasRequiredFiles: (URL) -> Bool = { directory in
+            requiredFiles.allSatisfy { fileManager.fileExists(atPath: directory.appendingPathComponent($0).path) }
+        }
+
+        if hasRequiredFiles(modelDirectory) {
+            return modelDirectory
+        }
+
+        if let sourceDirectory = tokenizerAssetSourceDirectory(for: modelDirectory), hasRequiredFiles(sourceDirectory) {
+            for fileName in requiredFiles {
+                let sourceURL = sourceDirectory.appendingPathComponent(fileName)
+                let destinationURL = modelDirectory.appendingPathComponent(fileName)
+
+                if fileManager.fileExists(atPath: destinationURL.path) {
+                    try fileManager.removeItem(at: destinationURL)
+                }
+                try fileManager.copyItem(at: sourceURL, to: destinationURL)
+            }
+
+            VocaLogger.info(.modelManager, "Repaired tokenizer assets for \(modelName)")
+            return modelDirectory
+        }
+
+        throw ModelManagerError.tokenizerAssetsUnavailable(modelName)
+    }
+
+    private func tokenizerAssetSourceDirectory(for modelDirectory: URL) -> URL? {
+        let snapshotsDirectory = modelDirectory.appendingPathComponent("snapshots", isDirectory: true)
+        guard let snapshotDirectories = try? FileManager.default.contentsOfDirectory(
+            at: snapshotsDirectory,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        ) else {
+            return nil
+        }
+
+        return snapshotDirectories.first(where: { snapshotURL in
+            (try? snapshotURL.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
+        })
     }
 
     /// Check if a model size is supported on this device.
