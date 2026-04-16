@@ -83,7 +83,11 @@ jobs:
 
       # ── Bundled Tiny Model ─────────────────────────────────────────────────
       - name: Set up Python for huggingface-cli
-        run: pip3 install -U huggingface_hub
+        run: |
+          python3 -m venv "$RUNNER_TEMP/hf-venv"
+          source "$RUNNER_TEMP/hf-venv/bin/activate"
+          pip install -U huggingface_hub
+          echo "$RUNNER_TEMP/hf-venv/bin" >> "$GITHUB_PATH"
 
       - name: Fetch bundled tiny model from Hugging Face
         run: |
