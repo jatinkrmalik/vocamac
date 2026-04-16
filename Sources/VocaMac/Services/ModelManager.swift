@@ -92,36 +92,42 @@ final class ModelManager {
         })
     }
 
-    private func repairTokenizerAssetsIfNeeded(in modelDirectory: URL, modelName: String) throws {
+    private func repairTokenizerAssetsIfNeeded(in modelDirectory: URL, for size: ModelSize) throws {
+        let modelName = whisperKitModelName(for: size)
         guard !hasRequiredTokenizerAssets(at: modelDirectory) else { return }
-        guard let sourceDirectory = tokenizerAssetSourceDirectory(for: modelDirectory),
-              hasRequiredTokenizerAssets(at: sourceDirectory) else {
-            throw ModelManagerError.tokenizerAssetsUnavailable(modelName)
-        }
 
-        for fileName in requiredTokenizerFiles {
-            let sourceURL = sourceDirectory.appendingPathComponent(fileName)
-            let destinationURL = modelDirectory.appendingPathComponent(fileName)
-            if fileManager.fileExists(atPath: destinationURL.path) {
-                try fileManager.removeItem(at: destinationURL)
+        // Search all known tokenizer locations (snapshots, openai cache, etc.)
+        let candidates = tokenizerSearchDirectories(for: size)
+        for candidateDir in candidates {
+            if hasRequiredTokenizerAssets(at: candidateDir) {
+                for fileName in requiredTokenizerFiles {
+                    let sourceURL = candidateDir.appendingPathComponent(fileName)
+                    let destinationURL = modelDirectory.appendingPathComponent(fileName)
+                    if fileManager.fileExists(atPath: destinationURL.path) {
+                        try fileManager.removeItem(at: destinationURL)
+                    }
+                    try fileManager.copyItem(at: sourceURL, to: destinationURL)
+                }
+                VocaLogger.info(.modelManager, "Repaired tokenizer assets for \(modelName) from \(candidateDir.path)")
+                return
             }
-            try fileManager.copyItem(at: sourceURL, to: destinationURL)
         }
 
-        VocaLogger.info(.modelManager, "Repaired tokenizer assets for \(modelName)")
+        throw ModelManagerError.tokenizerAssetsUnavailable(modelName)
     }
 
-    private func validateModelDirectory(_ directory: URL, modelName: String) throws {
+    private func validateModelDirectory(_ directory: URL, for size: ModelSize) throws {
         guard hasRequiredModelAssets(at: directory) else {
             throw ModelManagerError.missingModelDirectory(directory.path)
         }
-        try repairTokenizerAssetsIfNeeded(in: directory, modelName: modelName)
+        try repairTokenizerAssetsIfNeeded(in: directory, for: size)
     }
 
-    private func installBundledModel(from sourceDirectory: URL, to destinationDirectory: URL, modelName: String) throws {
+    private func installBundledModel(from sourceDirectory: URL, to destinationDirectory: URL, for size: ModelSize) throws {
+        let modelName = whisperKitModelName(for: size)
         try createParentDirectoryIfNeeded(for: destinationDirectory)
         try replaceDirectory(at: destinationDirectory, with: sourceDirectory)
-        try validateModelDirectory(destinationDirectory, modelName: modelName)
+        try validateModelDirectory(destinationDirectory, for: size)
         VocaLogger.info(.modelManager, "Installed bundled model: \(modelName)")
     }
 
@@ -136,12 +142,11 @@ final class ModelManager {
     }
 
     private func ensureInstalledModelReady(for size: ModelSize) throws -> URL {
-        let modelName = whisperKitModelName(for: size)
         let installedDirectory = installedModelDirectory(for: size)
         guard fileManager.fileExists(atPath: installedDirectory.path) else {
             throw ModelManagerError.missingModelDirectory(installedDirectory.path)
         }
-        try validateModelDirectory(installedDirectory, modelName: modelName)
+        try validateModelDirectory(installedDirectory, for: size)
         return installedDirectory
     }
 
@@ -153,9 +158,8 @@ final class ModelManager {
     @discardableResult
     func installBundledModelIfAvailable(for size: ModelSize) throws -> Bool {
         guard let sourceDirectory = bundledModelFolder(for: size) else { return false }
-        let modelName = whisperKitModelName(for: size)
         let destinationDirectory = installedModelDirectory(for: size)
-        try installBundledModel(from: sourceDirectory, to: destinationDirectory, modelName: modelName)
+        try installBundledModel(from: sourceDirectory, to: destinationDirectory, for: size)
         return true
     }
 
@@ -267,52 +271,84 @@ final class ModelManager {
 
     // MARK: - Model Download
 
-    /// After WhisperKit downloads a model, consolidate the files from its
-    /// temp/symlinked cache into our permanent installedModelDirectory.
-    /// WhisperKit stores CoreML models in temp directories with symlinks —
-    /// macOS may clean those up, causing "downloaded" models to vanish.
+    /// After WhisperKit downloads a model, ensure the tokenizer assets are
+    /// present alongside the CoreML model files in our installed directory.
+    ///
+    /// WhisperKit downloads CoreML weights from argmaxinc/whisperkit-coreml but
+    /// stores tokenizer files separately under openai/whisper-<size>. The
+    /// tokenizer files may land inside a HuggingFace snapshots subdirectory
+    /// rather than at the top level.  We search common locations and copy the
+    /// tokenizer JSON files into the model directory so `ensureTokenizerAssets`
+    /// succeeds on the next `loadModel` call.
     private func consolidateWhisperKitDownload(for size: ModelSize) throws {
         let modelName = whisperKitModelName(for: size)
         let destination = installedModelDirectory(for: size)
 
-        // Already consolidated — nothing to do
+        // Already fully consolidated — nothing to do
         if hasRequiredModelAssets(at: destination) && hasRequiredTokenizerAssets(at: destination) {
             return
         }
 
-        // Find the WhisperKit download location (may be a symlink to temp)
-        let wkDownloadDir = modelStorageBase.appendingPathComponent(modelName, isDirectory: true)
-
-        guard fileManager.fileExists(atPath: wkDownloadDir.path),
-              hasRequiredModelAssets(at: wkDownloadDir) else {
-            VocaLogger.warning(.modelManager, "WhisperKit download not found at \(wkDownloadDir.path) — skipping consolidation")
+        guard fileManager.fileExists(atPath: destination.path),
+              hasRequiredModelAssets(at: destination) else {
+            VocaLogger.warning(.modelManager, "Model assets not found at \(destination.path) — skipping consolidation")
             return
         }
 
-        // Copy from WhisperKit's cache to our permanent location
-        try createParentDirectoryIfNeeded(for: destination)
-        try replaceDirectory(at: destination, with: wkDownloadDir)
+        // Tokenizer files are already present — done
+        if hasRequiredTokenizerAssets(at: destination) {
+            VocaLogger.info(.modelManager, "Tokenizer assets already present for \(modelName)")
+            return
+        }
 
-        // Ensure tokenizer files are present (may need to copy from openai/ cache)
-        if !hasRequiredTokenizerAssets(at: destination) {
-            let tokenizerDir = downloadBase
-                .appendingPathComponent("models")
-                .appendingPathComponent("openai")
-                .appendingPathComponent("whisper-\(size.rawValue)", isDirectory: true)
-            if hasRequiredTokenizerAssets(at: tokenizerDir) {
+        // Search for tokenizer files in likely locations:
+        // 1. openai/whisper-<size>/ directory (HuggingFace flat download)
+        // 2. openai/whisper-<size>/snapshots/<hash>/ (HuggingFace Hub cache layout)
+        // 3. The model directory's own snapshots/ subdirectory
+        let candidateDirectories = tokenizerSearchDirectories(for: size)
+
+        for candidateDir in candidateDirectories {
+            if hasRequiredTokenizerAssets(at: candidateDir) {
                 for file in requiredTokenizerFiles {
-                    let src = tokenizerDir.appendingPathComponent(file)
+                    let src = candidateDir.appendingPathComponent(file)
                     let dst = destination.appendingPathComponent(file)
-                    if fileManager.fileExists(atPath: src.path) {
+                    if fileManager.fileExists(atPath: dst.path) {
                         try? fileManager.removeItem(at: dst)
-                        try fileManager.copyItem(at: src, to: dst)
                     }
+                    try fileManager.copyItem(at: src, to: dst)
                 }
-                VocaLogger.info(.modelManager, "Consolidated tokenizer assets from openai cache for \(modelName)")
+                VocaLogger.info(.modelManager, "Consolidated tokenizer assets for \(modelName) from \(candidateDir.path)")
+                return
             }
         }
 
-        VocaLogger.info(.modelManager, "Consolidated WhisperKit download for \(modelName) to permanent location")
+        VocaLogger.warning(.modelManager, "Could not find tokenizer assets for \(modelName) in any known location")
+    }
+
+    /// Returns candidate directories where tokenizer files may be found,
+    /// ordered from most likely to least likely.
+    private func tokenizerSearchDirectories(for size: ModelSize) -> [URL] {
+        var candidates: [URL] = []
+        let modelsBase = downloadBase.appendingPathComponent("models")
+
+        // 1. openai/whisper-<size>/ (flat download)
+        let openaiDir = modelsBase
+            .appendingPathComponent("openai")
+            .appendingPathComponent("whisper-\(size.rawValue)", isDirectory: true)
+        candidates.append(openaiDir)
+
+        // 2. openai/whisper-<size>/snapshots/<hash>/ (Hub cache layout)
+        if let snapshotDir = tokenizerAssetSourceDirectory(for: openaiDir) {
+            candidates.append(snapshotDir)
+        }
+
+        // 3. The model directory's own snapshots/ subdirectory
+        let modelDir = installedModelDirectory(for: size)
+        if let snapshotDir = tokenizerAssetSourceDirectory(for: modelDir) {
+            candidates.append(snapshotDir)
+        }
+
+        return candidates
     }
 
     /// Download a model using WhisperKit's built-in download mechanism
