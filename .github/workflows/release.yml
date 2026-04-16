@@ -119,7 +119,9 @@ jobs:
       - name: Create signed, notarized DMG
         run: ./scripts/dist.sh
         # Uses CODE_SIGN_IDENTITY and NOTARIZE_PROFILE=AC_PASSWORD from env
-
+        env:
+          VOCAMAC_BUNDLED_MODEL_SOURCE: ${{ env.VOCAMAC_BUNDLED_MODEL_SOURCE }}
+        
       - name: Rename artifacts with version
         run: |
           ARCH=$(uname -m)
