@@ -235,6 +235,27 @@ jobs:
           echo "APP_VERSION=${APP_VERSION}" >> "$GITHUB_ENV"
           echo "📌 Nightly version: ${APP_VERSION}"
 
+      # ── Bundled Tiny Model ─────────────────────────────────────────────────
+      - name: Install Git LFS
+        run: brew install git-lfs
+
+      - name: Fetch bundled tiny model from Hugging Face
+        run: |
+          git lfs install
+          MODEL_STAGE="$RUNNER_TEMP/whisperkit-coreml"
+          git clone --depth 1 --filter=blob:none https://huggingface.co/argmaxinc/whisperkit-coreml "$MODEL_STAGE"
+          cd "$MODEL_STAGE"
+          git sparse-checkout init --cone
+          git sparse-checkout set openai_whisper-tiny
+          git lfs pull --include "openai_whisper-tiny/**"
+          test -d "$MODEL_STAGE/openai_whisper-tiny"
+          test -f "$MODEL_STAGE/openai_whisper-tiny/tokenizer.json"
+          test -f "$MODEL_STAGE/openai_whisper-tiny/tokenizer_config.json"
+          test -d "$MODEL_STAGE/openai_whisper-tiny/MelSpectrogram.mlmodelc"
+          test -d "$MODEL_STAGE/openai_whisper-tiny/AudioEncoder.mlmodelc"
+          test -d "$MODEL_STAGE/openai_whisper-tiny/TextDecoder.mlmodelc"
+          echo "VOCAMAC_BUNDLED_MODEL_SOURCE=$MODEL_STAGE" >> "$GITHUB_ENV"
+
       # ── Build & Package ─────────────────────────────────────────────────────
       - name: Build signed, notarized DMG via dist.sh
         run: |
@@ -245,6 +266,7 @@ jobs:
           ./scripts/dist.sh $DIST_FLAGS
         env:
           APP_VERSION: ${{ env.APP_VERSION }}
+          VOCAMAC_BUNDLED_MODEL_SOURCE: ${{ env.VOCAMAC_BUNDLED_MODEL_SOURCE }}
 
       - name: Verify code signature
         run: codesign -v --deep --strict VocaMac.app
