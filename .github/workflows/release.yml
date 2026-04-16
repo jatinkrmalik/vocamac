@@ -115,7 +115,6 @@ jobs:
         run: ./scripts/dist.sh
         env:
           VOCAMAC_BUNDLED_MODEL_SOURCE: ${{ env.VOCAMAC_BUNDLED_MODEL_SOURCE }}
-          APP_VERSION: ${{ steps.version.outputs.VERSION }}
 
       - name: Verify code signature
         run: codesign -v --deep --strict VocaMac.app
