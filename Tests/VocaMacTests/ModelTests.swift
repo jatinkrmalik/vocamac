@@ -114,6 +114,21 @@ final class ModelSizeTests: XCTestCase {
 // MARK: - ModelManager Tests
 
 final class ModelManagerTests: XCTestCase {
+    /// Matches ModelManager's real modelStorageBase layout:
+    /// ~/Library/Application Support/VocaMac/models/models/argmaxinc/whisperkit-coreml
+    private var modelStorageBase: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("VocaMac/models/models/argmaxinc/whisperkit-coreml", isDirectory: true)
+    }
+
+    override func tearDownWithError() throws {
+        let vocamacRoot = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("VocaMac", isDirectory: true)
+        if FileManager.default.fileExists(atPath: vocamacRoot.path) {
+            try FileManager.default.removeItem(at: vocamacRoot)
+        }
+        try super.tearDownWithError()
+    }
 
     func testWhisperKitModelNames() {
         let manager = ModelManager()
@@ -138,6 +153,26 @@ final class ModelManagerTests: XCTestCase {
     func testTotalDiskUsageNonNegative() {
         let manager = ModelManager()
         XCTAssertGreaterThanOrEqual(manager.totalDiskUsage(), 0)
+    }
+
+    func testDeleteModelRemovesInstalledDirectory() throws {
+        let manager = ModelManager()
+        let modelName = manager.whisperKitModelName(for: .tiny)
+        let modelDir = modelStorageBase.appendingPathComponent(modelName, isDirectory: true)
+
+        try FileManager.default.createDirectory(at: modelDir, withIntermediateDirectories: true)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: modelDir.path))
+
+        try manager.deleteModel(.tiny)
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: modelDir.path),
+            "deleteModel should remove the model directory at the installed path")
+    }
+
+    func testDeleteModelIsNoOpWhenDirectoryMissing() throws {
+        let manager = ModelManager()
+        // Should not throw when model was never downloaded
+        XCTAssertNoThrow(try manager.deleteModel(.base))
     }
 }
 

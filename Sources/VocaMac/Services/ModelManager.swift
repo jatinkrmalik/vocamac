@@ -397,10 +397,10 @@ final class ModelManager {
     /// Delete a downloaded model's local files
     func deleteModel(_ size: ModelSize) throws {
         let modelName = whisperKitModelName(for: size)
-        let modelDir = modelStorageBase.appendingPathComponent(modelName)
+        let modelDir = installedModelDirectory(for: size)
 
-        if FileManager.default.fileExists(atPath: modelDir.path) {
-            try FileManager.default.removeItem(at: modelDir)
+        if fileManager.fileExists(atPath: modelDir.path) {
+            try fileManager.removeItem(at: modelDir)
             VocaLogger.info(.modelManager, "Deleted model: \(modelName)")
         }
     }

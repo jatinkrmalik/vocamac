@@ -668,9 +668,7 @@ final class AppState: ObservableObject {
 
     private func installBundledOrFallback(preferred: ModelSize) async -> Bool {
         do {
-            return try await Task.detached {
-                try self.modelManager.installBundledModelIfAvailable(for: preferred)
-            }.value
+            return try modelManager.installBundledModelIfAvailable(for: preferred)
         } catch {
             VocaLogger.warning(.appState, "Bundled model install failed for \(preferred.displayName): \(error.localizedDescription)")
             return false
