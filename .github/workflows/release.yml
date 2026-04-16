@@ -82,18 +82,19 @@ jobs:
             --password  "$NOTARIZE_PASSWORD"
 
       # ── Bundled Tiny Model ─────────────────────────────────────────────────
-      - name: Install Git LFS
-        run: brew install git-lfs
+      - name: Set up Python for huggingface-cli
+        run: pip3 install -U huggingface_hub
 
       - name: Fetch bundled tiny model from Hugging Face
         run: |
-          git lfs install
           MODEL_STAGE="$RUNNER_TEMP/whisperkit-coreml"
-          git clone --depth 1 --filter=blob:none https://huggingface.co/argmaxinc/whisperkit-coreml "$MODEL_STAGE"
-          cd "$MODEL_STAGE"
-          git sparse-checkout init --cone
-          git sparse-checkout set openai_whisper-tiny
-          git lfs pull --include "openai_whisper-tiny/**"
+          hf download argmaxinc/whisperkit-coreml \
+            --include "openai_whisper-tiny/*" \
+            --local-dir "$MODEL_STAGE"
+          hf download openai/whisper-tiny \
+            tokenizer.json tokenizer_config.json \
+            --local-dir "$MODEL_STAGE/openai_whisper-tiny"
+          rm -rf "$MODEL_STAGE/.cache" "$MODEL_STAGE/openai_whisper-tiny/.cache"
           test -d "$MODEL_STAGE/openai_whisper-tiny"
           test -f "$MODEL_STAGE/openai_whisper-tiny/tokenizer.json"
           test -f "$MODEL_STAGE/openai_whisper-tiny/tokenizer_config.json"
@@ -102,25 +103,17 @@ jobs:
           test -d "$MODEL_STAGE/openai_whisper-tiny/TextDecoder.mlmodelc"
           echo "VOCAMAC_BUNDLED_MODEL_SOURCE=$MODEL_STAGE" >> "$GITHUB_ENV"
 
-      # ── Build ───────────────────────────────────────────────────────────────
-      - name: Build release app bundle
-        run: ./scripts/build.sh release
-        # CODE_SIGN_IDENTITY is already in the environment from the import step
+      # ── Build & Package ──────────────────────────────────────────────────────
+      - name: Run tests
+        run: swift test
+
+      - name: Build and create signed, notarized DMG
+        run: ./scripts/dist.sh
         env:
           VOCAMAC_BUNDLED_MODEL_SOURCE: ${{ env.VOCAMAC_BUNDLED_MODEL_SOURCE }}
 
       - name: Verify code signature
         run: codesign -v --deep --strict VocaMac.app
-
-      - name: Run tests
-        run: swift test
-
-      # ── Package ─────────────────────────────────────────────────────────────
-      - name: Create signed, notarized DMG
-        run: ./scripts/dist.sh
-        # Uses CODE_SIGN_IDENTITY and NOTARIZE_PROFILE=AC_PASSWORD from env
-        env:
-          VOCAMAC_BUNDLED_MODEL_SOURCE: ${{ env.VOCAMAC_BUNDLED_MODEL_SOURCE }}
         
       - name: Rename artifacts with version
         run: |

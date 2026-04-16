@@ -323,8 +323,10 @@ final class ModelManager {
             // before we send the final progress update
             try? await Task.sleep(nanoseconds: 50_000_000)  // 50ms
             onProgress(1.0)
-            VocaLogger.info(.modelManager, "Model '\(whisperKitModelName(for: size))' downloaded successfully")
+            let installedDir = installedModelDirectory(for: size)
+            VocaLogger.info(.modelManager, "Model '\(whisperKitModelName(for: size))' downloaded successfully to: \(installedDir.path)")
         } catch {
+            VocaLogger.error(.modelManager, "Download failed for '\(whisperKitModelName(for: size))': \(error.localizedDescription)")
             throw ModelManagerError.downloadFailed(reason: error.localizedDescription)
         }
     }

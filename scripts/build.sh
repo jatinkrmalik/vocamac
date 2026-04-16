@@ -86,7 +86,7 @@ BUNDLED_MODEL_SOURCE="${VOCAMAC_BUNDLED_MODEL_SOURCE:-}"
 if [ -n "$BUNDLED_MODEL_SOURCE" ]; then
   if [ -d "$BUNDLED_MODEL_SOURCE" ]; then
     echo "📦 Staging bundled model assets from: $BUNDLED_MODEL_SOURCE"
-    rsync -a --delete "$BUNDLED_MODEL_SOURCE"/ "${APP_DIR}/Contents/Resources/BundledModels/whisperkit-coreml/"
+    rsync -a --delete --exclude='.git' "$BUNDLED_MODEL_SOURCE"/ "${APP_DIR}/Contents/Resources/BundledModels/whisperkit-coreml/"
   else
     echo "❌ VOCAMAC_BUNDLED_MODEL_SOURCE does not exist: $BUNDLED_MODEL_SOURCE"
     exit 1

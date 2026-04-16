@@ -236,18 +236,19 @@ jobs:
           echo "📌 Nightly version: ${APP_VERSION}"
 
       # ── Bundled Tiny Model ─────────────────────────────────────────────────
-      - name: Install Git LFS
-        run: brew install git-lfs
+      - name: Set up Python for huggingface-cli
+        run: pip3 install -U huggingface_hub
 
       - name: Fetch bundled tiny model from Hugging Face
         run: |
-          git lfs install
           MODEL_STAGE="$RUNNER_TEMP/whisperkit-coreml"
-          git clone --depth 1 --filter=blob:none https://huggingface.co/argmaxinc/whisperkit-coreml "$MODEL_STAGE"
-          cd "$MODEL_STAGE"
-          git sparse-checkout init --cone
-          git sparse-checkout set openai_whisper-tiny
-          git lfs pull --include "openai_whisper-tiny/**"
+          hf download argmaxinc/whisperkit-coreml \
+            --include "openai_whisper-tiny/*" \
+            --local-dir "$MODEL_STAGE"
+          hf download openai/whisper-tiny \
+            tokenizer.json tokenizer_config.json \
+            --local-dir "$MODEL_STAGE/openai_whisper-tiny"
+          rm -rf "$MODEL_STAGE/.cache" "$MODEL_STAGE/openai_whisper-tiny/.cache"
           test -d "$MODEL_STAGE/openai_whisper-tiny"
           test -f "$MODEL_STAGE/openai_whisper-tiny/tokenizer.json"
           test -f "$MODEL_STAGE/openai_whisper-tiny/tokenizer_config.json"
