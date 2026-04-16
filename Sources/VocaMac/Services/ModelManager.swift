@@ -267,6 +267,54 @@ final class ModelManager {
 
     // MARK: - Model Download
 
+    /// After WhisperKit downloads a model, consolidate the files from its
+    /// temp/symlinked cache into our permanent installedModelDirectory.
+    /// WhisperKit stores CoreML models in temp directories with symlinks —
+    /// macOS may clean those up, causing "downloaded" models to vanish.
+    private func consolidateWhisperKitDownload(for size: ModelSize) throws {
+        let modelName = whisperKitModelName(for: size)
+        let destination = installedModelDirectory(for: size)
+
+        // Already consolidated — nothing to do
+        if hasRequiredModelAssets(at: destination) && hasRequiredTokenizerAssets(at: destination) {
+            return
+        }
+
+        // Find the WhisperKit download location (may be a symlink to temp)
+        let wkDownloadDir = modelStorageBase.appendingPathComponent(modelName, isDirectory: true)
+
+        guard fileManager.fileExists(atPath: wkDownloadDir.path),
+              hasRequiredModelAssets(at: wkDownloadDir) else {
+            VocaLogger.warning(.modelManager, "WhisperKit download not found at \(wkDownloadDir.path) — skipping consolidation")
+            return
+        }
+
+        // Copy from WhisperKit's cache to our permanent location
+        try createParentDirectoryIfNeeded(for: destination)
+        try replaceDirectory(at: destination, with: wkDownloadDir)
+
+        // Ensure tokenizer files are present (may need to copy from openai/ cache)
+        if !hasRequiredTokenizerAssets(at: destination) {
+            let tokenizerDir = downloadBase
+                .appendingPathComponent("models")
+                .appendingPathComponent("openai")
+                .appendingPathComponent("whisper-\(size.rawValue)", isDirectory: true)
+            if hasRequiredTokenizerAssets(at: tokenizerDir) {
+                for file in requiredTokenizerFiles {
+                    let src = tokenizerDir.appendingPathComponent(file)
+                    let dst = destination.appendingPathComponent(file)
+                    if fileManager.fileExists(atPath: src.path) {
+                        try? fileManager.removeItem(at: dst)
+                        try fileManager.copyItem(at: src, to: dst)
+                    }
+                }
+                VocaLogger.info(.modelManager, "Consolidated tokenizer assets from openai cache for \(modelName)")
+            }
+        }
+
+        VocaLogger.info(.modelManager, "Consolidated WhisperKit download for \(modelName) to permanent location")
+    }
+
     /// Download a model using WhisperKit's built-in download mechanism
     /// The model will be downloaded from HuggingFace and cached locally.
     /// - Parameters:
@@ -319,9 +367,15 @@ final class ModelManager {
 
             // Stop the simulated progress and report completion
             progressTask.cancel()
-            // Small delay to ensure the cancelled task has stopped
-            // before we send the final progress update
-            try? await Task.sleep(nanoseconds: 50_000_000)  // 50ms
+            try? await Task.sleep(nanoseconds: 50_000_000)
+
+            // WhisperKit downloads CoreML models to a temp directory with a
+            // symlink from modelStorageBase. macOS may clean up temp files,
+            // so we consolidate into a permanent location — the same path
+            // used by installBundledModel. This ensures downloaded models
+            // survive temp directory cleanup.
+            try consolidateWhisperKitDownload(for: size)
+
             onProgress(1.0)
             let installedDir = installedModelDirectory(for: size)
             VocaLogger.info(.modelManager, "Model '\(whisperKitModelName(for: size))' downloaded successfully to: \(installedDir.path)")
