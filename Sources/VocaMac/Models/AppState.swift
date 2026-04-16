@@ -542,12 +542,12 @@ final class AppState: ObservableObject {
         }
 
         do {
-            // If model is downloaded locally, validate/repair tokenizer assets
-            // before WhisperKit initializes. If validation fails (e.g. partial
-            // download), pass nil and let WhisperKit handle it.
+            // If model is downloaded locally, pass the folder URL so WhisperKit
+            // loads from disk instead of downloading again. WhisperKit handles
+            // tokenizer fetching itself — we don't pre-validate those files.
             let folderURL: URL?
             if let targetSize = targetSize, modelManager.isModelDownloaded(targetSize) {
-                folderURL = try? modelManager.ensureTokenizerAssets(for: targetSize)
+                folderURL = modelManager.modelFolder(for: targetSize)
             } else {
                 folderURL = nil
             }
