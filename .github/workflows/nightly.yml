@@ -303,18 +303,20 @@ jobs:
             FAIL=1
           fi
 
-          # Verify the critical WhisperKit tokenizer fallback resources
+          # Verify the critical WhisperKit tokenizer fallback resources.
+          # xcodebuild bundles have the structure: <bundle>/Contents/Resources/<file>
           HUB="VocaMac.app/Contents/Resources/swift-transformers_Hub.bundle"
           if [ ! -d "$HUB" ]; then
             echo "❌ swift-transformers_Hub.bundle missing!"
             FAIL=1
           else
             for f in gpt2_tokenizer_config.json t5_tokenizer_config.json; do
-              if [ ! -f "$HUB/$f" ]; then
+              # Search recursively — xcodebuild places resources in Contents/Resources/
+              if find "$HUB" -name "$f" -print -quit | grep -q .; then
+                echo "✅ $f present in swift-transformers_Hub.bundle"
+              else
                 echo "❌ Missing $f in swift-transformers_Hub.bundle"
                 FAIL=1
-              else
-                echo "✅ $HUB/$f present"
               fi
             done
           fi
