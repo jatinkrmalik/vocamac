@@ -112,8 +112,37 @@ cp -f "$BINARY" "${APP_DIR}/Contents/MacOS/${APP_NAME}"
 find "${APP_DIR}" -maxdepth 1 -name "*.bundle" ! -name "Contents" -exec rm -rf {} + 2>/dev/null || true
 
 find ".build/arm64-apple-macosx/${CONFIG}" -maxdepth 1 -name "*.bundle" | while read -r bundle; do
+    bundle_name="$(basename "$bundle")"
     cp -rf "$bundle" "${APP_DIR}/Contents/Resources/"
+    # Also copy to Contents/MacOS/ so SPM's Bundle.module accessor can find
+    # them at runtime (it uses Bundle.main.bundleURL which resolves to the
+    # executable's directory for SPM-built .app bundles).
     cp -rf "$bundle" "${APP_DIR}/Contents/MacOS/"
+    # SPM resource bundles may lack an Info.plist, which causes codesign to
+    # reject them as "bundle format unrecognized". Add a minimal Info.plist
+    # so they can be properly signed as nested bundles.
+    MACOS_BUNDLE="${APP_DIR}/Contents/MacOS/${bundle_name}"
+    if [ ! -f "${MACOS_BUNDLE}/Info.plist" ] && [ ! -f "${MACOS_BUNDLE}/Contents/Info.plist" ]; then
+        bundle_id="com.vocamac.resource.$(echo "${bundle_name%.bundle}" | tr '_ ' '-')"
+        cat > "${MACOS_BUNDLE}/Info.plist" << BPLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>${bundle_id}</string>
+    <key>CFBundleName</key>
+    <string>${bundle_name%.bundle}</string>
+    <key>CFBundlePackageType</key>
+    <string>BNDL</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+</dict>
+</plist>
+BPLIST
+    fi
 done
 
 # Copy app icon and compile Asset Catalog
