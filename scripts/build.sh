@@ -60,10 +60,33 @@ if pgrep -f "VocaMac" > /dev/null 2>&1; then
 fi
 
 echo "🔨 Building VocaMac ($CONFIG)..."
-swift build -c "$CONFIG"
+
+# ── Build with xcodebuild ───────────────────────────────────────────────────
+#
+# We use xcodebuild instead of swift build because xcodebuild generates a
+# Bundle.module accessor that checks Bundle.main.resourceURL (Contents/Resources/)
+# in addition to Bundle.main.bundleURL (the .app root). This is critical for
+# .app bundles where:
+#   - Bundle.main.bundleURL resolves to the .app root (e.g. VocaMac.app/)
+#   - codesign forbids placing bundles at the .app root
+#   - Bundle.main.resourceURL resolves to Contents/Resources/ which IS allowed
+#
+# swift build generates a simpler accessor that only checks bundleURL + a
+# hardcoded build-time path, which causes a fatalError crash on end-user machines.
+
+DERIVED_DATA=".xcode-build"
+XCODE_CONFIG="$(echo "${CONFIG}" | sed 's/release/Release/; s/debug/Debug/')"
+
+xcodebuild build \
+    -scheme VocaMac \
+    -configuration "$XCODE_CONFIG" \
+    -derivedDataPath "$DERIVED_DATA" \
+    -destination 'platform=macOS,arch=arm64' \
+    ONLY_ACTIVE_ARCH=YES \
+    -quiet
 
 # Find the built binary
-BINARY=".build/arm64-apple-macosx/${CONFIG}/${APP_NAME}"
+BINARY="${DERIVED_DATA}/Build/Products/${XCODE_CONFIG}/${APP_NAME}"
 if [ ! -f "$BINARY" ]; then
     echo "❌ Build failed — binary not found at $BINARY"
     exit 1
@@ -96,43 +119,22 @@ fi
 # Update binary
 cp -f "$BINARY" "${APP_DIR}/Contents/MacOS/${APP_NAME}"
 
-# Update resource bundles
-# SPM's auto-generated Bundle.module accessor looks for resource bundles at
-# Bundle.main.bundleURL/<name>.bundle. For an SPM executable in a .app wrapper,
-# Bundle.main.bundleURL resolves to Contents/MacOS/ at runtime. The accessor
-# also hardcodes the developer's build-time path, which only works on the
-# machine that built it. On end-user machines neither path resolves →
-# fatalError → crash.
+# Update resource bundles — copy to Contents/Resources/
+# xcodebuild's Bundle.module accessor checks Bundle.main.resourceURL first,
+# which resolves to Contents/Resources/ for .app bundles. This is the correct
+# and codesign-compatible location.
 #
-# Fix: copy bundles to both Contents/Resources/ (standard macOS convention) and
-# Contents/MacOS/ (where SPM's accessor looks at runtime). Bundles in MacOS/
-# must be kept FLAT (resources at the bundle root) so Bundle.module can find
-# them. codesign accepts an Info.plist at the bundle root for flat bundles —
-# it does NOT require a Contents/ hierarchy for non-framework bundles.
-#
-# Clean up any stale bundles / symlinks at the app root from previous builds.
+# Clean up any stale bundles at the app root from previous builds.
 find "${APP_DIR}" -maxdepth 1 -name "*.bundle" ! -name "Contents" -exec rm -rf {} + 2>/dev/null || true
 
-find ".build/arm64-apple-macosx/${CONFIG}" -maxdepth 1 -name "*.bundle" | while read -r bundle; do
+find "${DERIVED_DATA}/Build/Products/${XCODE_CONFIG}" -maxdepth 1 -name "*.bundle" | while read -r bundle; do
     bundle_name="$(basename "$bundle")"
     cp -rf "$bundle" "${APP_DIR}/Contents/Resources/"
 
-    # Copy to Contents/MacOS/ keeping the SPM flat layout so that the
-    # SwiftPM-generated Bundle.module accessor (which does:
-    #   Bundle.main.bundleURL/<name>.bundle/<resource>
-    # at runtime) can find resources directly at the bundle root.
-    #
-    # codesign also requires an Info.plist, but for flat (non-framework)
-    # bundles it accepts one at the bundle root — no Contents/ hierarchy needed.
-    DEST="${APP_DIR}/Contents/MacOS/${bundle_name}"
-    rm -rf "$DEST"
-    mkdir -p "$DEST"
-    # Copy all original files flat into the bundle root.
-    cp -rf "$bundle"/. "$DEST/" 2>/dev/null || true
-    # Add a minimal Info.plist at the bundle root if one doesn't already exist.
-    if [ ! -f "${DEST}/Info.plist" ]; then
+    # Add a minimal Info.plist if missing so codesign accepts the bundle.
+    if [ ! -f "${APP_DIR}/Contents/Resources/${bundle_name}/Info.plist" ]; then
         bundle_id="com.vocamac.resource.$(echo "${bundle_name%.bundle}" | tr '_ ' '-')"
-        cat > "${DEST}/Info.plist" << BPLIST
+        cat > "${APP_DIR}/Contents/Resources/${bundle_name}/Info.plist" << BPLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -240,8 +242,8 @@ if [ "$CODE_SIGN_IDENTITY" != "-" ]; then
     CODESIGN_OPTIONS="--options runtime"
 fi
 
-# Sign nested bundles first (in both Resources/ and MacOS/)
-find "${APP_DIR}/Contents/Resources" "${APP_DIR}/Contents/MacOS" -name "*.bundle" -exec \
+# Sign nested bundles in Contents/Resources/
+find "${APP_DIR}/Contents/Resources" -maxdepth 1 -name "*.bundle" -exec \
     codesign --force --sign "$CODE_SIGN_IDENTITY" $CODESIGN_OPTIONS {} \; 2>/dev/null || true
 
 # Sign the main app

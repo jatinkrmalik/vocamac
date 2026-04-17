@@ -33,6 +33,7 @@ clean:
 	@swift package clean 2>/dev/null || true
 	@rm -rf VocaMac.app
 	@rm -rf .build
+	@rm -rf .xcode-build
 	@rm -rf dist
 	@echo "✅ Clean complete"
 
