@@ -97,8 +97,23 @@ fi
 cp -f "$BINARY" "${APP_DIR}/Contents/MacOS/${APP_NAME}"
 
 # Update resource bundles
+# SPM's auto-generated Bundle.module accessor resolves resource bundles via
+# Bundle.main.bundleURL/<name>.bundle. For an SPM executable wrapped in a .app
+# bundle, Bundle.main.bundleURL resolves to the Contents/MacOS/ directory at
+# runtime. The generated accessor also hardcodes the developer's build-time
+# path as a fallback, which only works on the machine that built it.
+#
+# To prevent a fatalError crash on end-user machines, we copy the resource
+# bundles into Contents/MacOS/ (alongside the executable) so the SPM accessor
+# finds them. We also keep a copy in Contents/Resources/ for standard macOS
+# bundle conventions.
+#
+# Clean up any stale bundles / symlinks at the app root from previous builds.
+find "${APP_DIR}" -maxdepth 1 -name "*.bundle" ! -name "Contents" -exec rm -rf {} + 2>/dev/null || true
+
 find ".build/arm64-apple-macosx/${CONFIG}" -maxdepth 1 -name "*.bundle" | while read -r bundle; do
     cp -rf "$bundle" "${APP_DIR}/Contents/Resources/"
+    cp -rf "$bundle" "${APP_DIR}/Contents/MacOS/"
 done
 
 # Copy app icon and compile Asset Catalog
