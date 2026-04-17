@@ -44,3 +44,4 @@ bitbucket-pipelines.yml
 # Tool artifacts
 .desloppify/
 .claude/
+VocaMac.app.bak/

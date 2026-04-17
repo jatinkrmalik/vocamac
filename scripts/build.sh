@@ -97,8 +97,51 @@ fi
 cp -f "$BINARY" "${APP_DIR}/Contents/MacOS/${APP_NAME}"
 
 # Update resource bundles
+# SPM's auto-generated Bundle.module accessor looks for resource bundles at
+# Bundle.main.bundleURL/<name>.bundle. For an SPM executable in a .app wrapper,
+# Bundle.main.bundleURL resolves to Contents/MacOS/ at runtime. The accessor
+# also hardcodes the developer's build-time path, which only works on the
+# machine that built it. On end-user machines neither path resolves →
+# fatalError → crash.
+#
+# Fix: copy bundles to both Contents/Resources/ (standard macOS convention) and
+# Contents/MacOS/ (where SPM's accessor looks at runtime). Bundles in MacOS/
+# must have a proper Info.plist so codesign accepts them as nested bundles.
+#
+# Clean up any stale bundles / symlinks at the app root from previous builds.
+find "${APP_DIR}" -maxdepth 1 -name "*.bundle" ! -name "Contents" -exec rm -rf {} + 2>/dev/null || true
+
 find ".build/arm64-apple-macosx/${CONFIG}" -maxdepth 1 -name "*.bundle" | while read -r bundle; do
+    bundle_name="$(basename "$bundle")"
     cp -rf "$bundle" "${APP_DIR}/Contents/Resources/"
+
+    # Copy to Contents/MacOS/ with a valid bundle structure for codesign.
+    # codesign requires bundles to have Contents/Info.plist and resources in
+    # Contents/Resources/. SPM builds flat bundles, so we restructure them.
+    DEST="${APP_DIR}/Contents/MacOS/${bundle_name}"
+    rm -rf "$DEST"
+    mkdir -p "${DEST}/Contents/Resources"
+    # Copy all original files into Contents/Resources/.
+    cp -rf "$bundle"/* "${DEST}/Contents/Resources/" 2>/dev/null || true
+    cp -rf "$bundle"/.[!.]* "${DEST}/Contents/Resources/" 2>/dev/null || true
+    # Add a minimal Info.plist if one doesn't already exist.
+    if [ ! -f "${DEST}/Contents/Info.plist" ]; then
+        bundle_id="com.vocamac.resource.$(echo "${bundle_name%.bundle}" | tr '_ ' '-')"
+        cat > "${DEST}/Contents/Info.plist" << BPLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>${bundle_id}</string>
+    <key>CFBundlePackageType</key>
+    <string>BNDL</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+</dict>
+</plist>
+BPLIST
+    fi
 done
 
 # Copy app icon and compile Asset Catalog
@@ -192,8 +235,8 @@ if [ "$CODE_SIGN_IDENTITY" != "-" ]; then
     CODESIGN_OPTIONS="--options runtime"
 fi
 
-# Sign nested bundles first
-find "${APP_DIR}/Contents/Resources" -name "*.bundle" -exec \
+# Sign nested bundles first (in both Resources/ and MacOS/)
+find "${APP_DIR}/Contents/Resources" "${APP_DIR}/Contents/MacOS" -name "*.bundle" -exec \
     codesign --force --sign "$CODE_SIGN_IDENTITY" $CODESIGN_OPTIONS {} \; 2>/dev/null || true
 
 # Sign the main app
