@@ -119,7 +119,54 @@ jobs:
 
       - name: Verify code signature
         run: codesign -v --deep --strict VocaMac.app
-        
+
+      - name: Verify SPM resource bundles are correctly staged
+        run: |
+          echo "🔍 Checking SPM resource bundle layout..."
+          FAIL=0
+
+          # Every *.bundle in Contents/MacOS must be FLAT — resources at the
+          # bundle root, not nested under Contents/Resources/. A nested layout
+          # breaks the SwiftPM-generated Bundle.module accessor at runtime and
+          # causes an EXC_BREAKPOINT / fatalError crash on end-user machines.
+          for bundle in VocaMac.app/Contents/MacOS/*.bundle; do
+            [ -d "$bundle" ] || continue
+            name="$(basename "$bundle")"
+
+            # Fail if the old (wrong) deep Contents/ hierarchy is present
+            if [ -d "$bundle/Contents/Resources" ]; then
+              echo "❌ $name has a Contents/Resources/ hierarchy — Bundle.module will crash at runtime!"
+              FAIL=1
+            fi
+
+            # Fail if Info.plist is missing (codesign will reject it)
+            if [ ! -f "$bundle/Info.plist" ]; then
+              echo "❌ $name is missing a root-level Info.plist"
+              FAIL=1
+            fi
+
+            echo "✅ $name — flat layout OK"
+          done
+
+          # Verify the critical WhisperKit tokenizer fallback resources are
+          # present in the swift-transformers_Hub bundle
+          HUB="VocaMac.app/Contents/MacOS/swift-transformers_Hub.bundle"
+          for f in gpt2_tokenizer_config.json t5_tokenizer_config.json; do
+            if [ ! -f "$HUB/$f" ]; then
+              echo "❌ Missing $f in swift-transformers_Hub.bundle"
+              FAIL=1
+            else
+              echo "✅ $HUB/$f present"
+            fi
+          done
+
+          if [ "$FAIL" -ne 0 ]; then
+            echo ""
+            echo "Bundle layout validation failed. See above for details."
+            exit 1
+          fi
+          echo "✅ All SPM resource bundles are correctly staged."
+
       - name: Rename artifacts with version
         run: |
           ARCH=$(uname -m)
