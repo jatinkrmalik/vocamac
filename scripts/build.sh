@@ -207,8 +207,8 @@ if [ "$CODE_SIGN_IDENTITY" != "-" ]; then
     CODESIGN_OPTIONS="--options runtime"
 fi
 
-# Sign nested bundles first
-find "${APP_DIR}/Contents/Resources" -name "*.bundle" -exec \
+# Sign nested bundles first (both in Resources/ and MacOS/)
+find "${APP_DIR}/Contents/Resources" "${APP_DIR}/Contents/MacOS" -name "*.bundle" -exec \
     codesign --force --sign "$CODE_SIGN_IDENTITY" $CODESIGN_OPTIONS {} \; 2>/dev/null || true
 
 # Sign the main app
