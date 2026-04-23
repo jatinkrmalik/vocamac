@@ -389,6 +389,16 @@ tccutil reset All com.vocamac.app
 
 This clears all permission entries (Microphone, Accessibility, Input Monitoring) for VocaMac. On next launch, macOS will prompt you to re-grant them. With Developer ID signing, permissions normally persist across updates — this reset is only needed for troubleshooting.
 
+**"Update check failed (HTTP 403)" on a shared / corporate / VPN network:** VocaMac checks for new releases by calling GitHub's public REST API, which is rate-limited to **60 unauthenticated requests per hour, per source IP**. When several people share the same egress IP (common on office VPNs, NAT'd networks, or busy CI runners), that quota is collectively exhausted and GitHub returns `HTTP 403` to every client from that IP — including VocaMac.
+
+This is **not a bug in VocaMac** and there is nothing wrong with your install. To recover:
+
+1. Disconnect from the VPN (or switch to a different network, e.g. your phone's hotspot).
+2. Open VocaMac → **Settings → About → "Check for Updates…"** and wait for it to complete.
+3. Reconnect to the VPN.
+
+After one successful check, VocaMac caches the response's `ETag` and sends it as `If-None-Match` on every subsequent request. GitHub then replies with `304 Not Modified`, which **does not count against the rate limit**, so future checks succeed even from a rate-limited IP — until a new release ships and the ETag changes (at which point one fresh `200` response per machine is needed before `304`s resume).
+
 ---
 
 
