@@ -490,13 +490,13 @@ struct ModelRow: View {
                 EmptyView()
             } else if model.isDownloaded {
                 Button("Load") {
-                    Task { await appState.loadModel(model.size) }
+                    Task { @MainActor in await appState.loadModel(model.size) }
                 }
                 .controlSize(.small)
                 .buttonStyle(.borderedProminent)
             } else {
                 Button("Download & Load") {
-                    Task {
+                    Task { @MainActor in
                         await appState.downloadModel(model.size)
                         if appState.availableModels.first(where: { $0.size == model.size })?.isDownloaded == true {
                             await appState.loadModel(model.size)
@@ -511,7 +511,7 @@ struct ModelRow: View {
         .alert("Use Unoptimized Model?", isPresented: $showForceDownloadAlert) {
             Button("Cancel", role: .cancel) {}
             Button(model.isDownloaded ? "Load Anyway" : "Download & Load", role: .destructive) {
-                Task {
+                Task { @MainActor in
                     if !model.isDownloaded {
                         await appState.downloadModel(model.size)
                     }
@@ -673,7 +673,7 @@ struct AboutTab: View {
                 .foregroundStyle(.tertiary)
 
             Button {
-                Task {
+                Task { @MainActor in
                     await appState.updateChecker.checkForUpdates()
                     if case .updateAvailable(let info) = appState.updateChecker.updateState {
                         updateInfoForSheet = info

@@ -103,7 +103,7 @@ struct UpdateDetailView: View {
                 Spacer()
 
                 Button("Download & Install") {
-                    Task {
+                    Task { @MainActor in
                         await appState.updateChecker.downloadUpdate(info)
                     }
                 }
@@ -168,7 +168,7 @@ struct UpdateDetailView: View {
                     .buttonStyle(.bordered)
 
                     Button("Retry") {
-                        Task {
+                        Task { @MainActor in
                             await appState.updateChecker.downloadUpdate(info)
                         }
                     }

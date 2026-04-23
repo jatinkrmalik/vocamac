@@ -219,7 +219,7 @@ struct MenuBarView: View {
                 // Stop/recovery button — visible during recording so the user
                 // can unstick the app if the hotkey isn't responding
                 Button {
-                    Task {
+                    Task { @MainActor in
                         await appState.stopRecordingAndTranscribe()
                     }
                 } label: {

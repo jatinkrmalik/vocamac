@@ -88,6 +88,8 @@ final class AudioEngine {
             VocaLogger.warning(.audioEngine, "Configuration changed while recording — forcing stop and reset")
             // Tear down the stale recording state
             isCurrentlyRecording = false
+            silenceCallbackFired = false
+            maxDurationCallbackFired = false
             engine.inputNode.removeTap(onBus: 0)
             engine.stop()
         }
