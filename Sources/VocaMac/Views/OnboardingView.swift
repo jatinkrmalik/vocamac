@@ -160,7 +160,7 @@ struct OnboardingView: View {
         }
         .frame(width: 600, height: 550)
         .onAppear {
-            Task {
+            Task { @MainActor in
                 await appState.performStartup()
             }
         }
@@ -425,12 +425,12 @@ struct ModelSelectionStep: View {
                                 return recommended == prefix || recommended.hasPrefix(prefix + "-")
                             }(),
                             onSelect: {
-                                Task {
+                                Task { @MainActor in
                                     await appState.loadModel(modelInfo.size)
                                 }
                             },
                             onDownload: {
-                                Task {
+                                Task { @MainActor in
                                     await appState.downloadModel(modelInfo.size)
                                 }
                             }
@@ -785,12 +785,12 @@ struct QuickTestStep: View {
 
     private func toggleRecording() {
         if isRecording {
-            Task {
+            Task { @MainActor in
                 await appState.stopRecordingAndTranscribe()
                 isRecording = false
             }
         } else {
-            Task {
+            Task { @MainActor in
                 await appState.startRecording()
                 isRecording = true
             }
