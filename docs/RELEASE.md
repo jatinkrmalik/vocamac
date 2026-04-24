@@ -28,6 +28,7 @@ Pre-release versions use suffixes: `v0.1.0-alpha`, `v0.1.0-beta.1`
    - `scripts/build.sh` — both `CFBundleVersion` and `CFBundleShortVersionString` in the Info.plist template
    - `Sources/VocaMac/Views/SettingsView.swift` — version label in the About tab
    - `web/layouts/index.html` — `softwareVersion` in JSON-LD schema and hero version badge (two occurrences)
+   - **Do NOT** create a `docs/RELEASE_NOTES_vX.Y.Z.md` file — release notes live out-of-tree (see [Release Notes (out-of-tree)](#release-notes-out-of-tree) below)
 4. **Test locally**:
    ```bash
    ./scripts/build.sh release
@@ -66,6 +67,61 @@ Pre-release versions use suffixes: `v0.1.0-alpha`, `v0.1.0-beta.1`
    - **Publish** the release when ready
 
 4. **Website auto-deploys** when the release is published (via `deploy-website.yml`)
+
+## Release Notes (out-of-tree)
+
+**We do not commit per-version release notes to this repository.** Files like `docs/RELEASE_NOTES_v0.6.1.md` should never appear in the source tree. The single source of truth for shipped notes is the **GitHub Release page**, which is also what `UpdateChecker` surfaces inside the app.
+
+### Why out-of-tree?
+
+- Release notes are written for end users and rarely re-edited after publish — they don't benefit from version control.
+- Per-version files accumulate over time, cluttering `docs/` and producing stale content (e.g. notes for an unreleased version sitting on `main` for weeks).
+- The PR description for the version-bump PR already provides the changelog context that reviewers need.
+- The GitHub Release editor renders the same Markdown and is editable post-publish for typo fixes.
+
+### Workflow
+
+1. **Draft** the notes in a scratch location *outside* the repo. Recommended locations:
+   - `/tmp/RELEASE_NOTES_vX.Y.Z.md` — quick local scratch, wiped on reboot
+   - A private Gist — survives reboots, easy to share for review
+   - The GitHub Release "Draft a new release" UI — write directly in the final destination
+2. **Reuse** the draft for the version-bump PR description (paste the changelog table inline) and any pre-release comms (Slack, Discord, etc.).
+3. **Publish** the release with the notes:
+   ```bash
+   gh release create vX.Y.Z --draft --notes-file /tmp/RELEASE_NOTES_vX.Y.Z.md
+   # or just paste into the GitHub UI when promoting the auto-created draft
+   ```
+4. **Delete** the local scratch file once the release is live:
+   ```bash
+   rm /tmp/RELEASE_NOTES_vX.Y.Z.md
+   ```
+
+### What goes in the version-bump PR
+
+The version-bump PR should only touch *code* files that carry the version string (`scripts/build.sh`, `Sources/VocaMac/Views/SettingsView.swift`, `web/layouts/index.html`). The **PR description** is where the changelog table lives — that gives reviewers the context they need without polluting the tree.
+
+### Suggested PR-description template
+
+```markdown
+## Summary
+Prepares the **vX.Y.Z** patch/minor release.
+
+### Changes since vA.B.C
+| PR | Type | Summary |
+|---|---|---|
+| #N | fix | … |
+| #N | feat | … |
+
+### Files updated
+- `scripts/build.sh`
+- `Sources/VocaMac/Views/SettingsView.swift`
+- `web/layouts/index.html`
+
+### Release plan after merge
+- Tag `vX.Y.Z`, push tag → `release.yml` builds, signs, notarizes, drafts the release
+- Paste finalized notes from local scratch into the draft, publish
+- Delete local scratch file
+```
 
 ## In-App Update Integration
 

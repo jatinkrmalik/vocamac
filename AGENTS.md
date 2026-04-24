@@ -183,6 +183,21 @@ ci: add GitHub Actions build workflow
 - Squash merge preferred for clean history
 - Wait for the user to review and merge — do not merge PRs yourself
 
+### Release Notes — Do NOT Commit Them to the Repo
+
+**Never create or commit `docs/RELEASE_NOTES_v*.md` files** (or any other per-version release-notes file inside the repo). These files clutter the source tree, become stale the moment the release ships, and duplicate content that already lives on the GitHub Release page.
+
+The release-notes lifecycle is:
+
+1. **Draft** the notes in a scratch location *outside* the repo (e.g. `/tmp/RELEASE_NOTES_vX.Y.Z.md`, a Gist, or directly in the GitHub Release "draft" UI).
+2. **Reuse** that draft to update the version-bump PR description, the `gh release create --notes-file ...` invocation, and any related comms.
+3. **Paste** the final text into the GitHub Release description when publishing.
+4. **Delete** the local scratch file after the release goes live.
+
+If a version bump PR needs changelog context, put the changelog table in the **PR description**, not in a tracked file. The single source of truth for shipped release notes is the **GitHub Release page** itself, which is also what the in-app update checker surfaces to users.
+
+See `docs/RELEASE.md` → **Release Notes (out-of-tree)** for the full process.
+
 ---
 
 ## Key Dependencies
