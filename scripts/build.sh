@@ -276,6 +276,6 @@ if [ "$FIRST_TIME" = true ]; then
         echo ""
         echo "   ⚠️  Permissions reset on every rebuild (ad-hoc signing limitation)."
         echo "   💡 TIP: To avoid this, add your Terminal app to Accessibility & Input Monitoring"
-        echo "      and run VocaMac directly: .build/arm64-apple-macosx/release/VocaMac"
+        echo "      and run the binary directly: ${APP_DIR}/Contents/MacOS/VocaMac"
     fi
 fi

@@ -153,6 +153,74 @@ jobs:
       - name: Build signed, notarized DMG
         run: ./scripts/dist.sh
 
+      - name: Verify code signature
+        run: codesign -v --deep --strict VocaMac.app
+
+      - name: Verify SPM resource bundles are correctly staged
+        # Mirrors the validation in release.yml and nightly.yml so PR builds
+        # catch bundle-layout regressions (the #119 class of bug) before they
+        # reach a release. xcodebuild's Bundle.module accessor resolves to
+        # Contents/Resources/, and bundles must NOT live at the .app root
+        # (codesign will reject that layout).
+        run: |
+          echo "🔍 Checking SPM resource bundle layout..."
+          FAIL=0
+
+          # Bundles must NOT be at the .app root (codesign rejects that).
+          if ls VocaMac.app/*.bundle 1>/dev/null 2>&1; then
+            echo "❌ Found .bundle at app root — will break codesign!"
+            ls VocaMac.app/*.bundle
+            FAIL=1
+          fi
+
+          FOUND_ANY=false
+          for bundle in VocaMac.app/Contents/Resources/*.bundle; do
+            [ -d "$bundle" ] || continue
+            FOUND_ANY=true
+            name="$(basename "$bundle")"
+            echo "✅ $name — present in Contents/Resources/"
+          done
+
+          if [ "$FOUND_ANY" = false ]; then
+            echo "❌ No .bundle directories found in Contents/Resources/!"
+            FAIL=1
+          fi
+
+          # Verify the critical WhisperKit tokenizer fallback resources.
+          # xcodebuild bundles have the structure: <bundle>/Contents/Resources/<file>
+          HUB="VocaMac.app/Contents/Resources/swift-transformers_Hub.bundle"
+          if [ ! -d "$HUB" ]; then
+            echo "❌ swift-transformers_Hub.bundle missing!"
+            FAIL=1
+          else
+            for f in gpt2_tokenizer_config.json t5_tokenizer_config.json; do
+              if find "$HUB" -name "$f" -print -quit | grep -q .; then
+                echo "✅ $f present in swift-transformers_Hub.bundle"
+              else
+                echo "❌ Missing $f in swift-transformers_Hub.bundle"
+                FAIL=1
+              fi
+            done
+          fi
+
+          # Verify the binary uses the xcodebuild accessor (contains resourceURL)
+          if strings VocaMac.app/Contents/MacOS/VocaMac | grep -q 'resourceURL'; then
+            echo "✅ Binary uses xcodebuild Bundle.module accessor"
+          else
+            echo "❌ Binary does NOT contain resourceURL — wrong accessor!"
+            echo "   Ensure build.sh uses xcodebuild, not swift build."
+            FAIL=1
+          fi
+
+          if [ "$FAIL" -ne 0 ]; then
+            echo ""
+            echo "Bundle layout validation failed. See above for details."
+            exit 1
+          fi
+
+          echo ""
+          echo "✅ All bundle checks passed."
+
       - name: Gather artifacts
         id: artifacts
         run: |
