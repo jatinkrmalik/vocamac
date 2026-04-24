@@ -79,6 +79,49 @@ final class TextInjectorTests: XCTestCase {
         XCTAssertEqual(mock.lastInjectedText, "world")
         XCTAssertEqual(mock.lastPreserveClipboard, false)
     }
+
+    // MARK: - Keyboard Layout Resolution (GitHub issue #123)
+
+    /// Verify that the keycode resolver returns a value for the lowercase
+    /// "v" character. The exact keycode depends on the active keyboard
+    /// layout (9 on US-QWERTY, 47 on Dvorak, etc.), but it must always be
+    /// resolvable on any ASCII-capable layout — otherwise Cmd+V paste
+    /// injection cannot work on that layout.
+    func testKeyCodeForVIsResolvable() {
+        let keyCode = TextInjector.keyCode(forCharacter: "v")
+        XCTAssertNotNil(keyCode, "Expected a virtual keycode for 'v' on the active layout")
+        // Sanity bound: ANSI keycodes live in the lower 128 range.
+        if let keyCode = keyCode {
+            XCTAssertLessThan(keyCode, 128)
+        }
+    }
+
+    /// Verify that on the default CI machine (US-QWERTY) the resolver
+    /// returns the well-known keycode 9 for "v". This guards against
+    /// regressions in the layout lookup path. Skipped if CI is run on a
+    /// machine configured with a non-QWERTY layout.
+    func testKeyCodeForVOnQWERTYIsNine() throws {
+        // We can only meaningfully assert this on a US-QWERTY layout.
+        // On other layouts the resolver should still return *some* keycode
+        // (covered by testKeyCodeForVIsResolvable).
+        guard let periodKeyCode = TextInjector.keyCode(forCharacter: ".") else {
+            throw XCTSkip("Could not inspect active keyboard layout")
+        }
+        // On QWERTY, "." lives at keycode 47; on Dvorak it lives at 9.
+        // Skip the strict assertion if we're not on QWERTY.
+        guard periodKeyCode == 47 else {
+            throw XCTSkip("Active layout is not US-QWERTY (period at keycode \(periodKeyCode))")
+        }
+        XCTAssertEqual(TextInjector.keyCode(forCharacter: "v"), 9)
+    }
+
+    /// Verify the resolver returns nil (rather than crashing) for a
+    /// character that is not directly typable on any standard ASCII layout.
+    func testKeyCodeForUntypableCharacterReturnsNil() {
+        // The "🎉" emoji is not produced by any single keycode on any
+        // ASCII keyboard layout.
+        XCTAssertNil(TextInjector.keyCode(forCharacter: "🎉"))
+    }
 }
 
 // MARK: - SoundManager Tests

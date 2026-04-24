@@ -6,6 +6,7 @@
 
 import Foundation
 import AppKit
+import Carbon.HIToolbox
 
 final class TextInjector {
 
@@ -22,8 +23,9 @@ final class TextInjector {
     /// pasteboard a moment to settle after we write to it.
     private let prePasteDelay: Double = 0.05
 
-    /// Virtual key code for the V key
-    private let kVK_V: CGKeyCode = 9
+    /// Default virtual key code for the V key on a US-QWERTY layout.
+    /// Used as a fallback when the active layout cannot be inspected.
+    private let kVK_ANSI_V_Fallback: CGKeyCode = 9
 
     // MARK: - Types
 
@@ -151,12 +153,27 @@ final class TextInjector {
 
     // MARK: - Paste Simulation
 
-    /// Simulate Cmd+V keystroke to paste from clipboard
+    /// Simulate Cmd+V keystroke to paste from clipboard.
+    ///
+    /// On non-QWERTY layouts (e.g. Dvorak, Colemak, AZERTY), the hardware
+    /// virtual keycode for "V" on a US-QWERTY keyboard (9) maps to a
+    /// different character. Posting `kVK_ANSI_V` directly therefore triggers
+    /// the wrong shortcut — for example, on Dvorak keycode 9 produces ".",
+    /// so the system fires Cmd+. (which most apps interpret as "cancel")
+    /// instead of Cmd+V (paste). See GitHub issue #123.
+    ///
+    /// To fix this, we resolve the keycode that produces the character "v"
+    /// on the *currently active* keyboard layout and post that keycode
+    /// instead. If the active layout cannot be inspected (e.g. in tests
+    /// with no input source available) we fall back to the QWERTY keycode.
     private func simulatePaste() {
+        let keyCode = TextInjector.keyCode(forCharacter: "v") ?? kVK_ANSI_V_Fallback
+        VocaLogger.debug(.textInjector, "Resolved keycode for 'v' on active layout: \(keyCode)")
+
         let source = CGEventSource(stateID: .combinedSessionState)
 
         // Cmd+V key down
-        guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: kVK_V, keyDown: true) else {
+        guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: true) else {
             VocaLogger.error(.textInjector, "ERROR: Failed to create key down event")
             return
         }
@@ -164,14 +181,85 @@ final class TextInjector {
         keyDown.post(tap: .cgAnnotatedSessionEventTap)
 
         // Cmd+V key up
-        guard let keyUp = CGEvent(keyboardEventSource: source, virtualKey: kVK_V, keyDown: false) else {
+        guard let keyUp = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: false) else {
             VocaLogger.error(.textInjector, "ERROR: Failed to create key up event")
             return
         }
         keyUp.flags = [.maskCommand]
         keyUp.post(tap: .cgAnnotatedSessionEventTap)
 
-        VocaLogger.info(.textInjector, "Cmd+V posted")
+        VocaLogger.info(.textInjector, "Cmd+V posted (keycode \(keyCode))")
+    }
+
+    // MARK: - Keyboard Layout Resolution
+
+    /// Find the virtual keycode that produces the given character on the
+    /// currently active keyboard layout.
+    ///
+    /// This walks all keycodes in the standard ANSI range (0...127) and
+    /// translates each one through the active Unicode key layout using
+    /// `UCKeyTranslate`, returning the first keycode whose unmodified
+    /// output matches the requested character.
+    ///
+    /// - Parameter character: The character to look up (e.g. "v")
+    /// - Returns: The virtual keycode that produces the character on the
+    ///            active layout, or `nil` if the character is unreachable
+    ///            or the input source cannot be inspected.
+    static func keyCode(forCharacter character: Character) -> CGKeyCode? {
+        // Prefer the active ASCII-capable input source; this skips over
+        // non-Latin layouts like Hiragana where "v" is not directly
+        // typable, and falls back to the underlying ASCII layout that
+        // macOS uses for shortcut interpretation.
+        let inputSource: TISInputSource? = {
+            if let asciiSource = TISCopyCurrentASCIICapableKeyboardLayoutInputSource()?.takeRetainedValue() {
+                return asciiSource
+            }
+            return TISCopyCurrentKeyboardLayoutInputSource()?.takeRetainedValue()
+        }()
+
+        guard let source = inputSource else { return nil }
+
+        guard let layoutDataPointer = TISGetInputSourceProperty(source, kTISPropertyUnicodeKeyLayoutData) else {
+            return nil
+        }
+        let layoutData = Unmanaged<CFData>.fromOpaque(layoutDataPointer).takeUnretainedValue() as Data
+
+        let target = String(character)
+
+        return layoutData.withUnsafeBytes { (rawBuffer: UnsafeRawBufferPointer) -> CGKeyCode? in
+            guard let baseAddress = rawBuffer.baseAddress else { return nil }
+            let keyboardLayout = baseAddress.assumingMemoryBound(to: UCKeyboardLayout.self)
+
+            var deadKeyState: UInt32 = 0
+            let maxStringLength = 4
+            var actualStringLength = 0
+            var unicodeString = [UniChar](repeating: 0, count: maxStringLength)
+
+            for keyCode in 0..<128 {
+                deadKeyState = 0
+                let status = UCKeyTranslate(
+                    keyboardLayout,
+                    UInt16(keyCode),
+                    UInt16(kUCKeyActionDisplay),
+                    0, // no modifiers — match the bare key
+                    UInt32(LMGetKbdType()),
+                    OptionBits(kUCKeyTranslateNoDeadKeysBit),
+                    &deadKeyState,
+                    maxStringLength,
+                    &actualStringLength,
+                    &unicodeString
+                )
+
+                guard status == noErr, actualStringLength > 0 else { continue }
+
+                let produced = String(utf16CodeUnits: unicodeString, count: actualStringLength)
+                if produced == target {
+                    return CGKeyCode(keyCode)
+                }
+            }
+
+            return nil
+        }
     }
 }
 
