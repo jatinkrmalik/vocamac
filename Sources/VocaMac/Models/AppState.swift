@@ -160,7 +160,7 @@ final class AppState: ObservableObject {
         self.permissionManager = permissionManager ?? PermissionManager(audioEngine: audioEngine, hotKeyManager: hotKeyManager)
         self.skipSystemIntegration = skipSystemIntegration
 
-        VocaLogger.info(.appState, "Initializing...")
+        VocaLogger.info(.appState, "Initializing... id=\(ObjectIdentifier(self))")
         if !skipSystemIntegration {
             syncLaunchAtLogin()
         }
@@ -174,11 +174,21 @@ final class AppState: ObservableObject {
             .store(in: &cancellables)
     }
 
+    /// Single production AppState instance for the process.
+    ///
+    /// SwiftUI can recreate the `App` value during scene setup, especially for
+    /// menu bar apps. Keeping the production instance outside the `App` value's
+    /// stored-property initialization prevents duplicate service graphs, event
+    /// taps, audio observers, and stale SwiftUI environment objects.
+    @MainActor
+    private static let sharedProductionInstance = AppState(cursorOverlay: CursorOverlayManager())
+
     /// Convenience factory for creating AppState with all real services.
     /// Needed because CursorOverlayManager is @MainActor and can't be a default parameter.
     @MainActor
     static func production() -> AppState {
-        AppState(cursorOverlay: CursorOverlayManager())
+        VocaLogger.debug(.appState, "Using production AppState id=\(ObjectIdentifier(sharedProductionInstance))")
+        return sharedProductionInstance
     }
 
     /// Called once from the SwiftUI lifecycle to complete initialization.

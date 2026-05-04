@@ -13,8 +13,13 @@ final class AudioEngine {
 
     private let engine = AVAudioEngine()
     private var audioBuffer: [Float] = []
-    private(set) var isCurrentlyRecording = false
+    private var _isCurrentlyRecording = false
     private let bufferQueue = DispatchQueue(label: "com.vocamac.audio-buffer", qos: .userInteractive)
+    private let lifecycleQueue = DispatchQueue(label: "com.vocamac.audio-engine.lifecycle", qos: .userInitiated)
+
+    var isCurrentlyRecording: Bool {
+        lifecycleQueue.sync { _isCurrentlyRecording }
+    }
 
     // Silence detection
     private var lastSoundTime: Date = Date()
@@ -80,28 +85,31 @@ final class AudioEngine {
     /// is invalidated — the installed tap references a stale format and no audio
     /// flows. We must stop, reset, and notify AppState so it can recover.
     @objc private func handleAudioConfigurationChange(_ notification: Notification) {
-        VocaLogger.info(.audioEngine, "Audio configuration changed (device plug/unplug or route change)")
+        lifecycleQueue.async { [weak self] in
+            guard let self = self else { return }
+            VocaLogger.info(.audioEngine, "Audio configuration changed (device plug/unplug or route change)")
 
-        let wasRecording = isCurrentlyRecording
+            let wasRecording = self._isCurrentlyRecording
 
-        if wasRecording {
-            VocaLogger.warning(.audioEngine, "Configuration changed while recording — forcing stop and reset")
-            // Tear down the stale recording state
-            isCurrentlyRecording = false
-            silenceCallbackFired = false
-            maxDurationCallbackFired = false
-            engine.inputNode.removeTap(onBus: 0)
-            engine.stop()
-        }
+            if wasRecording {
+                VocaLogger.warning(.audioEngine, "Configuration changed while recording — forcing stop and reset")
+                // Tear down the stale recording state
+                self._isCurrentlyRecording = false
+                self.silenceCallbackFired = false
+                self.maxDurationCallbackFired = false
+                self.engine.inputNode.removeTap(onBus: 0)
+                self.engine.stop()
+            }
 
-        // Reset the engine so it picks up the new audio device/format
-        engine.reset()
-        VocaLogger.info(.audioEngine, "Audio engine reset after configuration change")
+            // Reset the engine so it picks up the new audio device/format
+            self.engine.reset()
+            VocaLogger.info(.audioEngine, "Audio engine reset after configuration change")
 
-        if wasRecording {
-            // Notify AppState on the main queue so it can handle the interrupted recording
-            DispatchQueue.main.async { [weak self] in
-                self?.onAudioDeviceChanged?()
+            if wasRecording {
+                // Notify AppState on the main queue so it can handle the interrupted recording
+                DispatchQueue.main.async { [weak self] in
+                    self?.onAudioDeviceChanged?()
+                }
             }
         }
     }
@@ -143,54 +151,58 @@ final class AudioEngine {
         silenceDuration: Double = 2.0,
         maxDuration: TimeInterval = 60.0
     ) {
-        guard !isCurrentlyRecording else { return }
+        lifecycleQueue.sync {
+            guard !self._isCurrentlyRecording else { return }
 
-        self.silenceThreshold = silenceThreshold
-        self.silenceDuration = silenceDuration
-        self.maxDuration = maxDuration
+            self.silenceThreshold = silenceThreshold
+            self.silenceDuration = silenceDuration
+            self.maxDuration = maxDuration
 
-        // Reset state
-        bufferQueue.sync {
-            audioBuffer.removeAll(keepingCapacity: true)
-        }
-        lastSoundTime = Date()
-        recordingStartTime = Date()
-        silenceCallbackFired = false
-        maxDurationCallbackFired = false
-        isCurrentlyRecording = true
+            // Reset state
+            bufferQueue.sync {
+                audioBuffer.removeAll(keepingCapacity: true)
+            }
+            lastSoundTime = Date()
+            recordingStartTime = Date()
+            silenceCallbackFired = false
+            maxDurationCallbackFired = false
+            _isCurrentlyRecording = true
 
-        let inputNode = engine.inputNode
-        let inputFormat = inputNode.outputFormat(forBus: 0)
+            let inputNode = engine.inputNode
+            let inputFormat = inputNode.outputFormat(forBus: 0)
 
-        // Install a tap on the input node to capture audio
-        inputNode.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { [weak self] buffer, _ in
-            self?.processAudioBuffer(buffer, inputFormat: inputFormat)
-        }
+            // Install a tap on the input node to capture audio
+            inputNode.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { [weak self] buffer, _ in
+                self?.processAudioBuffer(buffer, inputFormat: inputFormat)
+            }
 
-        do {
-            try engine.start()
-        } catch {
-            VocaLogger.error(.audioEngine, "Failed to start audio engine: \(error)")
-            isCurrentlyRecording = false
+            do {
+                try engine.start()
+            } catch {
+                VocaLogger.error(.audioEngine, "Failed to start audio engine: \(error)")
+                _isCurrentlyRecording = false
+            }
         }
     }
 
     /// Stop recording and return the captured audio samples
     /// - Returns: Array of Float32 PCM samples at 16kHz mono
     func stopRecording() -> [Float] {
-        guard isCurrentlyRecording else { return [] }
+        lifecycleQueue.sync {
+            guard _isCurrentlyRecording else { return [] }
 
-        isCurrentlyRecording = false
-        engine.inputNode.removeTap(onBus: 0)
-        engine.stop()
+            _isCurrentlyRecording = false
+            engine.inputNode.removeTap(onBus: 0)
+            engine.stop()
 
-        let samples: [Float] = bufferQueue.sync {
-            let copy = audioBuffer
-            audioBuffer.removeAll(keepingCapacity: true)
-            return copy
+            let samples: [Float] = bufferQueue.sync {
+                let copy = audioBuffer
+                audioBuffer.removeAll(keepingCapacity: true)
+                return copy
+            }
+
+            return samples
         }
-
-        return samples
     }
 
     /// Forcibly reset the audio engine to a clean state, regardless of current state.
@@ -198,22 +210,24 @@ final class AudioEngine {
     /// taps, stops the engine, clears buffers, and resets all flags.
     /// Use when the engine is suspected to be in an inconsistent state.
     func forceReset() {
-        VocaLogger.warning(.audioEngine, "Force reset requested (wasRecording=\(isCurrentlyRecording))")
+        lifecycleQueue.sync {
+            VocaLogger.warning(.audioEngine, "Force reset requested (wasRecording=\(_isCurrentlyRecording))")
 
-        isCurrentlyRecording = false
-        silenceCallbackFired = false
-        maxDurationCallbackFired = false
+            _isCurrentlyRecording = false
+            silenceCallbackFired = false
+            maxDurationCallbackFired = false
 
-        // Safely remove tap — may throw if no tap is installed, but that's fine
-        engine.inputNode.removeTap(onBus: 0)
-        engine.stop()
-        engine.reset()
+            // Safely remove tap — may throw if no tap is installed, but that's fine
+            engine.inputNode.removeTap(onBus: 0)
+            engine.stop()
+            engine.reset()
 
-        bufferQueue.sync {
-            audioBuffer.removeAll(keepingCapacity: true)
+            bufferQueue.sync {
+                audioBuffer.removeAll(keepingCapacity: true)
+            }
+
+            VocaLogger.info(.audioEngine, "Force reset complete — engine is clean")
         }
-
-        VocaLogger.info(.audioEngine, "Force reset complete — engine is clean")
     }
 
     // MARK: - Audio Processing
