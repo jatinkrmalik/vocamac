@@ -399,6 +399,21 @@ final class AppState: ObservableObject {
     func requestAccessibilityPermission() { permissionManager.requestAccessibilityPermission() }
     func requestInputMonitoringPermission() { permissionManager.requestInputMonitoringPermission() }
 
+    // MARK: - Hotkey Configuration
+
+    /// Apply persisted hotkey settings to the active listener.
+    /// `@AppStorage` updates save preferences immediately, but an already-running
+    /// event tap also needs its in-memory configuration refreshed.
+    func syncHotKeyConfiguration() {
+        hotKeyManager.updateConfiguration(
+            keyCode: hotKeyCode,
+            mode: activationMode,
+            doubleTapThreshold: doubleTapThreshold,
+            safetyTimeout: Double(maxRecordingDuration) + 5.0
+        )
+        VocaLogger.info(.appState, "Hotkey configuration synced (keyCode=\(hotKeyCode), mode=\(activationMode.rawValue))")
+    }
+
     // MARK: - Force Recovery
 
     /// Forcibly reset the entire recording pipeline to idle state.
@@ -770,6 +785,7 @@ final class AppState: ObservableObject {
         VocaLogger.info(.appState, "Startup complete!")
     }
     func completeOnboarding() {
+        syncHotKeyConfiguration()
         hasCompletedOnboarding = true
         VocaLogger.info(.appState, "Onboarding completed")
     }

@@ -60,8 +60,8 @@ struct GeneralSettingsTab: View {
                     }
                 }
                 .pickerStyle(.radioGroup)
-                .onChange(of: appState.activationMode) { newMode in
-                    appState.hotKeyManager.updateConfiguration(mode: newMode)
+                .onChange(of: appState.activationMode) { _ in
+                    appState.syncHotKeyConfiguration()
                 }
 
                 Text(appState.activationMode.description)
@@ -76,8 +76,8 @@ struct GeneralSettingsTab: View {
                         Text(hotKey.name).tag(hotKey.keyCode)
                     }
                 }
-                .onChange(of: appState.hotKeyCode) { newCode in
-                    appState.hotKeyManager.updateConfiguration(keyCode: newCode)
+                .onChange(of: appState.hotKeyCode) { _ in
+                    appState.syncHotKeyConfiguration()
                 }
 
                 if appState.activationMode == .doubleTapToggle {
@@ -92,8 +92,8 @@ struct GeneralSettingsTab: View {
                             .monospacedDigit()
                             .frame(width: 40)
                     }
-                    .onChange(of: appState.doubleTapThreshold) { newVal in
-                        appState.hotKeyManager.updateConfiguration(doubleTapThreshold: newVal)
+                    .onChange(of: appState.doubleTapThreshold) { _ in
+                        appState.syncHotKeyConfiguration()
                     }
 
                     Text("Shorter = faster double-tap required. Longer = more forgiving.")
@@ -547,6 +547,9 @@ struct AudioSettingsTab: View {
                     Text("60 seconds").tag(60)
                     Text("120 seconds").tag(120)
                     Text("300 seconds (5 min)").tag(300)
+                }
+                .onChange(of: appState.maxRecordingDuration) { _ in
+                    appState.syncHotKeyConfiguration()
                 }
 
                 Text("Recording will automatically stop after this duration.")

@@ -685,6 +685,15 @@ struct HotkeyConfigStep: View {
             Spacer()
         }
         .padding()
+        .onChange(of: appState.activationMode) { _ in
+            appState.syncHotKeyConfiguration()
+        }
+        .onChange(of: appState.hotKeyCode) { _ in
+            appState.syncHotKeyConfiguration()
+        }
+        .onChange(of: appState.doubleTapThreshold) { _ in
+            appState.syncHotKeyConfiguration()
+        }
     }
 }
 
