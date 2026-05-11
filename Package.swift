@@ -20,10 +20,17 @@ let package = Package(
         .package(url: "https://github.com/argmaxinc/WhisperKit.git", from: "0.9.4"),
     ],
     targets: [
+        // Objective-C helpers used by the Swift app.
+        .target(
+            name: "VocaMacObjC",
+            path: "Sources/VocaMacObjC",
+            publicHeadersPath: "include"
+        ),
         // Main application target
         .executableTarget(
             name: "VocaMac",
             dependencies: [
+                "VocaMacObjC",
                 .product(name: "WhisperKit", package: "WhisperKit"),
             ],
             path: "Sources/VocaMac",

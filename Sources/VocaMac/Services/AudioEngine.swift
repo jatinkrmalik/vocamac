@@ -6,6 +6,7 @@
 
 import Foundation
 import AVFoundation
+import VocaMacObjC
 
 final class AudioEngine {
 
@@ -97,7 +98,7 @@ final class AudioEngine {
                 self._isCurrentlyRecording = false
                 self.silenceCallbackFired = false
                 self.maxDurationCallbackFired = false
-                self.engine.inputNode.removeTap(onBus: 0)
+                self.removeInputTap(reason: "audio configuration change")
                 self.engine.stop()
             }
 
@@ -158,29 +159,51 @@ final class AudioEngine {
             self.silenceDuration = silenceDuration
             self.maxDuration = maxDuration
 
-            // Reset state
-            bufferQueue.sync {
-                audioBuffer.removeAll(keepingCapacity: true)
-            }
-            lastSoundTime = Date()
-            recordingStartTime = Date()
-            silenceCallbackFired = false
-            maxDurationCallbackFired = false
+            resetRecordingState()
             _isCurrentlyRecording = true
 
             let inputNode = engine.inputNode
             let inputFormat = inputNode.outputFormat(forBus: 0)
 
-            // Install a tap on the input node to capture audio
-            inputNode.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { [weak self] buffer, _ in
-                self?.processAudioBuffer(buffer, inputFormat: inputFormat)
+            guard isValidInputFormat(inputFormat) else {
+                VocaLogger.error(
+                    .audioEngine,
+                    "Invalid input format before recording start: sampleRate=\(inputFormat.sampleRate), channels=\(inputFormat.channelCount)"
+                )
+                recoverFromStartFailure(notifyAppState: true)
+                return
             }
 
-            do {
-                try engine.start()
-            } catch {
-                VocaLogger.error(.audioEngine, "Failed to start audio engine: \(error)")
-                _isCurrentlyRecording = false
+            // A previous failed start can leave a tap installed even when our
+            // recording flag is false. Remove any stale tap before installing a
+            // fresh one; otherwise AVAudioEngine raises an uncaught NSException.
+            removeInputTap(reason: "pre-start cleanup")
+
+            var startError: Error?
+            let exception = VocaObjCExceptionCatcher.catchException { [weak self] in
+                guard let self = self else { return }
+
+                inputNode.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { [weak self] buffer, _ in
+                    self?.processAudioBuffer(buffer, inputFormat: inputFormat)
+                }
+
+                do {
+                    try self.engine.start()
+                } catch {
+                    startError = error
+                }
+            }
+
+            if let exception {
+                VocaLogger.error(.audioEngine, "AVAudioEngine exception while starting recording: \(exception.localizedDescription)")
+                recoverFromStartFailure(notifyAppState: true)
+                return
+            }
+
+            if let startError {
+                VocaLogger.error(.audioEngine, "Failed to start audio engine: \(startError.localizedDescription)")
+                recoverFromStartFailure(notifyAppState: true)
+                return
             }
         }
     }
@@ -192,15 +215,10 @@ final class AudioEngine {
             guard _isCurrentlyRecording else { return [] }
 
             _isCurrentlyRecording = false
-            engine.inputNode.removeTap(onBus: 0)
+            removeInputTap(reason: "stop recording")
             engine.stop()
 
-            let samples: [Float] = bufferQueue.sync {
-                let copy = audioBuffer
-                audioBuffer.removeAll(keepingCapacity: true)
-                return copy
-            }
-
+            let samples = capturedSamplesAndResetBuffer()
             return samples
         }
     }
@@ -217,16 +235,74 @@ final class AudioEngine {
             silenceCallbackFired = false
             maxDurationCallbackFired = false
 
-            // Safely remove tap — may throw if no tap is installed, but that's fine
-            engine.inputNode.removeTap(onBus: 0)
+            removeInputTap(reason: "force reset")
             engine.stop()
             engine.reset()
-
-            bufferQueue.sync {
-                audioBuffer.removeAll(keepingCapacity: true)
-            }
+            clearAudioBuffer()
 
             VocaLogger.info(.audioEngine, "Force reset complete — engine is clean")
+        }
+    }
+
+    // MARK: - Lifecycle Helpers
+
+    /// Resets per-recording state before a new capture attempt.
+    private func resetRecordingState() {
+        clearAudioBuffer()
+        lastSoundTime = Date()
+        recordingStartTime = Date()
+        silenceCallbackFired = false
+        maxDurationCallbackFired = false
+    }
+
+    /// Clears captured audio samples while preserving buffer capacity.
+    private func clearAudioBuffer() {
+        bufferQueue.sync {
+            audioBuffer.removeAll(keepingCapacity: true)
+        }
+    }
+
+    /// Returns captured samples and clears the backing buffer.
+    private func capturedSamplesAndResetBuffer() -> [Float] {
+        bufferQueue.sync {
+            let copy = audioBuffer
+            audioBuffer.removeAll(keepingCapacity: true)
+            return copy
+        }
+    }
+
+    /// Checks whether a hardware input format is safe to pass to AVAudioEngine.
+    /// Invalid or transient formats can cause installTap to raise NSException.
+    private func isValidInputFormat(_ format: AVAudioFormat) -> Bool {
+        format.sampleRate.isFinite && format.sampleRate > 0 && format.channelCount > 0
+    }
+
+    /// Removes the current input tap while converting AVFoundation NSExceptions
+    /// into log messages instead of process aborts.
+    private func removeInputTap(reason: String) {
+        let exception = VocaObjCExceptionCatcher.catchException { [weak self] in
+            self?.engine.inputNode.removeTap(onBus: 0)
+        }
+
+        if let exception {
+            VocaLogger.warning(.audioEngine, "Ignoring AVAudioEngine exception while removing tap during \(reason): \(exception.localizedDescription)")
+        }
+    }
+
+    /// Restores AudioEngine to a clean idle state after any failed start attempt.
+    private func recoverFromStartFailure(notifyAppState: Bool) {
+        _isCurrentlyRecording = false
+        silenceCallbackFired = false
+        maxDurationCallbackFired = false
+        removeInputTap(reason: "start failure")
+        engine.stop()
+        engine.reset()
+        clearAudioBuffer()
+
+        if notifyAppState {
+            DispatchQueue.main.async { [weak self] in
+                self?.onAudioDeviceChanged?()
+            }
         }
     }
 
