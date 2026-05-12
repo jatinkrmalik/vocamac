@@ -26,8 +26,8 @@ Pre-release versions use suffixes: `v0.1.0-alpha`, `v0.1.0-beta.1`
 2. **Verify CI passes** on the latest `main` commit
 3. **Update version number** in all locations:
    - `scripts/build.sh` — both `CFBundleVersion` and `CFBundleShortVersionString` in the Info.plist template
-   - `Sources/VocaMac/Views/SettingsView.swift` — version label in the About tab
    - `web/layouts/index.html` — `softwareVersion` in JSON-LD schema and hero version badge (two occurrences)
+   - _(No Swift change needed — the About tab reads the version from `Info.plist` via `appVersionDisplay` in `SettingsView.swift`.)_
    - **Do NOT** create a `docs/RELEASE_NOTES_vX.Y.Z.md` file — release notes live out-of-tree (see [Release Notes (out-of-tree)](#release-notes-out-of-tree) below)
 4. **Test locally**:
    ```bash
@@ -98,7 +98,7 @@ Pre-release versions use suffixes: `v0.1.0-alpha`, `v0.1.0-beta.1`
 
 ### What goes in the version-bump PR
 
-The version-bump PR should only touch *code* files that carry the version string (`scripts/build.sh`, `Sources/VocaMac/Views/SettingsView.swift`, `web/layouts/index.html`). The **PR description** is where the changelog table lives — that gives reviewers the context they need without polluting the tree.
+The version-bump PR should only touch *code* files that carry the version string (`scripts/build.sh`, `web/layouts/index.html`). The **PR description** is where the changelog table lives — that gives reviewers the context they need without polluting the tree.
 
 ### Suggested PR-description template
 
@@ -114,7 +114,6 @@ Prepares the **vX.Y.Z** patch/minor release.
 
 ### Files updated
 - `scripts/build.sh`
-- `Sources/VocaMac/Views/SettingsView.swift`
 - `web/layouts/index.html`
 
 ### Release plan after merge
