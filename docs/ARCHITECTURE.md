@@ -246,7 +246,7 @@ audioData: [Float]
 **Metal Acceleration:**
 - Enabled by default on Apple Silicon when WhisperKit is compiled with Metal support
 - Compile flag: `WHISPER_METAL=1` or `CoreML_METAL=1`
-- Falls back to CPU on Intel Macs
+- VocaMac targets Apple Silicon only; Intel Macs are not a supported runtime
 
 #### 3.2.6 `ModelManager` - Model Lifecycle Management
 
@@ -286,7 +286,7 @@ audioData: [Float]
 **Responsibility:** Detect system hardware capabilities and recommend optimal model size.
 
 **Detection Points:**
-- CPU architecture: `uname()` → arm64 (Apple Silicon) or x86_64 (Intel)
+- CPU architecture: `uname()` → arm64 (Apple Silicon) — the only supported runtime target
 - Physical RAM: `ProcessInfo.processInfo.physicalMemory`
 - Processor name: `sysctlbyname("machdep.cpu.brand_string")`
 - Core count: `ProcessInfo.processInfo.activeProcessorCount`
@@ -297,12 +297,12 @@ Apple Silicon:
   RAM ≤ 8 GB  → tiny  (safe default)
   RAM = 16 GB → small (good balance)
   RAM ≥ 24 GB → medium (high quality)
-
-Intel:
-  RAM ≤ 8 GB  → tiny
-  RAM = 16 GB → base
-  RAM ≥ 32 GB → small
 ```
+
+> The `recommendModel` function in `SystemInfo.swift` retains a defensive
+> Intel branch (smaller models, no Metal). It exists only to keep the
+> code valid if someone compiles from source on Intel; the released DMG
+> is `arm64`-only and Intel Macs are not a supported configuration.
 
 #### 3.2.8 `TextInjector` - System-Wide Text Insertion
 
