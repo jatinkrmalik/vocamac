@@ -77,12 +77,25 @@ echo "🔨 Building VocaMac ($CONFIG)..."
 DERIVED_DATA=".xcode-build"
 XCODE_CONFIG="$(echo "${CONFIG}" | sed 's/release/Release/; s/debug/Debug/')"
 
+# Target architecture — defaults to arm64 (Apple Silicon).
+# Set BUILD_ARCH=x86_64 to cross-compile an Intel build (experimental, unsupported).
+BUILD_ARCH="${BUILD_ARCH:-arm64}"
+case "$BUILD_ARCH" in
+    arm64|x86_64) ;;
+    *)
+        echo "❌ Unsupported BUILD_ARCH: $BUILD_ARCH (must be 'arm64' or 'x86_64')"
+        exit 1
+        ;;
+esac
+echo "   Target architecture: $BUILD_ARCH"
+
 xcodebuild build \
     -scheme VocaMac \
     -configuration "$XCODE_CONFIG" \
     -derivedDataPath "$DERIVED_DATA" \
-    -destination 'platform=macOS,arch=arm64' \
-    ONLY_ACTIVE_ARCH=YES \
+    -destination "platform=macOS,arch=${BUILD_ARCH}" \
+    ARCHS="$BUILD_ARCH" \
+    ONLY_ACTIVE_ARCH=NO \
     -quiet
 
 # Find the built binary

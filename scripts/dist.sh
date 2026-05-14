@@ -38,7 +38,8 @@ done
 
 # Get version from APP_VERSION env var (if set) or from build.sh's Info.plist template
 VERSION="${APP_VERSION:-$(grep -A1 'CFBundleShortVersionString' scripts/build.sh | grep '<string>' | sed 's/.*<string>\(.*\)<\/string>/\1/' | head -1)}"
-ARCH=$(uname -m)
+# Honour BUILD_ARCH (set by caller for cross-arch builds), else default to host arch.
+ARCH="${BUILD_ARCH:-$(uname -m)}"
 APP_NAME="VocaMac"
 DMG_NAME="${APP_NAME}-${VERSION}-${ARCH}.dmg"
 DIST_DIR="dist"
