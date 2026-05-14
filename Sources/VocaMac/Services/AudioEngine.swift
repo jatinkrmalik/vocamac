@@ -12,7 +12,12 @@ final class AudioEngine {
 
     // MARK: - Properties
 
-    private let engine = AVAudioEngine()
+    /// AVAudioEngine is created lazily when recording starts and torn down when
+    /// recording stops. Keeping it alive while idle holds an input route on the
+    /// system mic, which on Bluetooth devices like AirPods forces the headset
+    /// (HFP/SCO) profile and breaks remote media controls (e.g. tap-to-pause)
+    /// for any other app playing audio.
+    private var engine: AVAudioEngine?
     private var audioBuffer: [Float] = []
     private var _isCurrentlyRecording = false
     private let bufferQueue = DispatchQueue(label: "com.vocamac.audio-buffer", qos: .userInteractive)
@@ -60,20 +65,50 @@ final class AudioEngine {
     // MARK: - Initialization
 
     init() {
-        // Listen for audio configuration changes (device plug/unplug, route changes,
-        // Bluetooth disconnects, display sleep changing audio routing, etc.).
-        // AVAudioEngine posts this notification when the underlying hardware changes
-        // and the engine needs to be reconfigured.
+        // Note: we intentionally do NOT create the AVAudioEngine here, nor
+        // register for AVAudioEngineConfigurationChange. Both actions cause the
+        // engine's input node to materialise and claim the system input route,
+        // which on Bluetooth headsets forces the HFP profile. The observer is
+        // attached as part of `acquireEngine()` instead, and torn down by
+        // `releaseEngine()` when recording stops.
+    }
+
+    deinit {
+        // Make sure any active engine and its observer are released. This is a
+        // safety net — under normal flows `stopRecording`/`forceReset` will
+        // already have torn things down.
+        if let engine {
+            NotificationCenter.default.removeObserver(self, name: .AVAudioEngineConfigurationChange, object: engine)
+        }
+    }
+
+    // MARK: - Engine Lifecycle
+
+    /// Lazily create the AVAudioEngine and start observing configuration changes.
+    /// Must be called on `lifecycleQueue`.
+    private func acquireEngine() -> AVAudioEngine {
+        if let engine { return engine }
+        let newEngine = AVAudioEngine()
+        engine = newEngine
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handleAudioConfigurationChange),
             name: .AVAudioEngineConfigurationChange,
-            object: engine
+            object: newEngine
         )
+        VocaLogger.debug(.audioEngine, "AVAudioEngine instance acquired")
+        return newEngine
     }
 
-    deinit {
-        NotificationCenter.default.removeObserver(self)
+    /// Tear down the AVAudioEngine, removing its observer and releasing the
+    /// underlying input route so other apps (and Bluetooth audio profiles)
+    /// aren't affected while we're idle.
+    /// Must be called on `lifecycleQueue`.
+    private func releaseEngine() {
+        guard let engine else { return }
+        NotificationCenter.default.removeObserver(self, name: .AVAudioEngineConfigurationChange, object: engine)
+        self.engine = nil
+        VocaLogger.debug(.audioEngine, "AVAudioEngine instance released")
     }
 
     // MARK: - Audio Configuration Change
@@ -99,12 +134,13 @@ final class AudioEngine {
                 self.silenceCallbackFired = false
                 self.maxDurationCallbackFired = false
                 self.removeInputTap(reason: "audio configuration change")
-                self.engine.stop()
+                self.engine?.stop()
             }
 
-            // Reset the engine so it picks up the new audio device/format
-            self.engine.reset()
-            VocaLogger.info(.audioEngine, "Audio engine reset after configuration change")
+            // Drop the engine entirely so the next recording starts from a
+            // clean instance bound to the new default device.
+            self.releaseEngine()
+            VocaLogger.info(.audioEngine, "Audio engine released after configuration change")
 
             if wasRecording {
                 // Notify AppState on the main queue so it can handle the interrupted recording
@@ -162,6 +198,7 @@ final class AudioEngine {
             resetRecordingState()
             _isCurrentlyRecording = true
 
+            let engine = acquireEngine()
             let inputNode = engine.inputNode
             let inputFormat = inputNode.outputFormat(forBus: 0)
 
@@ -188,7 +225,7 @@ final class AudioEngine {
                 }
 
                 do {
-                    try self.engine.start()
+                    try engine.start()
                 } catch {
                     startError = error
                 }
@@ -216,9 +253,14 @@ final class AudioEngine {
 
             _isCurrentlyRecording = false
             removeInputTap(reason: "stop recording")
-            engine.stop()
+            engine?.stop()
 
             let samples = capturedSamplesAndResetBuffer()
+
+            // Release the engine so we don't keep holding the system input
+            // route (and forcing AirPods into HFP) while idle.
+            releaseEngine()
+
             return samples
         }
     }
@@ -236,9 +278,13 @@ final class AudioEngine {
             maxDurationCallbackFired = false
 
             removeInputTap(reason: "force reset")
-            engine.stop()
-            engine.reset()
+            engine?.stop()
+            engine?.reset()
             clearAudioBuffer()
+
+            // Drop the engine entirely so the input route is released. The
+            // next recording will create a fresh instance.
+            releaseEngine()
 
             VocaLogger.info(.audioEngine, "Force reset complete — engine is clean")
         }
@@ -278,10 +324,12 @@ final class AudioEngine {
     }
 
     /// Removes the current input tap while converting AVFoundation NSExceptions
-    /// into log messages instead of process aborts.
+    /// into log messages instead of process aborts. No-op if the engine has
+    /// already been released.
     private func removeInputTap(reason: String) {
-        let exception = VocaObjCExceptionCatcher.catchException { [weak self] in
-            self?.engine.inputNode.removeTap(onBus: 0)
+        guard let engine else { return }
+        let exception = VocaObjCExceptionCatcher.catchException {
+            engine.inputNode.removeTap(onBus: 0)
         }
 
         if let exception {
@@ -295,9 +343,14 @@ final class AudioEngine {
         silenceCallbackFired = false
         maxDurationCallbackFired = false
         removeInputTap(reason: "start failure")
-        engine.stop()
-        engine.reset()
+        engine?.stop()
+        engine?.reset()
         clearAudioBuffer()
+
+        // Release the engine so a failed start doesn't leave us holding the
+        // system input route (and forcing AirPods into HFP) until the next
+        // attempt.
+        releaseEngine()
 
         if notifyAppState {
             DispatchQueue.main.async { [weak self] in
