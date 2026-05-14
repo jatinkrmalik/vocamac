@@ -585,13 +585,13 @@ struct ModelSelectionCard: View {
             RoundedRectangle(cornerRadius: 8)
                 .stroke(isRecommended ? Color.orange : Color.clear, lineWidth: 1.5)
         )
-        .alert("Use Unoptimized Model?", isPresented: $showForceDownloadAlert) {
+        .alert("Use Experimental Model?", isPresented: $showForceDownloadAlert) {
             Button("Cancel", role: .cancel) {}
             Button("Download Anyway", role: .destructive) {
                 onDownload()
             }
         } message: {
-            Text("This model may exceed your device's capabilities. It could cause slow performance, high memory usage, or crashes. Are you sure you want to continue?")
+            Text("WhisperKit hasn't verified this model on your chip family. It will likely work but may be slower than tuned models.")
         }
     }
 }

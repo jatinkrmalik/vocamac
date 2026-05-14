@@ -341,8 +341,13 @@ struct ModelSettingsTab: View {
                     HStack {
                         Image(systemName: "sparkles")
                             .foregroundStyle(.blue)
-                        Text("Recommended for your device: **\(recommendedSize.displayName)**")
-                            .font(.callout)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Recommended for your device: **\(recommendedSize.displayName)**")
+                                .font(.callout)
+                            Text("Based on WhisperKit's tuned variants for your chip — not your RAM.")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                        }
                     }
                 }
 
@@ -418,13 +423,14 @@ struct ModelRow: View {
                     }
 
                     if !model.isSupported {
-                        Text("Unoptimized")
+                        Text("Experimental")
                             .font(.caption2)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 1)
                             .background(.orange.opacity(0.2))
                             .foregroundStyle(.orange)
                             .cornerRadius(4)
+                            .help("WhisperKit hasn't verified this model on your chip family. Your hardware can likely run it — use Load Anyway to try.")
                     }
                 }
 
@@ -508,7 +514,7 @@ struct ModelRow: View {
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 4)
-        .alert("Use Unoptimized Model?", isPresented: $showForceDownloadAlert) {
+        .alert("Use Experimental Model?", isPresented: $showForceDownloadAlert) {
             Button("Cancel", role: .cancel) {}
             Button(model.isDownloaded ? "Load Anyway" : "Download & Load", role: .destructive) {
                 Task { @MainActor in
@@ -521,7 +527,7 @@ struct ModelRow: View {
                 }
             }
         } message: {
-            Text("This model may exceed your device's capabilities. It could cause slow performance, high memory usage, or crashes. Are you sure you want to continue?")
+            Text("WhisperKit hasn't verified this model on your chip family. It will likely work but may be slower than tuned models.")
         }
     }
 }
