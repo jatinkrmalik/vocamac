@@ -37,7 +37,7 @@
 - **⌨️ System-Wide Text Injection** - Transcribed text is typed wherever your cursor is: browsers, Slack, VS Code, spreadsheets, terminals - everywhere.
 - **🎯 Push-to-Talk** - Hold a hotkey (default: Right Option) to record. Release to transcribe.
 - **👆 Double-Tap Toggle** - Double-tap the hotkey to start/stop recording.
-- **🧠 Smart Model Selection** - Auto-detects your hardware (Apple Silicon/Intel, RAM) and recommends the best whisper model via WhisperKit.
+- **🧠 Smart Model Selection** - Auto-detects your Apple Silicon chip and RAM, then recommends the best whisper model via WhisperKit.
 - **⚡ Native Apple Acceleration** - CoreML + Metal + Neural Engine acceleration on Apple Silicon. No manual setup.
 - **📊 Visual Feedback** - Menu bar icon changes color during recording and processing. Audio level indicator shows input.
 - **🔄 Auto-Updates** - Built-in update checker queries GitHub Releases on launch and lets you download and install the latest version in one click from within the app.
@@ -106,7 +106,7 @@ Same accuracy, dramatically better Apple platform integration.
 ## 📋 Requirements
 
 - **macOS 13 (Ventura)** or later
-- **Apple Silicon** (M1/M2/M3/M4)
+- **Apple Silicon Mac** (M1/M2/M3/M4) — **Intel Macs are not supported.** The released DMG is built for `arm64` only.
 - **Xcode 15+** or Swift 5.9+ (only for building from source)
 
 ### Permissions
