@@ -548,7 +548,7 @@ struct ModelSelectionCard: View {
                         showForceDownloadAlert = true
                     } label: {
                         HStack(spacing: 4) {
-                            Image(systemName: "exclamationmark.triangle")
+                            Image(systemName: "sparkles")
                             Text("Try Anyway")
                         }
                         .font(.caption)
