@@ -86,14 +86,16 @@ struct GeneralSettingsTab: View {
                         Slider(
                             value: $appState.doubleTapThreshold,
                             in: 0.2...0.8,
-                            step: 0.05
+                            step: 0.05,
+                            onEditingChanged: { isEditing in
+                                if !isEditing {
+                                    appState.syncHotKeyConfiguration()
+                                }
+                            }
                         )
                         Text("\(String(format: "%.2f", appState.doubleTapThreshold))s")
                             .monospacedDigit()
                             .frame(width: 40)
-                    }
-                    .onChange(of: appState.doubleTapThreshold) { _ in
-                        appState.syncHotKeyConfiguration()
                     }
 
                     Text("Shorter = faster double-tap required. Longer = more forgiving.")

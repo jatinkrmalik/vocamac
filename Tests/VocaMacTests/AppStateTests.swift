@@ -188,6 +188,7 @@ final class AppStateOnboardingTests: XCTestCase {
         XCTAssertEqual(mocks.hotKeyManager.lastKeyCode, 58)
         XCTAssertEqual(mocks.hotKeyManager.lastDoubleTapThreshold, 0.55)
         XCTAssertEqual(mocks.hotKeyManager.lastSafetyTimeout, 125.0)
+        XCTAssertEqual(mocks.hotKeyManager.resetKeyStateCallCount, 1)
     }
 
     @MainActor
@@ -205,6 +206,19 @@ final class AppStateOnboardingTests: XCTestCase {
         XCTAssertEqual(mocks.hotKeyManager.lastKeyCode, 54)
         XCTAssertEqual(mocks.hotKeyManager.lastDoubleTapThreshold, 0.3)
         XCTAssertEqual(mocks.hotKeyManager.lastSafetyTimeout, 35.0)
+    }
+
+    @MainActor
+    func testSyncHotKeyConfigurationAppliesDefaultSettings() {
+        let (appState, mocks) = AppState.makeTestState()
+
+        appState.syncHotKeyConfiguration()
+
+        XCTAssertEqual(mocks.hotKeyManager.updateConfigurationCallCount, 1)
+        XCTAssertEqual(mocks.hotKeyManager.lastMode, .pushToTalk)
+        XCTAssertEqual(mocks.hotKeyManager.lastKeyCode, 61)
+        XCTAssertEqual(mocks.hotKeyManager.lastDoubleTapThreshold, 0.4)
+        XCTAssertEqual(mocks.hotKeyManager.lastSafetyTimeout, 65.0)
     }
 
     @MainActor
