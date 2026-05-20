@@ -641,15 +641,10 @@ struct HotkeyConfigStep: View {
                         .fontWeight(.semibold)
                         .foregroundStyle(.secondary)
 
-                    Picker("Key", selection: $appState.hotKeyCode) {
-                        ForEach(KeyCodeReference.commonHotKeys, id: \.keyCode) { hotKey in
-                            Text(hotKey.name).tag(hotKey.keyCode)
-                        }
-                    }
-
-                    Text("Press this key to start recording.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    HotKeySelectionControl(
+                        pickerLabel: "Key",
+                        footerText: "Press this key to start recording."
+                    )
                 }
 
                 if appState.activationMode == .doubleTapToggle {

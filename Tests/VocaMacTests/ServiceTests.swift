@@ -18,8 +18,26 @@ final class KeyCodeReferenceTests: XCTestCase {
         XCTAssertEqual(KeyCodeReference.displayName(for: 61), "Right Option (⌥)")
     }
 
+    func testDisplayNameForRecordedCharacterKeyCode() {
+        XCTAssertEqual(KeyCodeReference.displayName(for: 0), "A")
+    }
+
+    func testDisplayNameForRecordedFunctionKeyCode() {
+        XCTAssertEqual(KeyCodeReference.displayName(for: 105), "F13")
+    }
+
     func testDisplayNameForUnknownKeyCode() {
         XCTAssertEqual(KeyCodeReference.displayName(for: 999), "Key 999")
+    }
+
+    func testCustomKeyCodeIsNotCommonPreset() {
+        XCTAssertFalse(KeyCodeReference.isCommonHotKey(105))
+    }
+
+    func testModifierKeyCodeDetection() {
+        XCTAssertTrue(KeyCodeReference.isModifierKeyCode(61))
+        XCTAssertTrue(KeyCodeReference.isModifierKeyCode(55))
+        XCTAssertFalse(KeyCodeReference.isModifierKeyCode(105))
     }
 
     func testCommonHotKeysValid() {

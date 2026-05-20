@@ -106,6 +106,39 @@ final class HotKeyManagerConfigurationTests: XCTestCase {
         manager.stopListening()
         XCTAssertFalse(manager.isListening)
     }
+
+    func testRegularKeyAutoRepeatDoesNotStopPushToTalk() throws {
+        let manager = HotKeyManager()
+        manager.updateConfiguration(keyCode: 0, mode: .pushToTalk, safetyTimeout: 5.0)
+
+        let startExpectation = expectation(description: "Recording starts once")
+        let stopExpectation = expectation(description: "Auto-repeat should not stop recording")
+        stopExpectation.isInverted = true
+
+        var startCount = 0
+        manager.onRecordingStart = {
+            startCount += 1
+            startExpectation.fulfill()
+        }
+        manager.onRecordingStop = {
+            stopExpectation.fulfill()
+        }
+
+        guard let keyDown = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: true),
+              let repeatedKeyDown = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: true)
+        else {
+            throw XCTSkip("Could not create keyboard events")
+        }
+        repeatedKeyDown.setIntegerValueField(.keyboardEventAutorepeat, value: 1)
+
+        manager._handleTestEvent(type: .keyDown, event: keyDown)
+        wait(for: [startExpectation], timeout: 1.0)
+
+        manager._handleTestEvent(type: .keyDown, event: repeatedKeyDown)
+        wait(for: [stopExpectation], timeout: 0.1)
+        XCTAssertEqual(startCount, 1)
+        manager.resetKeyState()
+    }
 }
 
 // MARK: - HotKeyManager Reset State Tests

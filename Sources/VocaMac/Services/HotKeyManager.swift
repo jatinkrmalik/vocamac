@@ -221,7 +221,7 @@ final class HotKeyManager {
             }
             handleModifierKeyEvent(keyCode: keyCode, event: event)
         } else if type == .keyDown || type == .keyUp {
-            handleRegularKeyEvent(keyCode: keyCode, isKeyDown: type == .keyDown)
+            handleRegularKeyEvent(keyCode: keyCode, isKeyDown: type == .keyDown, event: event)
         }
     }
 
@@ -304,8 +304,12 @@ final class HotKeyManager {
     }
 
     /// Handle regular (non-modifier) key events
-    private func handleRegularKeyEvent(keyCode: Int, isKeyDown: Bool) {
+    private func handleRegularKeyEvent(keyCode: Int, isKeyDown: Bool, event: CGEvent) {
         guard keyCode == targetKeyCode else { return }
+
+        if isKeyDown && event.getIntegerValueField(.keyboardEventAutorepeat) != 0 {
+            return
+        }
 
         if isKeyDown {
             handleKeyDown()
@@ -437,6 +441,15 @@ extension HotKeyManager: HotKeyMonitoring {
     }
 }
 
+// MARK: - Test Support
+
+extension HotKeyManager {
+    /// Exercise event handling without installing a process-wide event tap.
+    func _handleTestEvent(type: CGEventType, event: CGEvent) {
+        handleEvent(type: type, event: event)
+    }
+}
+
 // MARK: - Common Key Codes Reference
 
 /// Reference for common macOS virtual key codes
@@ -459,8 +472,138 @@ enum KeyCodeReference {
         ("F12", 111),
     ]
 
+    private static let namedKeyCodes: [Int: String] = [
+        0: "A",
+        1: "S",
+        2: "D",
+        3: "F",
+        4: "H",
+        5: "G",
+        6: "Z",
+        7: "X",
+        8: "C",
+        9: "V",
+        11: "B",
+        12: "Q",
+        13: "W",
+        14: "E",
+        15: "R",
+        16: "Y",
+        17: "T",
+        18: "1",
+        19: "2",
+        20: "3",
+        21: "4",
+        22: "6",
+        23: "5",
+        24: "=",
+        25: "9",
+        26: "7",
+        27: "-",
+        28: "8",
+        29: "0",
+        30: "]",
+        31: "O",
+        32: "U",
+        33: "[",
+        34: "I",
+        35: "P",
+        36: "Return",
+        37: "L",
+        38: "J",
+        39: "'",
+        40: "K",
+        41: ";",
+        42: "\\",
+        43: ",",
+        44: "/",
+        45: "N",
+        46: "M",
+        47: ".",
+        48: "Tab",
+        49: "Space",
+        50: "`",
+        51: "Delete",
+        53: "Escape",
+        54: "Right Command (⌘)",
+        55: "Left Command (⌘)",
+        56: "Left Shift (⇧)",
+        57: "Caps Lock",
+        58: "Left Option (⌥)",
+        59: "Left Control (⌃)",
+        60: "Right Shift (⇧)",
+        61: "Right Option (⌥)",
+        62: "Right Control (⌃)",
+        63: "Fn",
+        64: "F17",
+        65: "Keypad .",
+        67: "Keypad *",
+        69: "Keypad +",
+        71: "Clear",
+        75: "Keypad /",
+        76: "Keypad Enter",
+        78: "Keypad -",
+        79: "F18",
+        80: "F19",
+        81: "Keypad =",
+        82: "Keypad 0",
+        83: "Keypad 1",
+        84: "Keypad 2",
+        85: "Keypad 3",
+        86: "Keypad 4",
+        87: "Keypad 5",
+        88: "Keypad 6",
+        89: "Keypad 7",
+        90: "F20",
+        91: "Keypad 8",
+        92: "Keypad 9",
+        96: "F5",
+        97: "F6",
+        98: "F7",
+        99: "F3",
+        100: "F8",
+        101: "F9",
+        103: "F11",
+        105: "F13",
+        106: "F16",
+        107: "F14",
+        109: "F10",
+        111: "F12",
+        113: "F15",
+        114: "Help",
+        115: "Home",
+        116: "Page Up",
+        117: "Forward Delete",
+        118: "F4",
+        119: "End",
+        120: "F2",
+        121: "Page Down",
+        122: "F1",
+        123: "Left Arrow",
+        124: "Right Arrow",
+        125: "Down Arrow",
+        126: "Up Arrow",
+    ]
+
     /// Get the display name for a key code
     static func displayName(for keyCode: Int) -> String {
-        commonHotKeys.first(where: { $0.keyCode == keyCode })?.name ?? "Key \(keyCode)"
+        commonHotKeys.first(where: { $0.keyCode == keyCode })?.name
+            ?? namedKeyCodes[keyCode]
+            ?? "Key \(keyCode)"
+    }
+
+    /// Whether this key code is included in the curated preset list.
+    static func isCommonHotKey(_ keyCode: Int) -> Bool {
+        commonHotKeys.contains(where: { $0.keyCode == keyCode })
+    }
+
+    /// Whether this key code represents a modifier key that emits flagsChanged events.
+    static func isModifierKeyCode(_ keyCode: Int) -> Bool {
+        switch keyCode {
+        case 54, 55, 56, 58, 59, 60, 61, 62, 63:
+            return true
+        default:
+            return false
+        }
     }
 }

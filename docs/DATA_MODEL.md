@@ -284,7 +284,7 @@ struct TranscriptionResult: Identifiable {
 struct UserSettings {
     // Activation
     var activationMode: ActivationMode = .pushToTalk
-    var hotKeyCode: Int = 61                    // Right Option key
+    var hotKeyCode: Int = 61                    // Right Option by default; user may record any single key
     var doubleTapThreshold: Double = 0.4        // seconds
 
     // Audio
