@@ -12,7 +12,8 @@ final class AudioEngine {
 
     // MARK: - Properties
 
-    private let engine = AVAudioEngine()
+    private var engine = AVAudioEngine()
+    private var audioConfigurationObserver: NSObjectProtocol?
     private var audioBuffer: [Float] = []
     private var _isCurrentlyRecording = false
     private let bufferQueue = DispatchQueue(label: "com.vocamac.audio-buffer", qos: .userInteractive)
@@ -60,23 +61,34 @@ final class AudioEngine {
     // MARK: - Initialization
 
     init() {
-        // Listen for audio configuration changes (device plug/unplug, route changes,
-        // Bluetooth disconnects, display sleep changing audio routing, etc.).
-        // AVAudioEngine posts this notification when the underlying hardware changes
-        // and the engine needs to be reconfigured.
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(handleAudioConfigurationChange),
-            name: .AVAudioEngineConfigurationChange,
-            object: engine
-        )
+        registerForAudioConfigurationChanges()
     }
 
     deinit {
-        NotificationCenter.default.removeObserver(self)
+        unregisterFromAudioConfigurationChanges()
     }
 
     // MARK: - Audio Configuration Change
+
+    /// Register for configuration changes from the current AVAudioEngine instance.
+    private func registerForAudioConfigurationChanges() {
+        unregisterFromAudioConfigurationChanges()
+        audioConfigurationObserver = NotificationCenter.default.addObserver(
+            forName: .AVAudioEngineConfigurationChange,
+            object: engine,
+            queue: nil
+        ) { [weak self] notification in
+            self?.handleAudioConfigurationChange(notification)
+        }
+    }
+
+    /// Remove the configuration-change observer for the current engine.
+    private func unregisterFromAudioConfigurationChanges() {
+        if let audioConfigurationObserver {
+            NotificationCenter.default.removeObserver(audioConfigurationObserver)
+            self.audioConfigurationObserver = nil
+        }
+    }
 
     /// Called when macOS detects an audio hardware configuration change.
     /// This happens when a microphone is unplugged/replugged, Bluetooth audio
@@ -85,7 +97,7 @@ final class AudioEngine {
     /// When this fires during an active recording, the engine's internal state
     /// is invalidated — the installed tap references a stale format and no audio
     /// flows. We must stop, reset, and notify AppState so it can recover.
-    @objc private func handleAudioConfigurationChange(_ notification: Notification) {
+    private func handleAudioConfigurationChange(_ notification: Notification) {
         lifecycleQueue.async { [weak self] in
             guard let self = self else { return }
             VocaLogger.info(.audioEngine, "Audio configuration changed (device plug/unplug or route change)")
@@ -102,9 +114,11 @@ final class AudioEngine {
                 self.engine.stop()
             }
 
-            // Reset the engine so it picks up the new audio device/format
-            self.engine.reset()
-            VocaLogger.info(.audioEngine, "Audio engine reset after configuration change")
+            // Recreate the engine so it drops any stale hardware format/tap state.
+            // A plain reset can leave AVAudioEngine stuck with a pre-route-change
+            // input format, causing repeated "Input HW format and tap format not matching" exceptions.
+            self.recreateEngine(reason: "audio configuration change")
+            VocaLogger.info(.audioEngine, "Audio engine recreated after configuration change")
 
             if wasRecording {
                 // Notify AppState on the main queue so it can handle the interrupted recording
@@ -147,13 +161,14 @@ final class AudioEngine {
     ///   - silenceThreshold: RMS energy threshold below which audio is considered silence
     ///   - silenceDuration: Seconds of silence before triggering silence detection callback
     ///   - maxDuration: Maximum recording duration in seconds
+    @discardableResult
     func startRecording(
         silenceThreshold: Float = 0.01,
         silenceDuration: Double = 2.0,
         maxDuration: TimeInterval = 60.0
-    ) {
+    ) -> Bool {
         lifecycleQueue.sync {
-            guard !self._isCurrentlyRecording else { return }
+            guard !self._isCurrentlyRecording else { return true }
 
             self.silenceThreshold = silenceThreshold
             self.silenceDuration = silenceDuration
@@ -171,7 +186,7 @@ final class AudioEngine {
                     "Invalid input format before recording start: sampleRate=\(inputFormat.sampleRate), channels=\(inputFormat.channelCount)"
                 )
                 recoverFromStartFailure(notifyAppState: true)
-                return
+                return false
             }
 
             // A previous failed start can leave a tap installed even when our
@@ -197,14 +212,15 @@ final class AudioEngine {
             if let exception {
                 VocaLogger.error(.audioEngine, "AVAudioEngine exception while starting recording: \(exception.localizedDescription)")
                 recoverFromStartFailure(notifyAppState: true)
-                return
+                return false
             }
 
             if let startError {
                 VocaLogger.error(.audioEngine, "Failed to start audio engine: \(startError.localizedDescription)")
                 recoverFromStartFailure(notifyAppState: true)
-                return
+                return false
             }
+            return true
         }
     }
 
@@ -237,7 +253,7 @@ final class AudioEngine {
 
             removeInputTap(reason: "force reset")
             engine.stop()
-            engine.reset()
+            recreateEngine(reason: "force reset")
             clearAudioBuffer()
 
             VocaLogger.info(.audioEngine, "Force reset complete — engine is clean")
@@ -277,6 +293,17 @@ final class AudioEngine {
         format.sampleRate.isFinite && format.sampleRate > 0 && format.channelCount > 0
     }
 
+    /// Replaces the underlying AVAudioEngine with a fresh instance.
+    ///
+    /// Hardware route changes can leave an existing engine with stale input-node
+    /// format state even after `reset()`. Recreating the engine forces AVFoundation
+    /// to bind a fresh input node to the current hardware format.
+    private func recreateEngine(reason: String) {
+        engine = AVAudioEngine()
+        registerForAudioConfigurationChanges()
+        VocaLogger.info(.audioEngine, "Created fresh AVAudioEngine during \(reason)")
+    }
+
     /// Removes the current input tap while converting AVFoundation NSExceptions
     /// into log messages instead of process aborts.
     private func removeInputTap(reason: String) {
@@ -296,7 +323,7 @@ final class AudioEngine {
         maxDurationCallbackFired = false
         removeInputTap(reason: "start failure")
         engine.stop()
-        engine.reset()
+        recreateEngine(reason: "start failure")
         clearAudioBuffer()
 
         if notifyAppState {

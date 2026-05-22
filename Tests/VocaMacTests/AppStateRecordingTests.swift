@@ -362,6 +362,25 @@ final class AppStateRecordingGuardTests: XCTestCase {
     }
 
     @MainActor
+    func testFailedAudioStartResetsRecordingAndHotkeyState() async {
+        let (appState, mocks) = AppState.makeTestState()
+        mocks.audioEngine.shouldStartRecordingSucceed = false
+
+        await appState.startRecording()
+
+        XCTAssertEqual(appState.appStatus, .idle,
+            "A failed audio-engine start should immediately return the app to idle")
+        XCTAssertFalse(appState.isRecording,
+            "AppState should not stay recording if AudioEngine failed to start")
+        XCTAssertFalse(mocks.audioEngine.isCurrentlyRecording,
+            "AudioEngine mock should report idle after a failed start")
+        XCTAssertEqual(mocks.hotKeyManager.resetKeyStateCallCount, 1,
+            "Hotkey state should reset so the next shortcut press is handled")
+        XCTAssertEqual(mocks.soundManager.startSoundCallCount, 0,
+            "Start sound should not play when the microphone did not start")
+    }
+
+    @MainActor
     func testInitialStateIsIdle() {
         let (appState, _) = AppState.makeTestState()
         XCTAssertEqual(appState.appStatus, .idle)

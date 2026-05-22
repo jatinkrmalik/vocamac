@@ -464,11 +464,21 @@ final class AppState: ObservableObject {
         // Start recording immediately for instant responsiveness.
         // The start sound is played concurrently — any brief bleed into the
         // mic buffer is negligible and handled well by WhisperKit's noise model.
-        audioEngine.startRecording(
+        let didStartRecording = audioEngine.startRecording(
             silenceThreshold: Float(silenceThreshold),
             silenceDuration: silenceDuration,
             maxDuration: TimeInterval(maxRecordingDuration)
         )
+
+        guard didStartRecording else {
+            VocaLogger.warning(.appState, "Audio engine failed to start — resetting recording state")
+            isRecording = false
+            audioLevel = 0.0
+            cursorOverlay.hide()
+            hotKeyManager.resetKeyState()
+            appStatus = .idle
+            return
+        }
 
         // Play start sound after mic is active (fire-and-forget)
         if soundEffectsEnabled {
