@@ -192,6 +192,18 @@ final class AppStateOnboardingTests: XCTestCase {
     }
 
     @MainActor
+    func testCompleteOnboardingDoesNotResetHotKeyStateWhileRecording() {
+        let (appState, mocks) = AppState.makeTestState()
+        appState.isRecording = true
+
+        appState.completeOnboarding()
+
+        XCTAssertEqual(mocks.hotKeyManager.updateConfigurationCallCount, 1)
+        XCTAssertEqual(mocks.hotKeyManager.resetKeyStateCallCount, 0)
+        XCTAssertTrue(appState.hasCompletedOnboarding)
+    }
+
+    @MainActor
     func testSyncHotKeyConfigurationAppliesCurrentSettings() {
         let (appState, mocks) = AppState.makeTestState()
         appState.activationMode = .doubleTapToggle

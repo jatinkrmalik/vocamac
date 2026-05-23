@@ -790,7 +790,9 @@ final class AppState: ObservableObject {
     }
     func completeOnboarding() {
         syncHotKeyConfiguration()
-        hotKeyManager.resetKeyState()
+        if !isRecording {
+            hotKeyManager.resetKeyState()
+        }
         hasCompletedOnboarding = true
         VocaLogger.info(.appState, "Onboarding completed")
     }
