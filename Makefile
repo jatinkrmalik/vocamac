@@ -3,6 +3,8 @@
 
 .PHONY: build install install-cli dmg release test clean reset run help
 
+.DEFAULT_GOAL := help
+
 ## Build .app bundle in repo root (fast, for development)
 build:
 	@./scripts/build.sh
