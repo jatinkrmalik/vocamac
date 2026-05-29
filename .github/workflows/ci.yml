@@ -66,6 +66,7 @@ jobs:
     timeout-minutes: 30
     permissions:
       pull-requests: write
+      issues: write
 
     steps:
       - name: Checkout
