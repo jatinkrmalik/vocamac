@@ -82,10 +82,9 @@ final class WhisperService: @unchecked Sendable {
 
             // Store models in Application Support, not the default ~/Documents
             // path, to avoid triggering a Documents folder permission prompt.
-            let appSupport = FileManager.default.urls(
-                for: .applicationSupportDirectory,
-                in: .userDomainMask
-            ).first!
+            let appSupportURLs = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
+            // swiftlint:disable:next force_unwrapping
+            let appSupport = appSupportURLs.first!
             config.downloadBase = appSupport
                 .appendingPathComponent("VocaMac")
                 .appendingPathComponent("models")
@@ -236,7 +235,7 @@ final class WhisperService: @unchecked Sendable {
         "[Music]",
         "(music)",
         "[Applause]",
-        "(applause)",
+        "(applause)"
     ]
 
     /// Remove hallucination tokens from transcribed text.
@@ -274,6 +273,7 @@ final class WhisperService: @unchecked Sendable {
 // MARK: - SpeechTranscribing Conformance
 
 extension WhisperService: SpeechTranscribing {
+    // swiftlint:disable:next identifier_name
     func _loadModel(name: String?, folder: URL?, onPhaseChange: ((String) -> Void)?) async throws {
         try await loadModel(name: name, folder: folder, onPhaseChange: onPhaseChange)
     }

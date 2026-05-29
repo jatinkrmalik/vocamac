@@ -4,8 +4,8 @@
 // Protocol abstractions for all services that AppState depends on.
 // Enables dependency injection and test mocking.
 
-import Foundation
 import Combine
+import Foundation
 
 // MARK: - AudioRecording
 
@@ -45,6 +45,7 @@ protocol HotKeyMonitoring: AnyObject {
     func startListening(keyCode: Int, mode: ActivationMode, doubleTapThreshold: Double, safetyTimeout: Double)
     func stopListening()
     func resetKeyState()
+    // swiftlint:disable:next identifier_name
     func _updateConfiguration(keyCode: Int?, mode: ActivationMode?, doubleTapThreshold: Double?, safetyTimeout: Double?)
 }
 
@@ -88,6 +89,7 @@ protocol CursorOverlayManaging: AnyObject {
 // MARK: - ModelManaging
 
 protocol ModelManaging: AnyObject {
+    // swiftlint:disable:next large_tuple
     func deviceRecommendation() -> (defaultModel: String, supported: [String], disabled: [String])
     func modelFolder(for size: ModelSize) -> URL?
     func bundledModelFolder(for size: ModelSize) -> URL?
@@ -124,6 +126,7 @@ protocol SpeechTranscribing: AnyObject {
     var loadedModelName: String? { get }
     var isModelLoaded: Bool { get }
     func transcribe(audioData: [Float], language: String?, translate: Bool) async throws -> VocaTranscription
+    // swiftlint:disable:next identifier_name
     func _loadModel(name: String?, folder: URL?, onPhaseChange: ((String) -> Void)?) async throws
 }
 

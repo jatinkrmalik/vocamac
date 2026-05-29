@@ -4,10 +4,10 @@
 // Central observable state for the entire application.
 // All UI and services react to changes in AppState.
 
-import Foundation
-import SwiftUI
 import Combine
+import Foundation
 import ServiceManagement
+import SwiftUI
 
 // MARK: - Enums
 
@@ -253,7 +253,11 @@ final class AppState: ObservableObject {
         // WhisperKit's `.default` may not be in the supported list for some
         // devices. If so, fall back to the best supported model instead.
         let recommendation = modelManager.deviceRecommendation()
-        VocaLogger.info(.appState, "WhisperKit recommendation — default: \(recommendation.defaultModel), supported: [\(recommendation.supported.joined(separator: ", "))], disabled: [\(recommendation.disabled.joined(separator: ", "))]")
+        let supportedModels = recommendation.supported.joined(separator: ", ")
+        let disabledModels = recommendation.disabled.joined(separator: ", ")
+        VocaLogger.info(.appState,
+            "WhisperKit recommendation — default: \(recommendation.defaultModel), " +
+            "supported: [\(supportedModels)], disabled: [\(disabledModels)]")
         let defaultIsSupported = recommendation.supported.contains(recommendation.defaultModel)
         if !defaultIsSupported, let bestSupported = recommendation.supported.last {
             deviceRecommendedModel = bestSupported

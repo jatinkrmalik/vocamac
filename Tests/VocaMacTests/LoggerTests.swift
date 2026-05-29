@@ -3,8 +3,8 @@
 //
 // Tests for VocaLogger, LogCategory, and LogLevel.
 
-import XCTest
 @testable import VocaMac
+import XCTest
 
 // MARK: - LogCategory Tests
 
@@ -32,6 +32,7 @@ final class LogCategoryTests: XCTestCase {
         ]
 
         for category in categories {
+            // swiftlint:disable:next force_unwrapping
             let first = category.rawValue.first!
             XCTAssertTrue(first.isUppercase,
                          "LogCategory.\(category) raw value '\(category.rawValue)' should start with uppercase")

@@ -113,11 +113,13 @@ final class CursorOverlayManager {
         guard AXUIElementCopyAttributeValue(systemWide, kAXFocusedApplicationAttribute as CFString, &focusedApp) == .success else {
             return mousePosition()
         }
+        // swiftlint:disable:next force_cast
         let app = focusedApp as! AXUIElement
 
         var focusedElement: AnyObject?
         if AXUIElementCopyAttributeValue(app, kAXFocusedUIElementAttribute as CFString, &focusedElement) == .success,
            focusedElement != nil {
+            // swiftlint:disable:next force_cast
             let element = focusedElement as! AXUIElement
 
             if let caretRect = getCaretRectFromElement(element) {
@@ -146,9 +148,15 @@ final class CursorOverlayManager {
         guard rangeResult == .success, let range = selectedRange else { return nil }
 
         var bounds: AnyObject?
-        guard AXUIElementCopyParameterizedAttributeValue(element, kAXBoundsForRangeParameterizedAttribute as CFString, range, &bounds) == .success else { return nil }
+        guard AXUIElementCopyParameterizedAttributeValue(
+            element,
+            kAXBoundsForRangeParameterizedAttribute as CFString,
+            range,
+            &bounds
+        ) == .success else { return nil }
 
         var rect = CGRect.zero
+        // swiftlint:disable:next force_cast
         guard AXValueGetValue(bounds as! AXValue, .cgRect, &rect) else { return nil }
 
         return convertAXRectToAppKit(rect)
@@ -163,8 +171,10 @@ final class CursorOverlayManager {
 
         var position = CGPoint.zero
         var size = CGSize.zero
+        // swiftlint:disable force_cast
         guard AXValueGetValue(positionValue as! AXValue, .cgPoint, &position),
               AXValueGetValue(sizeValue as! AXValue, .cgSize, &size) else { return nil }
+        // swiftlint:enable force_cast
 
         return CGRect(origin: position, size: size)
     }
@@ -178,6 +188,7 @@ final class CursorOverlayManager {
         }
 
         guard result == .success, window != nil else { return nil }
+        // swiftlint:disable:next force_cast
         return getElementRect(window as! AXUIElement)
     }
 
@@ -197,14 +208,12 @@ final class CursorOverlayManager {
 
     private func clamped(_ point: NSPoint) -> NSPoint {
         let panelSize = CGSize(width: 36, height: 36)
-        for screen in NSScreen.screens {
-            if screen.frame.contains(point) {
-                let visible = screen.visibleFrame
-                return NSPoint(
-                    x: min(max(point.x, visible.minX), visible.maxX - panelSize.width),
-                    y: min(max(point.y, visible.minY), visible.maxY - panelSize.height)
-                )
-            }
+        for screen in NSScreen.screens where screen.frame.contains(point) {
+            let visible = screen.visibleFrame
+            return NSPoint(
+                x: min(max(point.x, visible.minX), visible.maxX - panelSize.width),
+                y: min(max(point.y, visible.minY), visible.maxY - panelSize.height)
+            )
         }
         return point
     }

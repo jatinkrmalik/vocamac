@@ -944,7 +944,10 @@ struct DebugTab: View {
     private func resetPermissions() {
         let alert = NSAlert()
         alert.messageText = "Reset All Permissions?"
-        alert.informativeText = "This will clear all permission grants (Microphone, Accessibility, Input Monitoring) for VocaMac. The app will quit and you'll need to re-grant permissions on next launch.\n\nThis is useful when permissions appear stuck or aren't being recognized after an update."
+        alert.informativeText =
+            "This will clear all permission grants (Microphone, Accessibility, Input Monitoring)" +
+            " for VocaMac. The app will quit and you'll need to re-grant permissions on next launch.\n\n" +
+            "This is useful when permissions appear stuck or aren't being recognized after an update."
         alert.alertStyle = .warning
         alert.addButton(withTitle: "Reset & Quit")
         alert.addButton(withTitle: "Cancel")

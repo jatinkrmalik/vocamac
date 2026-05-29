@@ -4,9 +4,9 @@
 // Manages system permission checking, requesting, and polling.
 // Extracts permission logic from AppState for focused responsibility.
 
-import Foundation
 import AppKit
 import Combine
+import Foundation
 
 /// Manages system permissions: microphone, accessibility, and input monitoring.
 ///
@@ -120,7 +120,7 @@ final class PermissionManager: ObservableObject {
 
     /// Prompt the user to grant Accessibility permission.
     func requestAccessibilityPermission() {
-        let _ = HotKeyManager.checkAccessibilityPermission(prompt: true)
+        _ = HotKeyManager.checkAccessibilityPermission(prompt: true)
         startPermissionPolling()
     }
 

@@ -173,7 +173,7 @@ struct MenuBarView: View {
                     details: [
                         ("CPU Usage", String(format: "%.1f%%", processMonitor.cpuUsage)),
                         ("Threads", "\(processMonitor.threadCount)"),
-                        ("Cores", "\(ProcessInfo.processInfo.activeProcessorCount)"),
+                        ("Cores", "\(ProcessInfo.processInfo.activeProcessorCount)")
                     ]
                 )
 
@@ -183,7 +183,7 @@ struct MenuBarView: View {
                     details: [
                         ("Resident", String(format: "%.1f MB", processMonitor.memoryMB)),
                         ("Peak", String(format: "%.1f MB", processMonitor.memoryPeakMB)),
-                        ("System", "\(ProcessInfo.processInfo.physicalMemory / (1024 * 1024 * 1024)) GB"),
+                        ("System", "\(ProcessInfo.processInfo.physicalMemory / (1024 * 1024 * 1024)) GB")
                     ]
                 )
             }

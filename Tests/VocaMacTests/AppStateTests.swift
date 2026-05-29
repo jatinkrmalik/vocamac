@@ -3,9 +3,9 @@
 //
 // Tests for AppState: translation toggle, onboarding, launch at login.
 
-import XCTest
 import ServiceManagement
 @testable import VocaMac
+import XCTest
 
 // MARK: - Translation Toggle Tests
 
@@ -29,7 +29,6 @@ final class TranslationToggleTests: XCTestCase {
         XCTAssertFalse(appState.translationEnabled)
     }
 }
-
 
 // MARK: - OnboardingStep Tests
 
@@ -64,7 +63,6 @@ final class OnboardingStepTests: XCTestCase {
         XCTAssertEqual(ids.count, uniqueIds.count)
     }
 }
-
 
 // MARK: - Launch at Login Tests
 
