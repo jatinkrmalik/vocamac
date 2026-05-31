@@ -1,7 +1,7 @@
 name: PR Build
 
-# Triggered by commenting "/build" on a pull request.
-# Builds a signed, notarized DMG from the PR branch and posts
+# Triggered by commenting "/build" or "/build-quick" on a pull request.
+# Builds a signed DMG (notarized if /build) from the PR branch and posts
 # a download link as a comment on the PR.
 
 on:
@@ -26,7 +26,7 @@ jobs:
     # 2. The comment body is exactly "/build" (trimmed)
     if: >-
       github.event.issue.pull_request &&
-      contains(github.event.comment.body, '/build')
+      (contains(github.event.comment.body, '/build') || contains(github.event.comment.body, '/build-quick'))
     runs-on: macos-15
     timeout-minutes: 45
 
@@ -59,16 +59,31 @@ jobs:
             core.setOutput('pr_number', context.issue.number);
             core.setOutput('pr_title', pr.data.title);
 
+      - name: Determine build type
+        id: build_type
+        run: |
+          if [[ "${{ github.event.comment.body }}" == *"/build-quick"* ]]; then
+            echo "QUICK=true" >> "$GITHUB_OUTPUT"
+            echo "BUILD_DESCRIPTION=Build signed DMG (skipping notarization)" >> "$GITHUB_OUTPUT"
+            echo "DIST_FLAGS=--skip-notarize" >> "$GITHUB_OUTPUT"
+          else
+            echo "QUICK=false" >> "$GITHUB_OUTPUT"
+            echo "BUILD_DESCRIPTION=Build signed & notarized DMG" >> "$GITHUB_OUTPUT"
+            echo "DIST_FLAGS=" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Post "build started" comment
         uses: actions/github-script@v7
         with:
           script: |
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const description = "${{ steps.build_type.outputs.BUILD_DESCRIPTION }}";
+            const timeEstimate = "${{ steps.build_type.outputs.QUICK }}" === "true" ? "3–5 minutes" : "10–20 minutes";
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: `⏳ **PR Build started** for \`${{ steps.pr.outputs.short_sha }}\`\n\nBuilding signed & notarized DMG... this usually takes 10–20 minutes.\n\n[Watch the build →](${runUrl})`
+              body: `⏳ **PR Build started** for \`${{ steps.pr.outputs.short_sha }}\`\n\n${description}... this usually takes ${timeEstimate}.\n\n[Watch the build →](${runUrl})`
             });
 
       - name: Checkout PR branch
@@ -131,6 +146,7 @@ jobs:
           echo "CODE_SIGN_IDENTITY=$IDENTITY" >> "$GITHUB_ENV"
 
       - name: Store notarization credentials
+        if: steps.build_type.outputs.QUICK != 'true'
         env:
           NOTARIZE_APPLE_ID: ${{ secrets.NOTARIZE_APPLE_ID }}
           NOTARIZE_TEAM_ID:  ${{ secrets.NOTARIZE_TEAM_ID }}
@@ -150,8 +166,8 @@ jobs:
           echo "APP_VERSION=$PR_VERSION" >> "$GITHUB_ENV"
           echo "📦 Build version: $PR_VERSION"
 
-      - name: Build signed, notarized DMG
-        run: ./scripts/dist.sh
+      - name: Build signed DMG
+        run: ./scripts/dist.sh ${{ steps.build_type.outputs.DIST_FLAGS }}
 
       - name: Verify code signature
         run: codesign -v --deep --strict VocaMac.app
@@ -249,6 +265,7 @@ jobs:
           script: |
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             const artifactUrl = `${runUrl}/artifacts/${{ steps.upload.outputs.artifact-id }}`;
+            const isQuick = "${{ steps.build_type.outputs.QUICK }}" === "true";
 
             await github.rest.issues.createComment({
               owner: context.repo.owner,
@@ -264,12 +281,12 @@ jobs:
                 `| **Branch** | \`${{ steps.pr.outputs.ref }}\` |`,
                 `| **Commit** | \`${{ steps.pr.outputs.short_sha }}\` |`,
                 `| **Signed** | ✅ Developer ID |`,
-                `| **Notarized** | ✅ Apple |`,
+                `| **Notarized** | ${isQuick ? '⏭️ Skipped' : '✅ Apple'} |`,
                 ``,
                 `### 📥 Install`,
                 `1. Click the DMG link above to download`,
                 `2. Open the DMG and drag VocaMac to Applications (replace existing)`,
-                `3. Open VocaMac — no Gatekeeper warnings, no permission resets`,
+                `3. Open VocaMac — ${isQuick ? 'Right-click → Open once to bypass Gatekeeper' : 'No Gatekeeper warnings'}, no permission resets`,
                 ``,
                 `<details><summary>SHA-256 checksum</summary>`,
                 ``,
@@ -278,7 +295,7 @@ jobs:
                 `\`\`\``,
                 `</details>`,
                 ``,
-                `> 💡 Comment \`/build\` again to rebuild with the latest changes.`
+                `> 💡 Comment \`/build\` or \`/build-quick\` to rebuild.`
               ].join('\n')
             });
 
