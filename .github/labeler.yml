@@ -1,0 +1,30 @@
+# Labeler configuration
+# See https://github.com/actions/labeler for more information
+
+app:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'Sources/**/*'
+      - 'Tests/**/*'
+      - 'Package.swift'
+      - 'Package.resolved'
+      - 'VocaMac.entitlements'
+
+web:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'web/**/*'
+
+docs:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'docs/**/*'
+      - '*.md'
+      - 'LICENSE'
+
+ci:
+  - changed-files:
+    - any-glob-to-any-file:
+      - '.github/workflows/**/*'
+      - 'Makefile'
+      - 'scripts/**/*'
