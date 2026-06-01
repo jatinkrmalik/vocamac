@@ -23,6 +23,11 @@ struct SettingsView: View {
                     Label("Models", systemImage: "brain")
                 }
 
+            StatsSettingsTab()
+                .tabItem {
+                    Label("Stats", systemImage: "chart.xyaxis.line")
+                }
+
             AudioSettingsTab()
                 .tabItem {
                     Label("Audio", systemImage: "waveform")

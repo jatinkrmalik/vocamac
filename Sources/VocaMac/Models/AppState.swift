@@ -117,6 +117,7 @@ final class AppState: ObservableObject {
     let modelManager: ModelManaging
     let soundManager: SoundPlaying
     let cursorOverlay: CursorOverlayManaging
+    let statsManager: StatsManaging
     let updateChecker = UpdateChecker()
     let permissionManager: any PermissionManaging
 
@@ -147,6 +148,7 @@ final class AppState: ObservableObject {
         modelManager: ModelManaging = ModelManager(),
         soundManager: SoundPlaying = SoundManager(),
         cursorOverlay: CursorOverlayManaging,
+        statsManager: StatsManaging,
         permissionManager: (any PermissionManaging)? = nil,
         skipSystemIntegration: Bool = false
     ) {
@@ -157,6 +159,7 @@ final class AppState: ObservableObject {
         self.modelManager = modelManager
         self.soundManager = soundManager
         self.cursorOverlay = cursorOverlay
+        self.statsManager = statsManager
         self.permissionManager = permissionManager ?? PermissionManager(audioEngine: audioEngine, hotKeyManager: hotKeyManager)
         self.skipSystemIntegration = skipSystemIntegration
 
@@ -172,6 +175,14 @@ final class AppState: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &cancellables)
+
+        // Forward statsManager changes
+        statsManager.objectWillChangePublisher
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
     }
 
     /// Single production AppState instance for the process.
@@ -181,7 +192,10 @@ final class AppState: ObservableObject {
     /// stored-property initialization prevents duplicate service graphs, event
     /// taps, audio observers, and stale SwiftUI environment objects.
     @MainActor
-    private static let sharedProductionInstance = AppState(cursorOverlay: CursorOverlayManager())
+    private static let sharedProductionInstance = AppState(
+        cursorOverlay: CursorOverlayManager(),
+        statsManager: StatsManager()
+    )
 
     /// Convenience factory for creating AppState with all real services.
     /// Needed because CursorOverlayManager is @MainActor and can't be a default parameter.
@@ -513,7 +527,10 @@ final class AppState: ObservableObject {
 
             lastTranscription = result
 
-            // Inject text at cursor position (text is already filtered
+            // Update stats
+            statsManager.recordTranscription(result)
+
+            // Inject text at cursor position
             // by WhisperService to remove hallucination tokens like [BLANK_AUDIO])
             let trimmedText = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
             if !trimmedText.isEmpty {

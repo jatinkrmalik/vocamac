@@ -138,3 +138,13 @@ extension SpeechTranscribing {
 protocol TextInjecting: AnyObject {
     func inject(text: String, preserveClipboard: Bool)
 }
+
+// MARK: - StatsManaging
+
+@MainActor
+protocol StatsManaging: AnyObject {
+    var stats: UserStats { get }
+    var objectWillChangePublisher: AnyPublisher<Void, Never> { get }
+    func recordTranscription(_ transcription: VocaTranscription)
+    func resetStats()
+}
