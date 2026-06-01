@@ -98,19 +98,17 @@ final class ModelManager {
 
         // Search all known tokenizer locations (snapshots, openai cache, etc.)
         let candidates = tokenizerSearchDirectories(for: size)
-        for candidateDir in candidates {
-            if hasRequiredTokenizerAssets(at: candidateDir) {
-                for fileName in requiredTokenizerFiles {
-                    let sourceURL = candidateDir.appendingPathComponent(fileName)
-                    let destinationURL = modelDirectory.appendingPathComponent(fileName)
-                    if fileManager.fileExists(atPath: destinationURL.path) {
-                        try fileManager.removeItem(at: destinationURL)
-                    }
-                    try fileManager.copyItem(at: sourceURL, to: destinationURL)
+        for candidateDir in candidates where hasRequiredTokenizerAssets(at: candidateDir) {
+            for fileName in requiredTokenizerFiles {
+                let sourceURL = candidateDir.appendingPathComponent(fileName)
+                let destinationURL = modelDirectory.appendingPathComponent(fileName)
+                if fileManager.fileExists(atPath: destinationURL.path) {
+                    try fileManager.removeItem(at: destinationURL)
                 }
-                VocaLogger.info(.modelManager, "Repaired tokenizer assets for \(modelName) from \(candidateDir.path)")
-                return
+                try fileManager.copyItem(at: sourceURL, to: destinationURL)
             }
+            VocaLogger.info(.modelManager, "Repaired tokenizer assets for \(modelName) from \(candidateDir.path)")
+            return
         }
 
         throw ModelManagerError.tokenizerAssetsUnavailable(modelName)
@@ -167,14 +165,12 @@ final class ModelManager {
         try ensureInstalledModelReady(for: size)
     }
 
-
     /// Local base directory passed to WhisperKit's downloadBase config.
     /// WhisperKit creates its own subdirectory structure under this path.
     private var downloadBase: URL {
-        let appSupport = FileManager.default.urls(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask
-        ).first!
+        let urls = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
+        // swiftlint:disable:next force_unwrapping
+        let appSupport = urls.first!
         return appSupport
             .appendingPathComponent("VocaMac")
             .appendingPathComponent("models")
@@ -190,6 +186,7 @@ final class ModelManager {
 
     // MARK: - Model Discovery
 
+    // swiftlint:disable large_tuple
     /// Get WhisperKit's recommendation for the current device
     func deviceRecommendation() -> (defaultModel: String, supported: [String], disabled: [String]) {
         let rec = WhisperKit.recommendedModels()
@@ -199,6 +196,7 @@ final class ModelManager {
             disabled: rec.disabled
         )
     }
+    // swiftlint:enable large_tuple
 
     /// Map a ModelSize enum to WhisperKit model variant name
     func whisperKitModelName(for size: ModelSize) -> String {
@@ -307,19 +305,17 @@ final class ModelManager {
         // 3. The model directory's own snapshots/ subdirectory
         let candidateDirectories = tokenizerSearchDirectories(for: size)
 
-        for candidateDir in candidateDirectories {
-            if hasRequiredTokenizerAssets(at: candidateDir) {
-                for file in requiredTokenizerFiles {
-                    let src = candidateDir.appendingPathComponent(file)
-                    let dst = destination.appendingPathComponent(file)
-                    if fileManager.fileExists(atPath: dst.path) {
-                        try? fileManager.removeItem(at: dst)
-                    }
-                    try fileManager.copyItem(at: src, to: dst)
+        for candidateDir in candidateDirectories where hasRequiredTokenizerAssets(at: candidateDir) {
+            for file in requiredTokenizerFiles {
+                let src = candidateDir.appendingPathComponent(file)
+                let dst = destination.appendingPathComponent(file)
+                if fileManager.fileExists(atPath: dst.path) {
+                    try? fileManager.removeItem(at: dst)
                 }
-                VocaLogger.info(.modelManager, "Consolidated tokenizer assets for \(modelName) from \(candidateDir.path)")
-                return
+                try fileManager.copyItem(at: src, to: dst)
             }
+            VocaLogger.info(.modelManager, "Consolidated tokenizer assets for \(modelName) from \(candidateDir.path)")
+            return
         }
 
         VocaLogger.warning(.modelManager, "Could not find tokenizer assets for \(modelName) in any known location")
@@ -399,7 +395,7 @@ final class ModelManager {
                 }
             }
 
-            let _ = try await WhisperKit(config)
+            _ = try await WhisperKit(config)
 
             // Stop the simulated progress and report completion
             progressTask.cancel()

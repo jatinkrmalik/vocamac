@@ -3,10 +3,10 @@
 //
 // Checks GitHub Releases for new versions and downloads DMG updates.
 
-import Foundation
-import SwiftUI
 import AppKit
 import CryptoKit
+import Foundation
+import SwiftUI
 
 enum UpdateCheckerError: LocalizedError {
     case invalidResponse
@@ -158,6 +158,7 @@ final class UpdateChecker: ObservableObject {
     }
 
     func isNewerVersion(remote: String, current: String) -> Bool {
+        // swiftlint:disable:next large_tuple
         func parse(_ version: String) -> (Int, Int, Int) {
             let values = version.split(separator: ".").compactMap { Int($0) }
             let major = values.indices.contains(0) ? values[0] : 0

@@ -4,8 +4,8 @@
 // Listens for global hotkey events using CGEventTap.
 // Supports push-to-talk (hold key) and double-tap toggle modes.
 
-import Foundation
 import AppKit
+import Foundation
 
 final class HotKeyManager {
 
@@ -189,7 +189,7 @@ final class HotKeyManager {
     // MARK: - Event Tap Callback
 
     /// Static C callback for CGEventTap — dispatches to the instance method
-    private static let eventTapCallback: CGEventTapCallBack = { proxy, type, event, userInfo in
+    private static let eventTapCallback: CGEventTapCallBack = { _, type, event, userInfo in
         guard let userInfo = userInfo else { return Unmanaged.passUnretained(event) }
 
         let manager = Unmanaged<HotKeyManager>.fromOpaque(userInfo).takeUnretainedValue()
@@ -432,6 +432,7 @@ extension HotKeyManager: HotKeyMonitoring {
         Self.checkAccessibilityPermission(prompt: prompt)
     }
 
+    // swiftlint:disable:next identifier_name
     func _updateConfiguration(keyCode: Int?, mode: ActivationMode?, doubleTapThreshold: Double?, safetyTimeout: Double?) {
         updateConfiguration(keyCode: keyCode, mode: mode, doubleTapThreshold: doubleTapThreshold, safetyTimeout: safetyTimeout)
     }
@@ -456,7 +457,7 @@ enum KeyCodeReference {
         ("F9", 101),
         ("F10", 109),
         ("F11", 103),
-        ("F12", 111),
+        ("F12", 111)
     ]
 
     /// Get the display name for a key code

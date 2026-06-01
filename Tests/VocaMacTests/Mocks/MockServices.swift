@@ -4,8 +4,8 @@
 // Mock implementations of service protocols for unit testing.
 // These avoid triggering real system side effects (sounds, permissions, mic, etc.).
 
-import Foundation
 import Combine
+import Foundation
 @testable import VocaMac
 
 // MARK: - MockAudioEngine
@@ -86,7 +86,7 @@ final class MockSoundManager: SoundPlaying {
 
 final class MockHotKeyManager: HotKeyMonitoring {
     var isListening = false
-    var eventTap: CFMachPort? = nil
+    var eventTap: CFMachPort?
     var onRecordingStart: (() -> Void)?
     var onRecordingStop: (() -> Void)?
 
@@ -124,6 +124,7 @@ final class MockHotKeyManager: HotKeyMonitoring {
         resetKeyStateCallCount += 1
     }
 
+    // swiftlint:disable:next identifier_name
     func _updateConfiguration(keyCode: Int?, mode: ActivationMode?, doubleTapThreshold: Double?, safetyTimeout: Double?) {
     }
 }
@@ -294,7 +295,13 @@ final class MockWhisperService: SpeechTranscribing {
     var lastTranscribedAudioData: [Float]?
     var lastLanguage: String?
     var lastTranslate: Bool?
-    var mockTranscriptionResult: VocaTranscription = VocaTranscription(text: "mock transcription", duration: 1.0, detectedLanguage: "en", audioLengthSeconds: 1.0, modelUsed: .tiny)
+    var mockTranscriptionResult: VocaTranscription = VocaTranscription(
+        text: "mock transcription",
+        duration: 1.0,
+        detectedLanguage: "en",
+        audioLengthSeconds: 1.0,
+        modelUsed: .tiny
+    )
     var shouldThrow = false
 
     func transcribe(audioData: [Float], language: String?, translate: Bool) async throws -> VocaTranscription {
@@ -307,6 +314,7 @@ final class MockWhisperService: SpeechTranscribing {
         return mockTranscriptionResult
     }
 
+    // swiftlint:disable:next identifier_name
     func _loadModel(name: String?, folder: URL?, onPhaseChange: ((String) -> Void)?) async throws {
         loadedModelName = name ?? "mock-model"
         isModelLoaded = true

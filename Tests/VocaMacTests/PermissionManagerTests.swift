@@ -3,8 +3,8 @@
 //
 // Tests for the PermissionManager service.
 
-import XCTest
 @testable import VocaMac
+import XCTest
 
 // MARK: - PermissionStatus Tests
 

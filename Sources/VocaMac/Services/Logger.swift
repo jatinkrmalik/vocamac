@@ -291,10 +291,8 @@ final class VocaLogger {
         result += "================================\n\n"
 
         let lines = getLastLines(lastLines)
-        for line in lines {
-            if !line.isEmpty {
-                result += line + "\n"
-            }
+        for line in lines where !line.isEmpty {
+            result += line + "\n"
         }
 
         return result

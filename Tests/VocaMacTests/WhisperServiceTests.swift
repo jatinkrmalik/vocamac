@@ -3,8 +3,8 @@
 //
 // Tests for WhisperService: translation and hallucination filtering.
 
-import XCTest
 @testable import VocaMac
+import XCTest
 
 // MARK: - WhisperService Translation Tests
 
@@ -18,7 +18,6 @@ final class WhisperServiceTranslationTests: XCTestCase {
         XCTAssertNotNil(service)
     }
 }
-
 
 // MARK: - WhisperService Hallucination Filtering Tests
 

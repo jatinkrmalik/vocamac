@@ -3,8 +3,8 @@
 //
 // Tests for HotKeyManager configuration and state logic.
 
-import XCTest
 @testable import VocaMac
+import XCTest
 
 // MARK: - HotKeyManager Configuration Tests
 

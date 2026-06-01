@@ -1,0 +1,86 @@
+# VocaMac — SwiftLint configuration
+# Docs: https://github.com/realm/SwiftLint
+
+# ─── Scope ────────────────────────────────────────────────────────────────────
+
+included:
+  - Sources/VocaMac
+  - Tests/VocaMacTests
+
+excluded:
+  - .build
+  - Sources/VocaMacObjC # Objective-C bridge; not linted
+
+# ─── Disabled rules ───────────────────────────────────────────────────────────
+
+disabled_rules:
+  - todo # TODOs are fine during active development
+  - multiple_closures_with_trailing_closure # Too restrictive with SwiftUI modifiers
+
+# ─── Opt-in rules ─────────────────────────────────────────────────────────────
+# These are not on by default; we explicitly enable the ones that match our conventions.
+
+opt_in_rules:
+  - force_unwrapping # AGENTS.md: "Never force-unwrap"
+  - empty_count # prefer .isEmpty over count == 0
+  - empty_string # prefer .isEmpty over == ""
+  - closure_spacing # { x } not {x}
+  - first_where # prefer first(where:) over filter().first
+  - last_where # prefer last(where:) over filter().last
+  - toggle_bool # prefer .toggle() over = !flag
+  - prefer_self_type_over_type_of_self # use Self instead of type(of: self)
+  - redundant_nil_coalescing # avoid ?? nil
+  - fatal_error_message # fatalError() must carry a message
+  - sorted_imports # keep import groups sorted alphabetically
+
+# ─── Rule configuration ───────────────────────────────────────────────────────
+
+force_cast: error
+force_try: error
+
+line_length:
+  warning: 140
+  error: 200
+  ignores_comments: true
+  ignores_urls: true
+
+file_length:
+  warning: 600
+  error: 1000
+  ignore_comment_only_lines: true
+
+function_body_length:
+  warning: 100
+  error: 150
+
+type_body_length:
+  warning: 500
+  error: 700
+
+cyclomatic_complexity:
+  warning: 15
+  error: 25
+
+nesting:
+  type_level:
+    warning: 2
+  function_level:
+    warning: 4
+
+type_name:
+  min_length: 3
+  max_length: 50
+
+identifier_name:
+  min_length: 2
+  max_length: 50
+  excluded:
+    - id
+    - x
+    - y
+    - i
+    - j
+    - k
+    - db
+    - ok
+    - on

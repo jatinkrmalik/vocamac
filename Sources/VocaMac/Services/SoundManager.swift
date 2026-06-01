@@ -4,8 +4,8 @@
 // Plays audio feedback sounds for recording start/stop events.
 // Uses macOS system sounds for soft, pleasing audio cues.
 
-import Foundation
 import AppKit
+import Foundation
 
 final class SoundManager: NSObject, NSSoundDelegate, @unchecked Sendable {
 
@@ -105,7 +105,7 @@ final class SoundManager: NSObject, NSSoundDelegate, @unchecked Sendable {
     // MARK: - NSSoundDelegate
 
     /// Called when sound finishes playing
-    nonisolated func sound(_ sound: NSSound, didFinishPlaying FinishedPlaying: Bool) {
+    nonisolated func sound(_ sound: NSSound, didFinishPlaying finishedPlaying: Bool) {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             self.continuationLock.lock()

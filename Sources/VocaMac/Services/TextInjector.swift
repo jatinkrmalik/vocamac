@@ -4,9 +4,9 @@
 // Injects transcribed text at the cursor position in any application
 // using the clipboard (NSPasteboard) + simulated Cmd+V keystroke approach.
 
-import Foundation
 import AppKit
 import Carbon.HIToolbox
+import Foundation
 
 final class TextInjector {
 
@@ -23,9 +23,11 @@ final class TextInjector {
     /// pasteboard a moment to settle after we write to it.
     private let prePasteDelay: Double = 0.05
 
+    // swiftlint:disable identifier_name
     /// Default virtual key code for the V key on a US-QWERTY layout.
     /// Used as a fallback when the active layout cannot be inspected.
     private let kVK_ANSI_V_Fallback: CGKeyCode = 9
+    // swiftlint:enable identifier_name
 
     // MARK: - Types
 

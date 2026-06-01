@@ -3,8 +3,8 @@
 //
 // Tests for CursorOverlayManager, IndicatorPhase, and MicIndicatorViewModel.
 
-import XCTest
 @testable import VocaMac
+import XCTest
 
 // MARK: - IndicatorPhase Tests
 

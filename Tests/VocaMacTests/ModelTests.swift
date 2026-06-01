@@ -4,9 +4,9 @@
 // Tests for data models: SystemInfo, ModelSize, ModelManager,
 // WhisperModelInfo, TranscriptionResult, AppStatus, ActivationMode.
 
-import XCTest
 import ServiceManagement
 @testable import VocaMac
+import XCTest
 
 // MARK: - SystemInfo Tests
 
@@ -274,4 +274,3 @@ final class ActivationModeTests: XCTestCase {
         XCTAssertEqual(ActivationMode.doubleTapToggle.rawValue, "doubleTapToggle")
     }
 }
-

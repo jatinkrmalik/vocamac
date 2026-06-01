@@ -4,8 +4,8 @@
 // Real-time microphone audio capture using AVAudioEngine.
 // Captures audio in the format required by whisper.cpp (16kHz, mono, Float32 PCM).
 
-import Foundation
 import AVFoundation
+import Foundation
 import VocaMacObjC
 
 final class AudioEngine {
@@ -33,13 +33,10 @@ final class AudioEngine {
     private var lastLevelReportTime: Date = Date()
     private let levelReportInterval: TimeInterval = 1.0 / 15.0  // ~15 Hz
 
+    // swiftlint:disable force_unwrapping
     /// Target audio format for whisper.cpp
-    static let whisperFormat = AVAudioFormat(
-        commonFormat: .pcmFormatFloat32,
-        sampleRate: 16000.0,
-        channels: 1,
-        interleaved: false
-    )!
+    static let whisperFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 16000.0, channels: 1, interleaved: false)!
+    // swiftlint:enable force_unwrapping
 
     // MARK: - Callbacks
 

@@ -3,8 +3,8 @@
 //
 // Tests for AppState recording flow and state transitions.
 
-import XCTest
 @testable import VocaMac
+import XCTest
 
 // MARK: - AppState Recording State Transition Tests
 
