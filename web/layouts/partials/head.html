@@ -60,3 +60,14 @@
 
     <link rel="preload" as="image" href="/logo-web.png">
     <link rel="stylesheet" href="/style.css">
+
+    <!-- Google tag (gtag.js) -->
+    {{ with .Site.Params.gaID }}
+    <script async src="https://www.googletagmanager.com/gtag/js?id={{ . }}"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', '{{ . }}');
+    </script>
+    {{ end }}
