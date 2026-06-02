@@ -152,7 +152,8 @@ HotKey Triggered (stop)
 
 **Implementation Approach:**
 - Uses `CGEvent.tapCreate()` to create a Mach port event tap
-- Tap is inserted at `.cghidEventTap` level for system-wide coverage
+- Tap is inserted at `.cgSessionEventTap` level for user-session coverage
+- The tap acts as an event filter and consumes only the configured hotkey events so they don't leak into the frontmost app
 - Callback processes `keyDown`/`keyUp` events for regular keys and `flagsChanged` events for modifier keys
 
 **Activation Modes:**
@@ -176,9 +177,9 @@ On keyUp:
   (Used only for push-to-talk mode)
 ```
 
-**Default Hotkey:** Right Option (keyCode 61). Users can choose a preset or record any single activation key from Settings.
+**Default Hotkey:** Right Option (keyCode 61). Users can choose a preset or record any single activation key from Settings; the selected key is reserved by VocaMac while the app is running.
 
-**Required Permission:** Accessibility (System Settings → Privacy & Security → Accessibility)
+**Required Permissions:** Accessibility and Input Monitoring (System Settings → Privacy & Security)
 
 #### 3.2.4 `AudioEngine` - Microphone Capture
 

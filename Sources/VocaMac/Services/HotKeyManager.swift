@@ -6,6 +6,7 @@
 
 import Foundation
 import AppKit
+import Carbon.HIToolbox
 
 final class HotKeyManager {
 
@@ -37,6 +38,12 @@ final class HotKeyManager {
 
     /// Whether we are currently in a "recording" toggle state (for double-tap mode)
     private var isToggled = false
+
+    /// Whether the configured modifier key is physically held.
+    /// This is tracked separately from recording state so modifier double-tap
+    /// mode can distinguish press/release even when another same-group modifier
+    /// keeps the shared modifier flag set.
+    private var isModifierKeyHeld = false
 
     /// Safety timer that auto-fires key-up if a real key-up event is missed.
     /// macOS can drop flagsChanged events when multiple modifiers interact,
@@ -97,6 +104,7 @@ final class HotKeyManager {
         self.lastKeyDownTime = 0
         self.isKeyHeld = false
         self.isToggled = false
+        self.isModifierKeyHeld = false
 
         // Create event tap for key events and flags changed (modifier keys)
         let eventMask: CGEventMask = (
@@ -109,9 +117,9 @@ final class HotKeyManager {
         let userInfo = Unmanaged.passUnretained(self).toOpaque()
 
         guard let tap = CGEvent.tapCreate(
-            tap: .cghidEventTap,
+            tap: .cgSessionEventTap,
             place: .headInsertEventTap,
-            options: .listenOnly,  // Listen only — don't suppress events
+            options: .defaultTap,
             eventsOfInterest: eventMask,
             callback: HotKeyManager.eventTapCallback,
             userInfo: userInfo
@@ -149,7 +157,7 @@ final class HotKeyManager {
         isListening = false
         isKeyHeld = false
         isToggled = false
-        previousFlags = []
+        isModifierKeyHeld = false
         cancelSafetyTimer()
 
         VocaLogger.info(.hotKeyManager, "Stopped listening")
@@ -162,6 +170,7 @@ final class HotKeyManager {
     func resetKeyState() {
         isKeyHeld = false
         isToggled = false
+        isModifierKeyHeld = false
         cancelSafetyTimer()
         VocaLogger.debug(.hotKeyManager, "Key state reset")
     }
@@ -202,7 +211,10 @@ final class HotKeyManager {
             return Unmanaged.passUnretained(event)
         }
 
-        manager.handleEvent(type: type, event: event)
+        let shouldConsumeEvent = manager.handleEvent(type: type, event: event)
+        if shouldConsumeEvent {
+            return nil
+        }
 
         return Unmanaged.passUnretained(event)
     }
@@ -210,7 +222,11 @@ final class HotKeyManager {
     // MARK: - Event Handling
 
     /// Handle an incoming key event
-    private func handleEvent(type: CGEventType, event: CGEvent) {
+    /// - Returns: `true` when the event belongs to the configured hotkey and
+    ///   should be consumed so it doesn't also affect the frontmost app.
+    private func handleEvent(type: CGEventType, event: CGEvent) -> Bool {
+        guard !isSelfGeneratedEvent(event) else { return false }
+
         let keyCode = Int(event.getIntegerValueField(.keyboardEventKeycode))
 
         // For modifier keys (like Option), we use flagsChanged events
@@ -219,10 +235,17 @@ final class HotKeyManager {
             if keyCode == targetKeyCode {
                 VocaLogger.debug(.hotKeyManager, "flagsChanged event for target keyCode \(keyCode)")
             }
-            handleModifierKeyEvent(keyCode: keyCode, event: event)
+            return handleModifierKeyEvent(keyCode: keyCode, event: event)
         } else if type == .keyDown || type == .keyUp {
-            handleRegularKeyEvent(keyCode: keyCode, isKeyDown: type == .keyDown, event: event)
+            return handleRegularKeyEvent(keyCode: keyCode, isKeyDown: type == .keyDown, event: event)
         }
+
+        return false
+    }
+
+    private func isSelfGeneratedEvent(_ event: CGEvent) -> Bool {
+        let eventPID = event.getIntegerValueField(.eventSourceUnixProcessID)
+        return eventPID == Int64(ProcessInfo.processInfo.processIdentifier)
     }
 
     /// Handle modifier key events (Option, Command, Control, Shift, Fn)
@@ -236,14 +259,13 @@ final class HotKeyManager {
     /// and releasing Right Option while Left Option is held would *not* clear
     /// the flag, causing the key-up to be missed.
     ///
-    /// **Fix:** We track the raw flags value and detect transitions. When the
-    /// target key code fires a `flagsChanged` event, we compare the current
-    /// flags with the previous snapshot to determine if the *specific* key
-    /// was pressed or released.
-    private var previousFlags: CGEventFlags = []
+    /// **Fix:** We track the target modifier's physical held state. When a
+    /// `flagsChanged` event arrives for the target key code, a transition from
+    /// not-held to set flags is a press; any later target-key event while held
+    /// is a release, even if another same-group modifier keeps the shared flag set.
 
-    private func handleModifierKeyEvent(keyCode: Int, event: CGEvent) {
-        guard keyCode == targetKeyCode else { return }
+    private func handleModifierKeyEvent(keyCode: Int, event: CGEvent) -> Bool {
+        guard keyCode == targetKeyCode else { return false }
 
         let flags = event.flags
 
@@ -261,54 +283,40 @@ final class HotKeyManager {
         case 63:      // Fn key
             relevantMask = .maskSecondaryFn
         default:
-            return
+            return false
         }
 
         // A flagsChanged event for this keyCode means the key was either
-        // pressed or released. We determine which by comparing the flag
-        // state with our expectation:
-        //
-        // • If the modifier flag is set AND we weren't already tracking
-        //   this key as held → key was pressed.
-        // • If the modifier flag is cleared → key was definitely released.
-        // • If the modifier flag is still set BUT macOS sent a flagsChanged
-        //   event specifically for our keyCode → the *specific* physical key
-        //   changed state. Since a flagsChanged for keyCode X only fires when
-        //   key X changes, if we were already holding it, this means it was
-        //   released (the flag may still be set because the *other* key in
-        //   the pair, e.g. Left Option, is still down).
+        // pressed or released. Modifier flags are shared by left/right pairs,
+        // so we cannot rely on the flag being cleared to detect release.
         let flagIsSet = flags.contains(relevantMask)
 
         let isPressed: Bool
-        if !flagIsSet {
-            // Flag is clear — the key is definitely released
-            isPressed = false
-        } else if !isKeyHeld {
-            // Flag is set and we weren't tracking this key — it was pressed
+        if flagIsSet && !isModifierKeyHeld {
             isPressed = true
-        } else {
-            // Flag is still set but we're already tracking the key as held,
-            // and macOS sent a flagsChanged event for this exact keyCode.
-            // This means the physical key was released (the flag persists
-            // because another key in the same modifier group is still held).
+            isModifierKeyHeld = true
+        } else if isModifierKeyHeld {
             isPressed = false
+            isModifierKeyHeld = false
+        } else {
+            return true
         }
-
-        previousFlags = flags
 
         if isPressed {
             handleKeyDown()
         } else {
             handleKeyUp()
         }
+
+        return true
     }
 
     /// Handle regular (non-modifier) key events
-    private func handleRegularKeyEvent(keyCode: Int, isKeyDown: Bool, event: CGEvent) {
-        guard keyCode == targetKeyCode else { return }
+    private func handleRegularKeyEvent(keyCode: Int, isKeyDown: Bool, event: CGEvent) -> Bool {
+        guard keyCode == targetKeyCode else { return false }
 
         if isKeyDown && event.getIntegerValueField(.keyboardEventAutorepeat) != 0 {
-            return
+            return true
         }
 
         if isKeyDown {
@@ -316,6 +324,8 @@ final class HotKeyManager {
         } else {
             handleKeyUp()
         }
+
+        return true
     }
 
     /// Process a key-down event for the target hotkey
@@ -445,7 +455,7 @@ extension HotKeyManager: HotKeyMonitoring {
 
 extension HotKeyManager {
     /// Exercise event handling without installing a process-wide event tap.
-    func _handleTestEvent(type: CGEventType, event: CGEvent) {
+    func _handleTestEvent(type: CGEventType, event: CGEvent) -> Bool {
         handleEvent(type: type, event: event)
     }
 }
@@ -455,6 +465,8 @@ extension HotKeyManager {
 /// Reference for common macOS virtual key codes
 /// Used for hotkey configuration UI
 enum KeyCodeReference {
+    static let escapeKeyCode = 53
+
     static let commonHotKeys: [(name: String, keyCode: Int)] = [
         ("Right Option (⌥)", 61),
         ("Left Option (⌥)", 58),
@@ -473,56 +485,9 @@ enum KeyCodeReference {
     ]
 
     private static let namedKeyCodes: [Int: String] = [
-        0: "A",
-        1: "S",
-        2: "D",
-        3: "F",
-        4: "H",
-        5: "G",
-        6: "Z",
-        7: "X",
-        8: "C",
-        9: "V",
-        11: "B",
-        12: "Q",
-        13: "W",
-        14: "E",
-        15: "R",
-        16: "Y",
-        17: "T",
-        18: "1",
-        19: "2",
-        20: "3",
-        21: "4",
-        22: "6",
-        23: "5",
-        24: "=",
-        25: "9",
-        26: "7",
-        27: "-",
-        28: "8",
-        29: "0",
-        30: "]",
-        31: "O",
-        32: "U",
-        33: "[",
-        34: "I",
-        35: "P",
         36: "Return",
-        37: "L",
-        38: "J",
-        39: "'",
-        40: "K",
-        41: ";",
-        42: "\\",
-        43: ",",
-        44: "/",
-        45: "N",
-        46: "M",
-        47: ".",
         48: "Tab",
         49: "Space",
-        50: "`",
         51: "Delete",
         53: "Escape",
         54: "Right Command (⌘)",
@@ -589,6 +554,7 @@ enum KeyCodeReference {
     static func displayName(for keyCode: Int) -> String {
         commonHotKeys.first(where: { $0.keyCode == keyCode })?.name
             ?? namedKeyCodes[keyCode]
+            ?? displayCharacter(for: keyCode)
             ?? "Key \(keyCode)"
     }
 
@@ -605,5 +571,73 @@ enum KeyCodeReference {
         default:
             return false
         }
+    }
+
+    private static func displayCharacter(for keyCode: Int) -> String? {
+        let inputSource: TISInputSource? = {
+            if let asciiSource = TISCopyCurrentASCIICapableKeyboardLayoutInputSource()?.takeRetainedValue() {
+                return asciiSource
+            }
+            return TISCopyCurrentKeyboardLayoutInputSource()?.takeRetainedValue()
+        }()
+
+        guard let source = inputSource,
+              let layoutDataPointer = TISGetInputSourceProperty(source, kTISPropertyUnicodeKeyLayoutData)
+        else {
+            return fallbackDisplayCharacter(for: keyCode)
+        }
+
+        let layoutData = Unmanaged<CFData>.fromOpaque(layoutDataPointer).takeUnretainedValue() as Data
+
+        return layoutData.withUnsafeBytes { (rawBuffer: UnsafeRawBufferPointer) -> String? in
+            guard let baseAddress = rawBuffer.baseAddress else {
+                return fallbackDisplayCharacter(for: keyCode)
+            }
+
+            let keyboardLayout = baseAddress.assumingMemoryBound(to: UCKeyboardLayout.self)
+            var deadKeyState: UInt32 = 0
+            let maxStringLength = 4
+            var actualStringLength = 0
+            var unicodeString = [UniChar](repeating: 0, count: maxStringLength)
+
+            let status = UCKeyTranslate(
+                keyboardLayout,
+                UInt16(keyCode),
+                UInt16(kUCKeyActionDisplay),
+                0,
+                UInt32(LMGetKbdType()),
+                OptionBits(kUCKeyTranslateNoDeadKeysBit),
+                &deadKeyState,
+                maxStringLength,
+                &actualStringLength,
+                &unicodeString
+            )
+
+            guard status == noErr, actualStringLength > 0 else {
+                return fallbackDisplayCharacter(for: keyCode)
+            }
+
+            let produced = String(utf16CodeUnits: unicodeString, count: actualStringLength)
+            guard produced.rangeOfCharacter(from: .controlCharacters) == nil else {
+                return fallbackDisplayCharacter(for: keyCode)
+            }
+
+            return produced.count == 1 ? produced.uppercased() : produced
+        }
+    }
+
+    private static func fallbackDisplayCharacter(for keyCode: Int) -> String? {
+        let qwertyNames: [Int: String] = [
+            0: "A", 1: "S", 2: "D", 3: "F", 4: "H", 5: "G",
+            6: "Z", 7: "X", 8: "C", 9: "V", 11: "B",
+            12: "Q", 13: "W", 14: "E", 15: "R", 16: "Y", 17: "T",
+            18: "1", 19: "2", 20: "3", 21: "4", 22: "6", 23: "5",
+            24: "=", 25: "9", 26: "7", 27: "-", 28: "8", 29: "0",
+            30: "]", 31: "O", 32: "U", 33: "[", 34: "I", 35: "P",
+            37: "L", 38: "J", 39: "'", 40: "K", 41: ";", 42: "\\",
+            43: ",", 44: "/", 45: "N", 46: "M", 47: ".", 50: "`",
+        ]
+
+        return qwertyNames[keyCode]
     }
 }

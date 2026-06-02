@@ -643,7 +643,7 @@ struct HotkeyConfigStep: View {
 
                     HotKeySelectionControl(
                         pickerLabel: "Key",
-                        footerText: "Press this key to start recording."
+                        footerText: "VocaMac reserves this key while running."
                     )
                 }
 

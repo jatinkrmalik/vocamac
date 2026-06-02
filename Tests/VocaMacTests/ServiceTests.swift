@@ -18,8 +18,12 @@ final class KeyCodeReferenceTests: XCTestCase {
         XCTAssertEqual(KeyCodeReference.displayName(for: 61), "Right Option (⌥)")
     }
 
-    func testDisplayNameForRecordedCharacterKeyCode() {
-        XCTAssertEqual(KeyCodeReference.displayName(for: 0), "A")
+    func testDisplayNameForRecordedCharacterKeyCodeUsesActiveLayout() throws {
+        guard let keyCode = TextInjector.keyCode(forCharacter: "a") else {
+            throw XCTSkip("Could not inspect active keyboard layout")
+        }
+
+        XCTAssertEqual(KeyCodeReference.displayName(for: Int(keyCode)), "A")
     }
 
     func testDisplayNameForRecordedFunctionKeyCode() {
@@ -38,6 +42,15 @@ final class KeyCodeReferenceTests: XCTestCase {
         XCTAssertTrue(KeyCodeReference.isModifierKeyCode(61))
         XCTAssertTrue(KeyCodeReference.isModifierKeyCode(55))
         XCTAssertFalse(KeyCodeReference.isModifierKeyCode(105))
+    }
+
+    func testEscapeKeyCodeConstant() {
+        XCTAssertEqual(KeyCodeReference.escapeKeyCode, 53)
+        XCTAssertEqual(KeyCodeReference.displayName(for: KeyCodeReference.escapeKeyCode), "Escape")
+    }
+
+    func testDisplayNameForSpaceUsesReadableName() {
+        XCTAssertEqual(KeyCodeReference.displayName(for: 49), "Space")
     }
 
     func testCommonHotKeysValid() {

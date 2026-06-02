@@ -34,9 +34,9 @@ struct HotKeySelectionControl: View {
                     }
                 }
                 .disabled(isRecording)
-                .onChange(of: appState.hotKeyCode) { newCode in
+                .onChange(of: appState.hotKeyCode) { _ in
                     guard !isRecording else { return }
-                    appState.hotKeyManager.updateConfiguration(keyCode: newCode)
+                    appState.syncHotKeyConfiguration()
                 }
 
                 HotKeyRecorderButton(
@@ -48,7 +48,7 @@ struct HotKeySelectionControl: View {
             }
 
             if isRecording {
-                Label("Press any single key", systemImage: "keyboard")
+                Label("Press a key, or press Escape to cancel", systemImage: "keyboard")
                     .font(.caption)
                     .foregroundStyle(Color.accentColor)
             } else if let footerText {
@@ -80,7 +80,7 @@ struct HotKeySelectionControl: View {
 
     private func recordKey(_ keyCode: Int) {
         appState.hotKeyCode = keyCode
-        appState.hotKeyManager.updateConfiguration(keyCode: keyCode)
+        appState.syncHotKeyConfiguration()
         finishRecording()
     }
 
@@ -117,10 +117,16 @@ private struct HotKeyRecorderButton: View {
             .controlSize(.small)
 
             if isRecording {
-                HotKeyCaptureView { keyCode in
-                    isRecording = false
-                    onKeyRecorded(keyCode)
-                }
+                HotKeyCaptureView(
+                    onCapture: { keyCode in
+                        isRecording = false
+                        onKeyRecorded(keyCode)
+                    },
+                    onCancel: {
+                        isRecording = false
+                        onCancel()
+                    }
+                )
                 .frame(width: 1, height: 1)
                 .opacity(0)
                 .accessibilityHidden(true)
@@ -131,15 +137,18 @@ private struct HotKeyRecorderButton: View {
 
 private struct HotKeyCaptureView: NSViewRepresentable {
     let onCapture: (Int) -> Void
+    let onCancel: () -> Void
 
     func makeNSView(context: Context) -> HotKeyCaptureNSView {
         let view = HotKeyCaptureNSView()
         view.onCapture = onCapture
+        view.onCancel = onCancel
         return view
     }
 
     func updateNSView(_ nsView: HotKeyCaptureNSView, context: Context) {
         nsView.onCapture = onCapture
+        nsView.onCancel = onCancel
         nsView.focus()
     }
 
@@ -150,8 +159,10 @@ private struct HotKeyCaptureView: NSViewRepresentable {
 
 private final class HotKeyCaptureNSView: NSView {
     var onCapture: ((Int) -> Void)?
+    var onCancel: (() -> Void)?
 
     private var localMonitor: Any?
+    private var windowResignObserver: NSObjectProtocol?
     private var didCapture = false
 
     override var acceptsFirstResponder: Bool { true }
@@ -159,6 +170,7 @@ private final class HotKeyCaptureNSView: NSView {
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         installMonitor()
+        installWindowObserver()
         focus()
     }
 
@@ -182,6 +194,11 @@ private final class HotKeyCaptureNSView: NSView {
             NSEvent.removeMonitor(localMonitor)
             self.localMonitor = nil
         }
+
+        if let windowResignObserver {
+            NotificationCenter.default.removeObserver(windowResignObserver)
+            self.windowResignObserver = nil
+        }
     }
 
     private func installMonitor() {
@@ -192,8 +209,26 @@ private final class HotKeyCaptureNSView: NSView {
         }
     }
 
+    private func installWindowObserver() {
+        guard windowResignObserver == nil, let window else { return }
+        windowResignObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didResignKeyNotification,
+            object: window,
+            queue: .main
+        ) { [weak self] _ in
+            self?.cancelCapture()
+        }
+    }
+
     private func capture(_ event: NSEvent) -> Bool {
-        guard !didCapture, shouldCapture(event) else { return false }
+        guard !didCapture else { return false }
+
+        if shouldCancel(event) {
+            cancelCapture()
+            return true
+        }
+
+        guard shouldCapture(event) else { return false }
 
         didCapture = true
         stopMonitoring()
@@ -203,6 +238,15 @@ private final class HotKeyCaptureNSView: NSView {
             self?.onCapture?(keyCode)
         }
         return true
+    }
+
+    private func cancelCapture() {
+        guard !didCapture else { return }
+        didCapture = true
+        stopMonitoring()
+        DispatchQueue.main.async { [weak self] in
+            self?.onCancel?()
+        }
     }
 
     private func shouldCapture(_ event: NSEvent) -> Bool {
@@ -220,6 +264,10 @@ private final class HotKeyCaptureNSView: NSView {
         default:
             return false
         }
+    }
+
+    private func shouldCancel(_ event: NSEvent) -> Bool {
+        event.type == .keyDown && Int(event.keyCode) == KeyCodeReference.escapeKeyCode
     }
 
     private func modifierFlag(for keyCode: Int) -> NSEvent.ModifierFlags? {

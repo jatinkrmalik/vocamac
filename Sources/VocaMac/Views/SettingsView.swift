@@ -73,7 +73,7 @@ struct GeneralSettingsTab: View {
             Section("Hotkey") {
                 HotKeySelectionControl(
                     pickerLabel: "Activation Key",
-                    footerText: "Choose a preset or record a custom activation key."
+                    footerText: "Choose a preset or record a key. VocaMac reserves this key while running."
                 )
 
                 if appState.activationMode == .doubleTapToggle {
