@@ -41,7 +41,7 @@
 - **⚡ Native Apple Acceleration** - CoreML + Metal + Neural Engine acceleration on Apple Silicon. No manual setup.
 - **📊 Visual Feedback** - Menu bar icon changes color during recording and processing. Audio level indicator shows input.
 - **🔄 Auto-Updates** - Built-in update checker queries GitHub Releases on launch and lets you download and install the latest version in one click from within the app.
-- **⚙️ Configurable** - Choose hotkeys, models, languages, silence detection thresholds, and more.
+- **⚙️ Configurable** - Choose hotkey presets or record a custom activation key reserved by VocaMac while it runs, models, languages, silence detection thresholds, and more.
 
 ---
 
@@ -251,7 +251,7 @@ Open Settings from the menu bar popover or with **⌘,**
 
 ### General
 - **Activation mode** - Push-to-Talk or Double-Tap Toggle
-- **Hotkey** - Choose from Right Option, Right Command, Fn, function keys, etc.
+- **Hotkey** - Choose from common presets or record a custom activation key directly from your keyboard. The selected key is consumed by VocaMac while the app is running.
 - **Language** - Auto-detect or specify (English, Spanish, French, German, Chinese, Japanese, and more)
 - **Launch at login**
 

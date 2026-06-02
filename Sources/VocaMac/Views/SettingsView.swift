@@ -71,14 +71,10 @@ struct GeneralSettingsTab: View {
 
             // Hotkey
             Section("Hotkey") {
-                Picker("Activation Key", selection: $appState.hotKeyCode) {
-                    ForEach(KeyCodeReference.commonHotKeys, id: \.keyCode) { hotKey in
-                        Text(hotKey.name).tag(hotKey.keyCode)
-                    }
-                }
-                .onChange(of: appState.hotKeyCode) { _ in
-                    appState.syncHotKeyConfiguration()
-                }
+                HotKeySelectionControl(
+                    pickerLabel: "Activation Key",
+                    footerText: "Choose a preset or record a key. VocaMac reserves this key while running."
+                )
 
                 if appState.activationMode == .doubleTapToggle {
                     HStack {
