@@ -183,13 +183,15 @@ final class AudioEngine {
     ///   - silenceThreshold: RMS energy threshold below which audio is considered silence
     ///   - silenceDuration: Seconds of silence before triggering silence detection callback
     ///   - maxDuration: Maximum recording duration in seconds
+    /// - Returns: `true` when the engine is recording, otherwise `false`.
+    @discardableResult
     func startRecording(
         silenceThreshold: Float = 0.01,
         silenceDuration: Double = 2.0,
         maxDuration: TimeInterval = 60.0
-    ) {
+    ) -> Bool {
         lifecycleQueue.sync {
-            guard !self._isCurrentlyRecording else { return }
+            guard !self._isCurrentlyRecording else { return true }
 
             self.silenceThreshold = silenceThreshold
             self.silenceDuration = silenceDuration
@@ -208,7 +210,7 @@ final class AudioEngine {
                     "Invalid input format before recording start: sampleRate=\(inputFormat.sampleRate), channels=\(inputFormat.channelCount)"
                 )
                 recoverFromStartFailure(notifyAppState: true)
-                return
+                return false
             }
 
             // A previous failed start can leave a tap installed even when our
@@ -234,14 +236,15 @@ final class AudioEngine {
             if let exception {
                 VocaLogger.error(.audioEngine, "AVAudioEngine exception while starting recording: \(exception.localizedDescription)")
                 recoverFromStartFailure(notifyAppState: true)
-                return
+                return false
             }
 
             if let startError {
                 VocaLogger.error(.audioEngine, "Failed to start audio engine: \(startError.localizedDescription)")
                 recoverFromStartFailure(notifyAppState: true)
-                return
+                return false
             }
+            return true
         }
     }
 

@@ -22,14 +22,17 @@ final class MockAudioEngine: AudioRecording {
     var lastMaxDuration: TimeInterval?
     var stopRecordingResult: [Float] = []
     var forceResetCallCount = 0
+    var startRecordingResult = true
 
     private var permissionStatus: PermissionStatus = .granted
 
-    func startRecording(silenceThreshold: Float, silenceDuration: Double, maxDuration: TimeInterval) {
-        isCurrentlyRecording = true
+    @discardableResult
+    func startRecording(silenceThreshold: Float, silenceDuration: Double, maxDuration: TimeInterval) -> Bool {
+        isCurrentlyRecording = startRecordingResult
         lastSilenceThreshold = silenceThreshold
         lastSilenceDuration = silenceDuration
         lastMaxDuration = maxDuration
+        return startRecordingResult
     }
 
     @discardableResult
