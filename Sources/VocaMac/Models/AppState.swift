@@ -108,6 +108,10 @@ final class AppState: ObservableObject {
     @AppStorage("vocamac.translationEnabled") var translationEnabled: Bool = false
     @AppStorage("vocamac.logLevel") var logLevel: String = "info"
 
+    private var hotKeySafetyTimeout: Double {
+        Double(maxRecordingDuration) + 5.0
+    }
+
     // MARK: - Services
 
     let audioEngine: AudioRecording
@@ -374,7 +378,7 @@ final class AppState: ObservableObject {
                 keyCode: self.hotKeyCode,
                 mode: self.activationMode,
                 doubleTapThreshold: self.doubleTapThreshold,
-                safetyTimeout: Double(self.maxRecordingDuration) + 5.0
+                safetyTimeout: self.hotKeySafetyTimeout
             )
             VocaLogger.info(.appState, "Hotkey listener started after permission grant")
         }
@@ -398,6 +402,21 @@ final class AppState: ObservableObject {
     func openMicrophoneSettings() { permissionManager.openMicrophoneSettings() }
     func requestAccessibilityPermission() { permissionManager.requestAccessibilityPermission() }
     func requestInputMonitoringPermission() { permissionManager.requestInputMonitoringPermission() }
+
+    // MARK: - Hotkey Configuration
+
+    /// Apply persisted hotkey settings to the active listener.
+    /// `@AppStorage` updates save preferences immediately, but an already-running
+    /// event tap also needs its in-memory configuration refreshed.
+    func syncHotKeyConfiguration() {
+        hotKeyManager.updateConfiguration(
+            keyCode: hotKeyCode,
+            mode: activationMode,
+            doubleTapThreshold: doubleTapThreshold,
+            safetyTimeout: hotKeySafetyTimeout
+        )
+        VocaLogger.debug(.appState, "Hotkey configuration synced (keyCode=\(hotKeyCode), mode=\(activationMode.rawValue))")
+    }
 
     // MARK: - Force Recovery
 
@@ -757,7 +776,7 @@ final class AppState: ObservableObject {
             keyCode: hotKeyCode,
             mode: activationMode,
             doubleTapThreshold: doubleTapThreshold,
-            safetyTimeout: Double(maxRecordingDuration) + 5.0
+            safetyTimeout: hotKeySafetyTimeout
         )
         if hotKeyManager.isListening {
             VocaLogger.info(.appState, "Hotkey listener active (keyCode=\(hotKeyCode), mode=\(activationMode.rawValue))")
@@ -770,6 +789,10 @@ final class AppState: ObservableObject {
         VocaLogger.info(.appState, "Startup complete!")
     }
     func completeOnboarding() {
+        syncHotKeyConfiguration()
+        if !isRecording {
+            hotKeyManager.resetKeyState()
+        }
         hasCompletedOnboarding = true
         VocaLogger.info(.appState, "Onboarding completed")
     }

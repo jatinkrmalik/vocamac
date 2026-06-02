@@ -139,7 +139,22 @@ final class AppStateOnboardingTests: XCTestCase {
 
     override func setUp() {
         super.setUp()
-        UserDefaults.standard.removeObject(forKey: "vocamac.hasCompletedOnboarding")
+        clearPersistedSettings()
+    }
+
+    override func tearDown() {
+        clearPersistedSettings()
+        super.tearDown()
+    }
+
+    private func clearPersistedSettings() {
+        [
+            "vocamac.hasCompletedOnboarding",
+            "vocamac.activationMode",
+            "vocamac.hotKeyCode",
+            "vocamac.doubleTapThreshold",
+            "vocamac.maxRecordingDuration",
+        ].forEach { UserDefaults.standard.removeObject(forKey: $0) }
     }
 
     @MainActor
@@ -156,6 +171,66 @@ final class AppStateOnboardingTests: XCTestCase {
         appState.completeOnboarding()
 
         XCTAssertTrue(appState.hasCompletedOnboarding)
+    }
+
+    @MainActor
+    func testCompleteOnboardingSyncsHotKeyConfiguration() {
+        let (appState, mocks) = AppState.makeTestState()
+        appState.activationMode = .doubleTapToggle
+        appState.hotKeyCode = 58
+        appState.doubleTapThreshold = 0.55
+        appState.maxRecordingDuration = 120
+
+        appState.completeOnboarding()
+
+        XCTAssertEqual(mocks.hotKeyManager.updateConfigurationCallCount, 1)
+        XCTAssertEqual(mocks.hotKeyManager.lastMode, .doubleTapToggle)
+        XCTAssertEqual(mocks.hotKeyManager.lastKeyCode, 58)
+        XCTAssertEqual(mocks.hotKeyManager.lastDoubleTapThreshold, 0.55)
+        XCTAssertEqual(mocks.hotKeyManager.lastSafetyTimeout, 125.0)
+        XCTAssertEqual(mocks.hotKeyManager.resetKeyStateCallCount, 1)
+    }
+
+    @MainActor
+    func testCompleteOnboardingDoesNotResetHotKeyStateWhileRecording() {
+        let (appState, mocks) = AppState.makeTestState()
+        appState.isRecording = true
+
+        appState.completeOnboarding()
+
+        XCTAssertEqual(mocks.hotKeyManager.updateConfigurationCallCount, 1)
+        XCTAssertEqual(mocks.hotKeyManager.resetKeyStateCallCount, 0)
+        XCTAssertTrue(appState.hasCompletedOnboarding)
+    }
+
+    @MainActor
+    func testSyncHotKeyConfigurationAppliesCurrentSettings() {
+        let (appState, mocks) = AppState.makeTestState()
+        appState.activationMode = .doubleTapToggle
+        appState.hotKeyCode = 54
+        appState.doubleTapThreshold = 0.3
+        appState.maxRecordingDuration = 30
+
+        appState.syncHotKeyConfiguration()
+
+        XCTAssertEqual(mocks.hotKeyManager.updateConfigurationCallCount, 1)
+        XCTAssertEqual(mocks.hotKeyManager.lastMode, .doubleTapToggle)
+        XCTAssertEqual(mocks.hotKeyManager.lastKeyCode, 54)
+        XCTAssertEqual(mocks.hotKeyManager.lastDoubleTapThreshold, 0.3)
+        XCTAssertEqual(mocks.hotKeyManager.lastSafetyTimeout, 35.0)
+    }
+
+    @MainActor
+    func testSyncHotKeyConfigurationAppliesDefaultSettings() {
+        let (appState, mocks) = AppState.makeTestState()
+
+        appState.syncHotKeyConfiguration()
+
+        XCTAssertEqual(mocks.hotKeyManager.updateConfigurationCallCount, 1)
+        XCTAssertEqual(mocks.hotKeyManager.lastMode, .pushToTalk)
+        XCTAssertEqual(mocks.hotKeyManager.lastKeyCode, 61)
+        XCTAssertEqual(mocks.hotKeyManager.lastDoubleTapThreshold, 0.4)
+        XCTAssertEqual(mocks.hotKeyManager.lastSafetyTimeout, 65.0)
     }
 
     @MainActor
