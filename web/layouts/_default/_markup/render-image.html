@@ -1,0 +1,7 @@
+{{- $src := .Destination -}}
+{{- $staticPath := path.Join "static" (strings.TrimPrefix "/" $src) -}}
+{{- $image := false -}}
+{{- if fileExists $staticPath -}}
+    {{- $image = imageConfig $staticPath -}}
+{{- end -}}
+<img src="{{ $src | safeURL }}" alt="{{ .Text }}"{{ with .Title }} title="{{ . }}"{{ end }}{{ with $image }} width="{{ .Width }}" height="{{ .Height }}"{{ end }} loading="lazy">

@@ -6,11 +6,14 @@
         function closeMenu() {
             navMenu?.classList.remove('navbar__menu--open');
             navToggle?.classList.remove('active');
+            navToggle?.setAttribute('aria-expanded', 'false');
         }
 
         function toggleMenu() {
             navMenu?.classList.toggle('navbar__menu--open');
             navToggle?.classList.toggle('active');
+            const isOpen = navMenu?.classList.contains('navbar__menu--open') || false;
+            navToggle?.setAttribute('aria-expanded', String(isOpen));
         }
 
         navToggle?.addEventListener('click', function(e) {

@@ -9,17 +9,17 @@
 <section class="feature-content">
     <div class="container">
         {{ .Content }}
+        <div class="feature-list">
         {{ range .Pages }}
-        <div style="margin-bottom: 16px;">
-            <a href="{{ .Permalink }}" style="text-decoration: none; color: inherit;">
-                <div class="feature-card" style="cursor: pointer;">
+            <a href="{{ .Permalink }}" class="feature-list__item">
+                <div class="feature-card">
                     <div class="feature-card__icon">{{ .Params.icon }}</div>
                     <h3>{{ .Title }}</h3>
                     <p>{{ .Params.subtitle }}</p>
                 </div>
             </a>
-        </div>
         {{ end }}
+        </div>
     </div>
 </section>
 {{ end }}
