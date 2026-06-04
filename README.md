@@ -451,14 +451,6 @@ Release builds of VocaMac are **Developer ID signed and notarized** by Apple. Ac
 
 AGPL-3.0 License - see [LICENSE](LICENSE) for details.
 
----
-
-<div align="center">
-  
-Made with ❤️ for the macOS community!
-
-</div>
-
 ## Star History
 
 <a href="https://www.star-history.com/?repos=jatinkrmalik%2Fvocamac&type=date&legend=top-left">
@@ -468,3 +460,11 @@ Made with ❤️ for the macOS community!
    <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=jatinkrmalik/vocamac&type=date&legend=top-left" />
  </picture>
 </a>
+
+---
+
+<div align="center">
+  
+Made with ❤️ for the macOS community!
+
+</div>
