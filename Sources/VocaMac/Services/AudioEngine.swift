@@ -6,6 +6,8 @@
 
 import Foundation
 import AVFoundation
+import AudioToolbox
+import CoreAudio
 import VocaMacObjC
 
 final class AudioEngine {
@@ -188,7 +190,8 @@ final class AudioEngine {
     func startRecording(
         silenceThreshold: Float = 0.01,
         silenceDuration: Double = 2.0,
-        maxDuration: TimeInterval = 60.0
+        maxDuration: TimeInterval = 60.0,
+        preferredInputDeviceID: String? = nil
     ) -> Bool {
         lifecycleQueue.sync {
             guard !self._isCurrentlyRecording else { return true }
@@ -202,6 +205,7 @@ final class AudioEngine {
 
             let engine = acquireEngine()
             let inputNode = engine.inputNode
+            configurePreferredInputDevice(preferredInputDeviceID, on: inputNode)
             let inputFormat = inputNode.outputFormat(forBus: 0)
 
             guard isValidInputFormat(inputFormat) else {
@@ -490,22 +494,183 @@ final class AudioEngine {
 
     // MARK: - Audio Device Enumeration
 
-    /// List available audio input devices
+    /// List available audio input devices.
     static func availableInputDevices() -> [AudioDevice] {
-        let devices = AVCaptureDevice.DiscoverySession(
-            deviceTypes: [.builtInMicrophone, .externalUnknown],
-            mediaType: .audio,
-            position: .unspecified
-        ).devices
+        let defaultDeviceID = defaultInputAudioDeviceID()
 
-        let defaultDevice = AVCaptureDevice.default(for: .audio)
+        return inputAudioDeviceIDs().compactMap { deviceID in
+            guard let uid = audioDeviceUID(for: deviceID),
+                  let name = audioDeviceName(for: deviceID) else {
+                return nil
+            }
 
-        return devices.map { device in
-            AudioDevice(
-                id: device.uniqueID,
-                name: device.localizedName,
-                isDefault: device.uniqueID == defaultDevice?.uniqueID
+            return AudioDevice(
+                id: uid,
+                name: name,
+                isDefault: deviceID == defaultDeviceID,
+                sampleRate: audioDeviceSampleRate(for: deviceID),
+                channelCount: inputChannelCount(for: deviceID)
             )
+        }
+        .sorted { lhs, rhs in
+            if lhs.isDefault != rhs.isDefault { return lhs.isDefault }
+            return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+        }
+    }
+
+    /// Configure this engine's input unit to use a specific Core Audio device.
+    /// This is scoped to VocaMac's AudioUnit and does not change macOS' global default input.
+    private func configurePreferredInputDevice(_ preferredInputDeviceID: String?, on inputNode: AVAudioInputNode) {
+        guard let preferredInputDeviceID,
+              !preferredInputDeviceID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            VocaLogger.debug(.audioEngine, "Using system default input device")
+            return
+        }
+
+        guard let deviceID = Self.inputAudioDeviceID(forUID: preferredInputDeviceID) else {
+            VocaLogger.warning(.audioEngine, "Preferred input device unavailable, falling back to system default: \(preferredInputDeviceID)")
+            return
+        }
+
+        guard let audioUnit = inputNode.audioUnit else {
+            VocaLogger.warning(.audioEngine, "Input node has no AudioUnit; falling back to system default input")
+            return
+        }
+
+        var mutableDeviceID = deviceID
+        let status = AudioUnitSetProperty(
+            audioUnit,
+            kAudioOutputUnitProperty_CurrentDevice,
+            kAudioUnitScope_Global,
+            0,
+            &mutableDeviceID,
+            UInt32(MemoryLayout<AudioDeviceID>.size)
+        )
+
+        guard status == noErr else {
+            VocaLogger.warning(.audioEngine, "Failed to set preferred input device \(preferredInputDeviceID): OSStatus \(status)")
+            return
+        }
+
+        let deviceName = Self.audioDeviceName(for: deviceID) ?? preferredInputDeviceID
+        VocaLogger.info(.audioEngine, "Using preferred input device: \(deviceName)")
+    }
+
+    private static func inputAudioDeviceID(forUID uid: String) -> AudioDeviceID? {
+        inputAudioDeviceIDs().first { audioDeviceUID(for: $0) == uid }
+    }
+
+    private static func inputAudioDeviceIDs() -> [AudioDeviceID] {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDevices,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var dataSize: UInt32 = 0
+        let systemObjectID = AudioObjectID(kAudioObjectSystemObject)
+
+        guard AudioObjectGetPropertyDataSize(systemObjectID, &address, 0, nil, &dataSize) == noErr else {
+            VocaLogger.warning(.audioEngine, "Failed to read Core Audio device list size")
+            return []
+        }
+
+        let deviceCount = Int(dataSize) / MemoryLayout<AudioDeviceID>.size
+        guard deviceCount > 0 else { return [] }
+
+        var deviceIDs = [AudioDeviceID](repeating: AudioDeviceID(kAudioObjectUnknown), count: deviceCount)
+        let status = AudioObjectGetPropertyData(systemObjectID, &address, 0, nil, &dataSize, &deviceIDs)
+        guard status == noErr else {
+            VocaLogger.warning(.audioEngine, "Failed to read Core Audio device list: OSStatus \(status)")
+            return []
+        }
+
+        return deviceIDs.filter { inputChannelCount(for: $0) > 0 }
+    }
+
+    private static func defaultInputAudioDeviceID() -> AudioDeviceID? {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultInputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var deviceID = AudioDeviceID(kAudioObjectUnknown)
+        var dataSize = UInt32(MemoryLayout<AudioDeviceID>.size)
+        let status = AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject),
+            &address,
+            0,
+            nil,
+            &dataSize,
+            &deviceID
+        )
+
+        guard status == noErr, deviceID != AudioDeviceID(kAudioObjectUnknown) else {
+            return nil
+        }
+        return deviceID
+    }
+
+    private static func audioDeviceUID(for deviceID: AudioDeviceID) -> String? {
+        stringProperty(kAudioDevicePropertyDeviceUID, for: deviceID)
+    }
+
+    private static func audioDeviceName(for deviceID: AudioDeviceID) -> String? {
+        stringProperty(kAudioObjectPropertyName, for: deviceID)
+    }
+
+    private static func stringProperty(_ selector: AudioObjectPropertySelector, for deviceID: AudioDeviceID) -> String? {
+        var address = AudioObjectPropertyAddress(
+            mSelector: selector,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var value: Unmanaged<CFString>?
+        var dataSize = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
+        let status = AudioObjectGetPropertyData(deviceID, &address, 0, nil, &dataSize, &value)
+
+        guard status == noErr, let value else { return nil }
+        return value.takeRetainedValue() as String
+    }
+
+    private static func audioDeviceSampleRate(for deviceID: AudioDeviceID) -> Double {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyNominalSampleRate,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var sampleRate = Float64(0)
+        var dataSize = UInt32(MemoryLayout<Float64>.size)
+        let status = AudioObjectGetPropertyData(deviceID, &address, 0, nil, &dataSize, &sampleRate)
+
+        guard status == noErr else { return 0 }
+        return sampleRate
+    }
+
+    private static func inputChannelCount(for deviceID: AudioDeviceID) -> Int {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyStreamConfiguration,
+            mScope: kAudioObjectPropertyScopeInput,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var dataSize: UInt32 = 0
+
+        guard AudioObjectGetPropertyDataSize(deviceID, &address, 0, nil, &dataSize) == noErr,
+              dataSize > 0 else {
+            return 0
+        }
+
+        let rawPointer = UnsafeMutableRawPointer.allocate(
+            byteCount: Int(dataSize),
+            alignment: MemoryLayout<AudioBufferList>.alignment
+        )
+        defer { rawPointer.deallocate() }
+
+        let bufferList = rawPointer.bindMemory(to: AudioBufferList.self, capacity: 1)
+        let status = AudioObjectGetPropertyData(deviceID, &address, 0, nil, &dataSize, bufferList)
+        guard status == noErr else { return 0 }
+
+        return UnsafeMutableAudioBufferListPointer(bufferList).reduce(0) { total, buffer in
+            total + Int(buffer.mNumberChannels)
         }
     }
 }
@@ -517,6 +682,8 @@ struct AudioDevice: Identifiable, Hashable {
     let id: String
     let name: String
     let isDefault: Bool
+    let sampleRate: Double
+    let channelCount: Int
 }
 
 // MARK: - AudioRecording Conformance

@@ -20,6 +20,7 @@ final class MockAudioEngine: AudioRecording {
     var lastSilenceThreshold: Float?
     var lastSilenceDuration: Double?
     var lastMaxDuration: TimeInterval?
+    var lastPreferredInputDeviceID: String?
     var stopRecordingResult: [Float] = []
     var forceResetCallCount = 0
     var startRecordingResult = true
@@ -27,11 +28,17 @@ final class MockAudioEngine: AudioRecording {
     private var permissionStatus: PermissionStatus = .granted
 
     @discardableResult
-    func startRecording(silenceThreshold: Float, silenceDuration: Double, maxDuration: TimeInterval) -> Bool {
+    func startRecording(
+        silenceThreshold: Float,
+        silenceDuration: Double,
+        maxDuration: TimeInterval,
+        preferredInputDeviceID: String?
+    ) -> Bool {
         isCurrentlyRecording = startRecordingResult
         lastSilenceThreshold = silenceThreshold
         lastSilenceDuration = silenceDuration
         lastMaxDuration = maxDuration
+        lastPreferredInputDeviceID = preferredInputDeviceID
         return startRecordingResult
     }
 
@@ -349,6 +356,9 @@ final class MockTextInjector: TextInjecting {
 extension AppState {
     @MainActor
     static func makeTestState() -> (appState: AppState, mocks: TestMocks) {
+        UserDefaults.standard.removeObject(forKey: "vocamac.selectedAudioDeviceID")
+        UserDefaults.standard.removeObject(forKey: "vocamac.selectedAudioDeviceName")
+
         let audioEngine = MockAudioEngine()
         let soundManager = MockSoundManager()
         let hotKeyManager = MockHotKeyManager()

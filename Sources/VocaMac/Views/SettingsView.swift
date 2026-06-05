@@ -595,6 +595,19 @@ struct AudioSettingsTab: View {
             }
 
             Section("Input Device") {
+                Picker("Microphone", selection: $appState.selectedAudioDeviceID) {
+                    Text("System Default").tag("")
+                    if selectedAudioDeviceIsUnavailable {
+                        Text("\(selectedAudioDeviceDisplayName) (Unavailable)").tag(appState.selectedAudioDeviceID)
+                    }
+                    ForEach(audioDevices) { device in
+                        Text(audioDeviceLabel(for: device)).tag(device.id)
+                    }
+                }
+                .onChange(of: appState.selectedAudioDeviceID) { _ in
+                    syncSelectedAudioDeviceName()
+                }
+
                 if audioDevices.isEmpty {
                     HStack {
                         Image(systemName: "exclamationmark.triangle")
@@ -602,42 +615,78 @@ struct AudioSettingsTab: View {
                         Text("No audio input devices found")
                             .foregroundStyle(.secondary)
                     }
-                } else {
-                    ForEach(audioDevices) { device in
-                        HStack {
-                            Image(systemName: device.isDefault ? "mic.circle.fill" : "mic.circle")
-                                .foregroundStyle(device.isDefault ? .blue : .secondary)
-                            VStack(alignment: .leading) {
-                                Text(device.name)
-                                    .font(.callout)
-                                if device.isDefault {
-                                    Text("System Default")
-                                        .font(.caption2)
-                                        .foregroundStyle(.blue)
-                                }
-                            }
-                            Spacer()
-                            if device.isDefault {
-                                Image(systemName: "checkmark")
-                                    .foregroundStyle(.blue)
-                            }
-                        }
+                } else if selectedAudioDeviceIsUnavailable {
+                    HStack(alignment: .top) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .foregroundStyle(.orange)
+                        Text("\(selectedAudioDeviceDisplayName) is unavailable. VocaMac will use System Default until it reconnects.")
+                            .foregroundStyle(.secondary)
                     }
+                } else if let selectedAudioDevice {
+                    HStack {
+                        Image(systemName: "mic.circle.fill")
+                            .foregroundStyle(.blue)
+                        Text("VocaMac will record from \(selectedAudioDevice.name) without changing macOS' system default input.")
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    Text(systemDefaultInputDescription)
+                        .foregroundStyle(.secondary)
                 }
 
                 Button("Refresh Devices") {
-                    audioDevices = AudioEngine.availableInputDevices()
+                    refreshAudioDevices()
                 }
                 .controlSize(.small)
 
-                Text("VocaMac uses your system default input device. Change it in System Settings → Sound → Input.")
+                Text("Choose System Default to follow macOS, or pin VocaMac to a specific microphone.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
         .onAppear {
-            audioDevices = AudioEngine.availableInputDevices()
+            refreshAudioDevices()
+        }
+    }
+
+    private var selectedAudioDevice: AudioDevice? {
+        guard !appState.selectedAudioDeviceID.isEmpty else { return nil }
+        return audioDevices.first { $0.id == appState.selectedAudioDeviceID }
+    }
+
+    private var selectedAudioDeviceIsUnavailable: Bool {
+        !appState.selectedAudioDeviceID.isEmpty && selectedAudioDevice == nil
+    }
+
+    private var selectedAudioDeviceDisplayName: String {
+        appState.selectedAudioDeviceName.isEmpty ? "Selected microphone" : appState.selectedAudioDeviceName
+    }
+
+    private var systemDefaultInputDescription: String {
+        if let defaultDevice = audioDevices.first(where: { $0.isDefault }) {
+            return "VocaMac will follow macOS' system default input: \(defaultDevice.name)."
+        }
+        return "VocaMac will follow macOS' system default input."
+    }
+
+    private func audioDeviceLabel(for device: AudioDevice) -> String {
+        device.isDefault ? "\(device.name) (System Default)" : device.name
+    }
+
+    private func refreshAudioDevices() {
+        audioDevices = AudioEngine.availableInputDevices()
+        syncSelectedAudioDeviceName()
+    }
+
+    private func syncSelectedAudioDeviceName() {
+        guard !appState.selectedAudioDeviceID.isEmpty else {
+            appState.selectedAudioDeviceName = ""
+            return
+        }
+
+        if let selectedAudioDevice {
+            appState.selectedAudioDeviceName = selectedAudioDevice.name
         }
     }
 

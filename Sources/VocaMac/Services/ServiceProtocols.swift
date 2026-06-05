@@ -17,7 +17,12 @@ protocol AudioRecording: AnyObject {
     var onAudioDeviceChanged: (() -> Void)? { get set }
 
     @discardableResult
-    func startRecording(silenceThreshold: Float, silenceDuration: Double, maxDuration: TimeInterval) -> Bool
+    func startRecording(
+        silenceThreshold: Float,
+        silenceDuration: Double,
+        maxDuration: TimeInterval,
+        preferredInputDeviceID: String?
+    ) -> Bool
     @discardableResult func stopRecording() -> [Float]
     func forceReset()
     func checkPermissionStatus() -> PermissionStatus
