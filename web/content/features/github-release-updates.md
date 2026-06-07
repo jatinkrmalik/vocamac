@@ -1,6 +1,6 @@
 ---
 title: "GitHub Release Updates"
-subtitle: "VocaMac checks GitHub Releases, downloads the latest signed DMG, and guides you through drag-to-replace updates."
+subtitle: "VocaMac checks GitHub Releases for updates. Homebrew users run `brew upgrade`. DMG users get in-app downloads."
 description: "VocaMac includes built-in update checks powered by the GitHub Releases API. See new versions in-app, download the signed DMG with progress, and install safely."
 keywords: "mac app update checker, github releases updater, signed dmg updates, menu bar app update flow, vocamac updates"
 icon: "⬇️"
@@ -8,7 +8,9 @@ icon: "⬇️"
 
 ## Built-In Update Checks
 
-VocaMac can now check for new releases directly from GitHub. It compares your current app version to the latest stable release, then shows an in-app update banner when a newer version is available.
+VocaMac checks for new releases directly from GitHub. It compares your current app version to the latest stable release, then shows an in-app update banner when a newer version is available.
+
+If you installed VocaMac via Homebrew (`brew install --cask vocamac`), updates are managed by Homebrew — simply run `brew upgrade --cask vocamac`. VocaMac detects Homebrew installs and guides you accordingly.
 
 The check is lightweight and rate-limit friendly:
 
@@ -16,7 +18,7 @@ The check is lightweight and rate-limit friendly:
 - manual **Check for Updates...** button in **Settings -> About**
 - no extra account, login, or update service required
 
-## Update Flow
+## Update Flow (DMG Installs)
 
 When an update is found, VocaMac shows a clear, non-intrusive banner in the menu bar popover. From there, you can open update details, review release notes, and start the download.
 

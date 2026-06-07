@@ -301,7 +301,7 @@ Apple Silicon:
 
 > The `recommendModel` function in `SystemInfo.swift` retains a defensive
 > Intel branch (smaller models, no Metal). It exists only to keep the
-> code valid if someone compiles from source on Intel; the released DMG
+> code valid if someone compiles from source on Intel; the released binary
 > is `arm64`-only and Intel Macs are not a supported configuration.
 
 #### 3.2.8 `TextInjector` - System-Wide Text Insertion
@@ -337,9 +337,9 @@ CGEventSource(stateID: .hidSystemState)
 
 #### 3.2.9 `UpdateChecker` - GitHub Release Updates
 
-**Responsibility:** Detect new stable releases from GitHub, download the latest signed DMG, verify integrity, and guide the user through drag-to-replace installation.
+**Responsibility:** Detect new stable releases from GitHub and manage updates. For Homebrew-installed copies, it shows a `brew upgrade` command instead of in-app DMG downloads.
 
-**Update Flow:**
+**Update Flow (DMG installs):**
 ```
 On launch (max once every 24h)
   → GET /repos/jatinkrmalik/vocamac/releases/latest
@@ -349,6 +349,14 @@ On launch (max once every 24h)
   → Download DMG with progress
   → Verify SHA-256 using assets[].digest
   → Open DMG in Finder (user drags app to /Applications)
+```
+
+**Update Flow (Homebrew installs):**
+```
+On launch (max once every 24h)
+  → Detect /Caskroom/ in Bundle.main.bundlePath
+  → If newer release available: show "brew upgrade --cask vocamac" banner
+  → User copies command and upgrades via Homebrew
 ```
 
 **Manual Check:**
@@ -495,8 +503,8 @@ swift build -c release
 
 ### 7.3 Distribution Strategy
 
-1. **GitHub Releases** — Developer ID signed & notarized DMG and ZIP, built by CI
-2. **Homebrew Cask** - `brew install --cask vocamac` (see docs/HOMEBREW.md)
+1. **Homebrew Cask** — `brew install --cask vocamac` (recommended, see `docs/HOMEBREW.md`)
+2. **GitHub Releases** — Developer ID signed & notarized DMG and ZIP, built by CI
 3. **Mac App Store** - Future consideration (requires sandbox compliance)
 
 ---

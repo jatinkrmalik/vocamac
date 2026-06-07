@@ -12,7 +12,7 @@ Every Apple Silicon Mac is different. An 8 GB MacBook Air has very different hea
 
 On first launch, VocaMac analyzes your chip generation, CPU core count, Neural Engine availability, and installed RAM. It then suggests the optimal model tier. You remain free to choose any model, but the recommendation gets you great results immediately without guesswork.
 
-> **Note:** VocaMac is Apple Silicon only. The released DMG does not run on Intel Macs.
+> **Note:** VocaMac is Apple Silicon only — it does not run on Intel Macs.
 
 ## Five Model Tiers
 

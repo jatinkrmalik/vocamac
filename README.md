@@ -106,7 +106,7 @@ Same accuracy, dramatically better Apple platform integration.
 ## 📋 Requirements
 
 - **macOS 13 (Ventura)** or later
-- **Apple Silicon Mac** (M1/M2/M3/M4) — **Intel Macs are not supported.** The released DMG is built for `arm64` only.
+- **Apple Silicon Mac** (M1/M2/M3/M4) — **Intel Macs are not supported.** VocaMac is built for `arm64` only.
 - **Xcode 15+** or Swift 5.9+ (only for building from source)
 
 ### Permissions
@@ -125,7 +125,23 @@ VocaMac requires three macOS permissions:
 
 ## 🚀 Quick Start
 
-### Option 1: Download DMG (Recommended)
+### Option 1: Install via Homebrew (Recommended)
+
+```bash
+brew tap jatinkrmalik/vocamac
+brew trust --cask jatinkrmalik/vocamac/vocamac
+brew install --cask vocamac
+```
+
+Homebrew installs VocaMac to `/Applications/VocaMac.app`. Launch it from Spotlight or your Applications folder. Updates are a single command away:
+
+```bash
+brew upgrade --cask vocamac
+```
+
+> **Why Homebrew?** Terminal-based install. One-command updates. Permissions persist across upgrades. No manual DMG downloads. See [`docs/HOMEBREW.md`](docs/HOMEBREW.md) for the full Homebrew guide.
+
+### Option 2: Download DMG
 
 1. **Download** the latest `VocaMac-x.x.x-arm64.dmg` from the [Releases page](https://github.com/jatinkrmalik/vocamac/releases)
 2. **Open** the DMG and drag VocaMac to Applications
@@ -134,7 +150,7 @@ VocaMac requires three macOS permissions:
 
 > VocaMac is **Developer ID signed and notarized** by Apple — macOS will open it without any security warnings.
 
-### Option 2: Build from Source (Recommended)
+### Option 3: Build from Source
 
 ```bash
 git clone https://github.com/jatinkrmalik/vocamac.git
@@ -144,7 +160,7 @@ make install
 
 This builds VocaMac, installs it to `/Applications`, and launches it. Permissions are granted directly to VocaMac, just like the DMG method.
 
-### Option 3: CLI Commands (For Developers)
+### Option 4: CLI Commands (For Developers)
 
 ```bash
 git clone https://github.com/jatinkrmalik/vocamac.git
@@ -179,6 +195,14 @@ Nightly builds are automated builds from the latest `main` branch, published eve
 
 **How to install:**
 
+**Via Homebrew (recommended):**
+```bash
+brew tap jatinkrmalik/vocamac
+brew trust --cask jatinkrmalik/vocamac/vocamac-nightly
+brew install --cask vocamac-nightly
+```
+
+**Or via DMG:**
 1. Download the latest `VocaMac-nightly-*.dmg` from the [Nightly Release](https://github.com/jatinkrmalik/vocamac/releases/tag/nightly)
 2. Open the DMG and drag VocaMac to Applications
 3. Grant permissions when prompted (same as a stable release)
