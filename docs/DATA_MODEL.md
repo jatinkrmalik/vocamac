@@ -397,8 +397,10 @@ enum UpdateState: Equatable {
     case idle
     case checking
     case updateAvailable(UpdateInfo)
+    case updateAvailableViaHomebrew(info: UpdateInfo)
     case upToDate
-    case downloading(progress: Double)
+    case downloading(progress: Double, bytesDownloaded: Int64, totalBytes: Int64, estimatedSecondsRemaining: Double)
+    case verifying
     case readyToInstall(dmgPath: URL)
     case error(String)
 }

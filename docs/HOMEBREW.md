@@ -190,6 +190,23 @@ zap trash: [
 
 This is useful for a clean reinstall or when troubleshooting. A plain `brew uninstall --cask vocamac` only removes the `.app` bundle and leaves user data intact.
 
+## In-App Update Behavior
+
+When VocaMac is installed via Homebrew Cask, the built-in update checker detects the Homebrew installation and disables in-app DMG downloads. Instead of showing a **"Download & Install"** button, the update banner and About tab display a Homebrew-specific message:
+
+> Updates are managed by Homebrew. Run: `brew upgrade --cask vocamac`
+
+### How Detection Works
+
+VocaMac checks whether `Bundle.main.bundlePath` contains `/Caskroom/`. This path segment is present for both Apple Silicon (`/opt/homebrew/Caskroom/`) and Intel (`/usr/local/Caskroom/`) Homebrew installations.
+
+| Installation Method | Update Behavior |
+|---|---|
+| **DMG (manual)** | In-app download, SHA-256 verification, open DMG |
+| **Homebrew Cask** | Shows Homebrew upgrade command; no in-app download |
+
+This prevents conflicts between Homebrew's version management and the app's own update mechanism. Always use `brew upgrade --cask vocamac` to update a Homebrew-installed copy of VocaMac.
+
 ## Troubleshooting
 
 ### Cask install fails with "SHA256 mismatch"

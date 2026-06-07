@@ -682,9 +682,12 @@ struct AboutTab: View {
             Button {
                 Task { @MainActor in
                     await appState.updateChecker.checkForUpdates()
-                    if case .updateAvailable(let info) = appState.updateChecker.updateState {
+                    switch appState.updateChecker.updateState {
+                    case .updateAvailable(let info), .updateAvailableViaHomebrew(let info):
                         updateInfoForSheet = info
                         showingUpdateSheet = true
+                    default:
+                        break
                     }
                 }
             } label: {
@@ -792,6 +795,8 @@ struct AboutTab: View {
             return "You are on the latest version."
         case .updateAvailable(let info):
             return "Update available: \(info.tagName)"
+        case .updateAvailableViaHomebrew:
+            return "Update available via Homebrew. Run: brew upgrade --cask vocamac"
         case .error(let message):
             return message
         case .downloading(let progress, _, _, _):

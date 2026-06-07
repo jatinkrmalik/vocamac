@@ -33,4 +33,77 @@ final class UpdateCheckerTests: XCTestCase {
         XCTAssertEqual(release.assets.count, 1)
         XCTAssertEqual(release.assets.first?.name, "VocaMac-0.4.0-arm64.dmg")
     }
+
+    func testIsHomebrewPathDetectsCaskroom() {
+        XCTAssertTrue(UpdateChecker.isHomebrewPath("/opt/homebrew/Caskroom/vocamac/0.5.0/VocaMac.app"))
+        XCTAssertTrue(UpdateChecker.isHomebrewPath("/usr/local/Caskroom/vocamac/0.5.0/VocaMac.app"))
+        XCTAssertFalse(UpdateChecker.isHomebrewPath("/Applications/VocaMac.app"))
+        XCTAssertFalse(UpdateChecker.isHomebrewPath("/Users/john/Applications/VocaMac.app"))
+    }
+
+    @MainActor
+    func testCheckForUpdatesTransitionsToHomebrewStateWhenInstalledViaHomebrew() async {
+        let checker = UpdateChecker()
+        checker.overrideHomebrewInstalled = true
+
+        let mockRelease = GitHubRelease(
+            tagName: "v99.99.99",
+            name: "v99.99.99",
+            body: "Test release",
+            htmlURL: URL(string: "https://example.com")!,
+            prerelease: false,
+            draft: false,
+            publishedAt: "2026-01-01T00:00:00Z",
+            assets: [
+                GitHubAsset(
+                    name: "VocaMac-99.99.99-arm64.dmg",
+                    size: 1234,
+                    browserDownloadURL: URL(string: "https://example.com/dmg")!,
+                    contentType: "application/x-apple-diskimage",
+                    digest: nil
+                )
+            ]
+        )
+
+        await checker.checkForUpdates(releaseProvider: { mockRelease })
+
+        if case .updateAvailableViaHomebrew(let info) = checker.updateState {
+            XCTAssertEqual(info.tagName, "v99.99.99")
+        } else {
+            XCTFail("Expected .updateAvailableViaHomebrew but got \(String(describing: checker.updateState))")
+        }
+    }
+
+    @MainActor
+    func testCheckForUpdatesTransitionsToUpdateAvailableWhenNotHomebrew() async {
+        let checker = UpdateChecker()
+        checker.overrideHomebrewInstalled = false
+
+        let mockRelease = GitHubRelease(
+            tagName: "v99.99.99",
+            name: "v99.99.99",
+            body: "Test release",
+            htmlURL: URL(string: "https://example.com")!,
+            prerelease: false,
+            draft: false,
+            publishedAt: "2026-01-01T00:00:00Z",
+            assets: [
+                GitHubAsset(
+                    name: "VocaMac-99.99.99-arm64.dmg",
+                    size: 1234,
+                    browserDownloadURL: URL(string: "https://example.com/dmg")!,
+                    contentType: "application/x-apple-diskimage",
+                    digest: nil
+                )
+            ]
+        )
+
+        await checker.checkForUpdates(releaseProvider: { mockRelease })
+
+        if case .updateAvailable(let info) = checker.updateState {
+            XCTAssertEqual(info.tagName, "v99.99.99")
+        } else {
+            XCTFail("Expected .updateAvailable but got \(String(describing: checker.updateState))")
+        }
+    }
 }

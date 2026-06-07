@@ -38,16 +38,27 @@ enum UpdateCheckerError: LocalizedError {
 final class UpdateChecker: ObservableObject {
     @Published var updateState: UpdateState = .idle
 
+    var isHomebrewInstalled: Bool {
+        if let override = overrideHomebrewInstalled { return override }
+        return Self.isHomebrewPath(Bundle.main.bundlePath)
+    }
+
+    var overrideHomebrewInstalled: Bool?
+
     /// Returns the UpdateInfo if the checker is in any active update flow
     /// (available, downloading, verifying, ready to install, or error after a download attempt).
     /// Used to keep banners and sheets visible during the entire update process.
     var activeUpdateInfo: UpdateInfo? {
         switch updateState {
-        case .updateAvailable(let info):
+        case .updateAvailable(let info), .updateAvailableViaHomebrew(let info):
             return info
         default:
             return lastKnownUpdateInfo
         }
+    }
+
+    static func isHomebrewPath(_ path: String) -> Bool {
+        path.contains("/Caskroom/")
     }
 
     /// Stored when an update is found so views can reference it across state transitions.
@@ -76,11 +87,15 @@ final class UpdateChecker: ObservableObject {
     }
 
     func checkForUpdates() async {
+        await checkForUpdates(releaseProvider: { try await self.fetchLatestRelease() })
+    }
+
+    func checkForUpdates(releaseProvider: () async throws -> GitHubRelease) async {
         guard updateState != .checking else { return }
         updateState = .checking
 
         do {
-            let release = try await fetchLatestRelease()
+            let release = try await releaseProvider()
             UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: lastCheckKey)
 
             let remoteVersion = normalizeVersion(release.tagName)
@@ -96,8 +111,13 @@ final class UpdateChecker: ObservableObject {
                     throw UpdateCheckerError.noDMGAsset
                 }
                 lastKnownUpdateInfo = info
-                updateState = .updateAvailable(info)
-                VocaLogger.info(.updateChecker, "Update available: \(info.tagName)")
+                if isHomebrewInstalled {
+                    updateState = .updateAvailableViaHomebrew(info: info)
+                    VocaLogger.info(.updateChecker, "Update available via Homebrew: \(info.tagName)")
+                } else {
+                    updateState = .updateAvailable(info)
+                    VocaLogger.info(.updateChecker, "Update available: \(info.tagName)")
+                }
             } else {
                 updateState = .upToDate
             }
