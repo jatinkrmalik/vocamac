@@ -28,6 +28,7 @@ Pre-release versions use suffixes: `v0.1.0-alpha`, `v0.1.0-beta.1`
    - `scripts/build.sh` — both `CFBundleVersion` and `CFBundleShortVersionString` in the Info.plist template
    - `web/layouts/index.html` — `softwareVersion` in JSON-LD schema and hero version badge (two occurrences)
    - _(No Swift change needed — the About tab reads the version from `Info.plist` via `appVersionDisplay` in `SettingsView.swift`.)_
+   - `homebrew/Casks/vocamac.rb` — version and sha256 (if doing a manual tap update)
    - **Do NOT** create a `docs/RELEASE_NOTES_vX.Y.Z.md` file — release notes live out-of-tree (see [Release Notes (out-of-tree)](#release-notes-out-of-tree) below)
 4. **Test locally**:
    ```bash
@@ -66,7 +67,9 @@ Pre-release versions use suffixes: `v0.1.0-alpha`, `v0.1.0-beta.1`
    - Verify artifacts are attached
    - **Publish** the release when ready
 
-4. **Website auto-deploys** when the release is published (via `deploy-website.yml`)
+4. **Homebrew tap auto-updates** — The `update-homebrew-cask.yml` workflow runs automatically on release publish, updating the custom tap with the new version and SHA. If it fails, update manually (see `docs/HOMEBREW.md`).
+
+5. **Website auto-deploys** when the release is published (via `deploy-website.yml`)
 
 ## Release Notes (out-of-tree)
 

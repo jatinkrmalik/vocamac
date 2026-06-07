@@ -496,7 +496,7 @@ swift build -c release
 ### 7.3 Distribution Strategy
 
 1. **GitHub Releases** — Developer ID signed & notarized DMG and ZIP, built by CI
-2. **Homebrew Cask** - `brew install --cask vocamac` (planned)
+2. **Homebrew Cask** - `brew install --cask vocamac` (see docs/HOMEBREW.md)
 3. **Mac App Store** - Future consideration (requires sandbox compliance)
 
 ---

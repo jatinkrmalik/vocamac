@@ -354,8 +354,12 @@ jobs:
           ditto -c -k --sequesterRsrc --keepParent VocaMac.app "$ZIP_NAME"
           echo "ZIP_NAME=${ZIP_NAME}" >> "$GITHUB_ENV"
 
+          # Create stable-named copies for Homebrew cask (no date/SHA)
+          cp "$DMG_NAME" "VocaMac-nightly-${ARCH}.dmg"
+          cp "$ZIP_NAME" "VocaMac-nightly-${ARCH}.zip"
+
           echo "Artifacts created:"
-          ls -lh "$DMG_NAME" "$ZIP_NAME"
+          ls -lh "$DMG_NAME" "$ZIP_NAME" "VocaMac-nightly-${ARCH}.dmg" "VocaMac-nightly-${ARCH}.zip"
 
       - name: Generate checksums
         run: |
