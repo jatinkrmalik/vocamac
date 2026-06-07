@@ -7,9 +7,7 @@ cask "vocamac" do
   desc "Local voice-to-text dictation for macOS, powered by WhisperKit"
   homepage "https://vocamac.com"
 
-  # :no_check is used here because the sha256 will be injected by the
-  # automated cask update workflow when a new release is published.
-  sha256 :no_check
+  sha256 "9de43a316ac885deb7b84ead8fe292d16432cce9968d53941c855cc8ff3bed28"
 
   livecheck do
     url :url
