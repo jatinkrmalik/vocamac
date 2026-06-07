@@ -1,25 +1,21 @@
 cask "vocamac" do
   version "0.6.2"
+  sha256 "9de43a316ac885deb7b84ead8fe292d16432cce9968d53941c855cc8ff3bed28"
 
   url "https://github.com/jatinkrmalik/vocamac/releases/download/v#{version}/VocaMac-#{version}-arm64.dmg",
-      verified: "github.com/jatinkrmalik/vocamac"
+      verified: "github.com/jatinkrmalik/vocamac/"
   name "VocaMac"
-  desc "Local voice-to-text dictation for macOS, powered by WhisperKit"
-  homepage "https://vocamac.com"
-
-  sha256 "9de43a316ac885deb7b84ead8fe292d16432cce9968d53941c855cc8ff3bed28"
+  desc "Local voice-to-text dictation powered by WhisperKit"
+  homepage "https://vocamac.com/"
 
   livecheck do
     url :url
     strategy :github_latest
   end
 
-  license "AGPL-3.0-only"
-
-  depends_on arch: :arm64
-  depends_on macos: ">= :ventura"
-
   conflicts_with cask: "vocamac-nightly"
+  depends_on arch: :arm64
+  depends_on macos: :ventura
 
   app "VocaMac.app"
 

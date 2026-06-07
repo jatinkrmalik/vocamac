@@ -5,13 +5,12 @@ cask "vocamac-nightly" do
   url "https://github.com/jatinkrmalik/vocamac/releases/download/nightly/VocaMac-nightly-arm64.dmg",
       verified: "github.com/jatinkrmalik/vocamac/"
   name "VocaMac Nightly"
-  desc "Nightly build of VocaMac — local voice-to-text dictation for macOS"
-  homepage "https://vocamac.com"
+  desc "Nightly build of VocaMac — local voice-to-text dictation"
+  homepage "https://vocamac.com/"
 
   conflicts_with cask: "vocamac"
-
   depends_on arch: :arm64
-  depends_on macos: ">= :ventura"
+  depends_on macos: :ventura
 
   app "VocaMac.app"
 
