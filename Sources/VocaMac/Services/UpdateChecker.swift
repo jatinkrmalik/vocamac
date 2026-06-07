@@ -57,7 +57,7 @@ final class UpdateChecker: ObservableObject {
         }
     }
 
-    static func isHomebrewPath(_ path: String) -> Bool {
+    nonisolated static func isHomebrewPath(_ path: String) -> Bool {
         path.contains("/Caskroom/")
     }
 
