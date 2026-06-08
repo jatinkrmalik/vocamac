@@ -278,19 +278,6 @@ final class AppState: ObservableObject {
             )
         }
 
-        // Enforce monotonic support ordering: if a smaller model is unsupported,
-        // all larger models must also be unsupported. This prevents contradictory
-        // UI states like Medium="Too Large" but Large v3="Recommended".
-        var foundUnsupported = false
-        for i in availableModels.indices {
-            if !availableModels[i].isSupported {
-                foundUnsupported = true
-            }
-            if foundUnsupported {
-                availableModels[i].isSupported = false
-            }
-        }
-
         // Validate that the recommended model maps to a supported ModelSize.
         // If the recommendation points to an unsupported model, fall back to
         // the largest supported model instead.
@@ -577,6 +564,12 @@ final class AppState: ObservableObject {
     // MARK: - Model Management
 
     func loadModel(_ size: ModelSize? = nil) async {
+        let previousLoadedModelName = whisperService.loadedModelName
+        let previousModelSize = currentModel?.size
+            ?? previousLoadedModelName.flatMap { modelManager.modelSize(from: $0) }
+            ?? ModelSize(rawValue: selectedModelSize)
+        let hadLoadedModel = whisperService.isModelLoaded
+
         let modelName: String?
         if let size = size {
             modelName = modelManager.whisperKitModelName(for: size)
@@ -667,8 +660,89 @@ final class AppState: ObservableObject {
                 availableModels[i].isLoading = false
                 availableModels[i].loadingStatus = "Loading…"
             }
-            errorMessage = "Failed to load model: \(error.localizedDescription)"
-            VocaLogger.error(.appState, "Failed to load model: \(error.localizedDescription)")
+
+            let modelDisplayName = targetSize?.displayName ?? "model"
+            let failureMessage = "Failed to load \(modelDisplayName): \(error.localizedDescription)"
+            showTemporaryError(failureMessage)
+            VocaLogger.error(.appState, failureMessage)
+
+            await restorePreviousModelIfNeeded(
+                afterFailedLoadFor: targetSize,
+                previousSize: previousModelSize,
+                previousName: previousLoadedModelName,
+                hadLoadedModel: hadLoadedModel,
+                originalFailureMessage: failureMessage
+            )
+        }
+    }
+
+    /// Surface a short-lived error state for settings and menu UI.
+    private func showTemporaryError(_ message: String) {
+        errorMessage = message
+        appStatus = .error
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) { [weak self] in
+            if self?.appStatus == .error, self?.errorMessage == message {
+                self?.appStatus = .idle
+                self?.errorMessage = nil
+            }
+        }
+    }
+
+    /// Restore the model that was active before a failed switch.
+    private func restorePreviousModelIfNeeded(
+        afterFailedLoadFor failedSize: ModelSize?,
+        previousSize: ModelSize?,
+        previousName: String?,
+        hadLoadedModel: Bool,
+        originalFailureMessage: String
+    ) async {
+        guard hadLoadedModel,
+              let previousSize,
+              failedSize != previousSize else {
+            clearActiveModelState()
+            return
+        }
+
+        do {
+            VocaLogger.info(.appState, "Restoring previous model: \(previousSize.displayName)")
+            let folderURL = modelManager.isModelDownloaded(previousSize)
+                ? modelManager.modelFolder(for: previousSize)
+                : nil
+            let restoreName = previousName ?? modelManager.whisperKitModelName(for: previousSize)
+            try await whisperService.loadModel(name: restoreName, folder: folderURL)
+            markModelActive(previousSize)
+            VocaLogger.info(.appState, "Restored previous model: \(previousSize.displayName)")
+        } catch {
+            clearActiveModelState()
+            let restoreFailure = "Previous model could not be restored: \(error.localizedDescription)"
+            errorMessage = "\(originalFailureMessage) \(restoreFailure)"
+            VocaLogger.error(.appState, restoreFailure)
+        }
+    }
+
+    /// Synchronize AppState's model metadata after a successful load.
+    private func markModelActive(_ size: ModelSize) {
+        currentModel = nil
+        for i in availableModels.indices {
+            let matches = availableModels[i].size == size
+            availableModels[i].isActive = matches
+            availableModels[i].isLoading = false
+            availableModels[i].loadingStatus = "Loading…"
+            if matches {
+                availableModels[i].isDownloaded = modelManager.isModelDownloaded(size)
+                currentModel = availableModels[i]
+            }
+        }
+    }
+
+    /// Clear active model metadata when no model is loaded in WhisperService.
+    private func clearActiveModelState() {
+        currentModel = nil
+        for i in availableModels.indices {
+            availableModels[i].isActive = false
+            availableModels[i].isLoading = false
+            availableModels[i].loadingStatus = "Loading…"
         }
     }
 

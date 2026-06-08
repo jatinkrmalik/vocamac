@@ -302,6 +302,30 @@ struct ModelSettingsTab: View {
                     }
                 }
 
+                if appState.appStatus == .error, let errorMessage = appState.errorMessage {
+                    GroupBox {
+                        HStack(alignment: .top, spacing: 8) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.orange)
+                            Text(errorMessage)
+                                .font(.caption)
+                                .foregroundStyle(.primary)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Spacer()
+                            Button {
+                                appState.errorMessage = nil
+                                appState.appStatus = .idle
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(.secondary)
+                            .help("Dismiss")
+                        }
+                        .padding(4)
+                    }
+                }
+
                 // Model list
                 GroupBox {
                     VStack(alignment: .leading, spacing: 0) {
@@ -428,7 +452,7 @@ struct ModelRow: View {
                             .background(.orange.opacity(0.2))
                             .foregroundStyle(.orange)
                             .cornerRadius(4)
-                            .help("WhisperKit hasn't verified this model on your chip family. Your hardware can likely run it — use Load Anyway to try.")
+                            .help("WhisperKit hasn't verified this model on your chip family. It may fail to load, or it may run slower than tuned models.")
                     }
                 }
 
@@ -525,7 +549,7 @@ struct ModelRow: View {
                 }
             }
         } message: {
-            Text("WhisperKit hasn't verified this model on your chip family. It will likely work but may be slower than tuned models.")
+            Text("WhisperKit hasn't verified this model on your chip family. It may fail to load, or it may run slower than tuned models.")
         }
     }
 }

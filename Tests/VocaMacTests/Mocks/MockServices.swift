@@ -239,6 +239,8 @@ final class MockCursorOverlay: CursorOverlayManaging {
 final class MockModelManager: ModelManaging {
     var supportedModels: [ModelSize] = ModelSize.allCases
     var defaultModel: String = "openai_whisper-tiny"
+    var supportedModelNames: [String]?
+    var disabledModelNames: [String] = []
     var downloadedModels: Set<ModelSize> = []
     var diskUsage: String = "100 MB"
     var bundledModels: Set<ModelSize> = []
@@ -247,7 +249,11 @@ final class MockModelManager: ModelManaging {
     var installBundledModelError: Error?
 
     func deviceRecommendation() -> (defaultModel: String, supported: [String], disabled: [String]) {
-        (defaultModel: defaultModel, supported: supportedModels.map(whisperKitModelName(for:)), disabled: [])
+        (
+            defaultModel: defaultModel,
+            supported: supportedModelNames ?? supportedModels.map(whisperKitModelName(for:)),
+            disabled: disabledModelNames
+        )
     }
 
     func modelFolder(for size: ModelSize) -> URL? {
@@ -313,11 +319,15 @@ final class MockModelManager: ModelManaging {
 // MARK: - MockWhisperService
 
 final class MockWhisperService: SpeechTranscribing {
+    typealias LoadRequest = (name: String?, folder: URL?)
+
     var loadedModelName: String? = "openai_whisper-tiny"
     var isModelLoaded: Bool = true
     var lastTranscribedAudioData: [Float]?
     var lastLanguage: String?
     var lastTranslate: Bool?
+    var loadRequests: [LoadRequest] = []
+    var loadResponses: [Result<String?, Error>] = []
     var mockTranscriptionResult: VocaTranscription = VocaTranscription(text: "mock transcription", duration: 1.0, detectedLanguage: "en", audioLengthSeconds: 1.0, modelUsed: .tiny)
     var shouldThrow = false
 
@@ -332,6 +342,23 @@ final class MockWhisperService: SpeechTranscribing {
     }
 
     func _loadModel(name: String?, folder: URL?, onPhaseChange: ((String) -> Void)?) async throws {
+        loadRequests.append((name: name, folder: folder))
+        onPhaseChange?("Loading model…")
+
+        if !loadResponses.isEmpty {
+            let response = loadResponses.removeFirst()
+            switch response {
+            case .success(let loadedName):
+                loadedModelName = loadedName ?? name ?? "mock-model"
+                isModelLoaded = true
+                return
+            case .failure(let error):
+                loadedModelName = nil
+                isModelLoaded = false
+                throw error
+            }
+        }
+
         loadedModelName = name ?? "mock-model"
         isModelLoaded = true
     }
@@ -355,7 +382,10 @@ final class MockTextInjector: TextInjecting {
 
 extension AppState {
     @MainActor
-    static func makeTestState() -> (appState: AppState, mocks: TestMocks) {
+    static func makeTestState(
+        modelManager: MockModelManager = MockModelManager(),
+        whisperService: MockWhisperService = MockWhisperService()
+    ) -> (appState: AppState, mocks: TestMocks) {
         UserDefaults.standard.removeObject(forKey: "vocamac.selectedAudioDeviceID")
         UserDefaults.standard.removeObject(forKey: "vocamac.selectedAudioDeviceName")
 
@@ -364,8 +394,6 @@ extension AppState {
         let hotKeyManager = MockHotKeyManager()
         let permissionManager = MockPermissionManager()
         let cursorOverlay = MockCursorOverlay()
-        let modelManager = MockModelManager()
-        let whisperService = MockWhisperService()
         let textInjector = MockTextInjector()
 
         let mocks = TestMocks(
