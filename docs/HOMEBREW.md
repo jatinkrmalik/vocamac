@@ -196,16 +196,20 @@ When VocaMac is installed via Homebrew Cask, the built-in update checker detects
 
 > Updates are managed by Homebrew. Run: `brew upgrade --cask vocamac`
 
+Nightly users see the nightly token instead:
+
+> Updates are managed by Homebrew. Run: `brew upgrade --cask vocamac-nightly`
+
 ### How Detection Works
 
-VocaMac checks whether `Bundle.main.bundlePath` contains `/Caskroom/`. This path segment is present for both Apple Silicon (`/opt/homebrew/Caskroom/`) and Intel (`/usr/local/Caskroom/`) Homebrew installations.
+Homebrew moves the launched app into the configured app directory, usually `/Applications/VocaMac.app`, and keeps cask metadata under the Homebrew prefix. VocaMac checks standard Apple Silicon and Intel Caskroom roots for the supported cask tokens (`vocamac` and `vocamac-nightly`), requires a Homebrew install receipt, and verifies that the cask's staged `VocaMac.app` entry resolves back to the running app bundle.
 
 | Installation Method | Update Behavior |
 |---|---|
 | **DMG (manual)** | In-app download, SHA-256 verification, open DMG |
-| **Homebrew Cask** | Shows Homebrew upgrade command; no in-app download |
+| **Homebrew Cask** | Shows the matching Homebrew upgrade command; no in-app download |
 
-This prevents conflicts between Homebrew's version management and the app's own update mechanism. Always use `brew upgrade --cask vocamac` to update a Homebrew-installed copy of VocaMac.
+This prevents conflicts between Homebrew's version management and the app's own update mechanism. Always use `brew upgrade --cask vocamac` or `brew upgrade --cask vocamac-nightly` to update a Homebrew-installed copy of VocaMac.
 
 ## Troubleshooting
 

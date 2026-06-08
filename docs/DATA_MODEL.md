@@ -397,7 +397,7 @@ enum UpdateState: Equatable {
     case idle
     case checking
     case updateAvailable(UpdateInfo)
-    case updateAvailableViaHomebrew(info: UpdateInfo)
+    case updateAvailableViaHomebrew(info: UpdateInfo, install: HomebrewInstall)
     case upToDate
     case downloading(progress: Double, bytesDownloaded: Int64, totalBytes: Int64, estimatedSecondsRemaining: Double)
     case verifying

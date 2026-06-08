@@ -34,17 +34,45 @@ final class UpdateCheckerTests: XCTestCase {
         XCTAssertEqual(release.assets.first?.name, "VocaMac-0.4.0-arm64.dmg")
     }
 
-    func testIsHomebrewPathDetectsCaskroom() {
-        XCTAssertTrue(UpdateChecker.isHomebrewPath("/opt/homebrew/Caskroom/vocamac/0.5.0/VocaMac.app"))
-        XCTAssertTrue(UpdateChecker.isHomebrewPath("/usr/local/Caskroom/vocamac/0.5.0/VocaMac.app"))
-        XCTAssertFalse(UpdateChecker.isHomebrewPath("/Applications/VocaMac.app"))
-        XCTAssertFalse(UpdateChecker.isHomebrewPath("/Users/john/Applications/VocaMac.app"))
+    func testDetectHomebrewInstallFromCaskroomSymlink() throws {
+        let fixture = try makeHomebrewFixture(caskToken: "vocamac", version: "0.6.2")
+
+        let install = UpdateChecker.detectHomebrewInstall(
+            bundlePath: fixture.appBundle.path,
+            caskroomRoots: [fixture.caskroomRoot]
+        )
+
+        XCTAssertEqual(install?.caskToken, "vocamac")
+        XCTAssertEqual(install?.upgradeCommand, "brew upgrade --cask vocamac")
+    }
+
+    func testDetectHomebrewInstallPreservesNightlyCaskToken() throws {
+        let fixture = try makeHomebrewFixture(caskToken: "vocamac-nightly", version: "nightly")
+
+        let install = UpdateChecker.detectHomebrewInstall(
+            bundlePath: fixture.appBundle.path,
+            caskroomRoots: [fixture.caskroomRoot]
+        )
+
+        XCTAssertEqual(install?.caskToken, "vocamac-nightly")
+        XCTAssertEqual(install?.upgradeCommand, "brew upgrade --cask vocamac-nightly")
+    }
+
+    func testDetectHomebrewInstallRequiresReceipt() throws {
+        let fixture = try makeHomebrewFixture(caskToken: "vocamac", version: "0.6.2", writeReceipt: false)
+
+        let install = UpdateChecker.detectHomebrewInstall(
+            bundlePath: fixture.appBundle.path,
+            caskroomRoots: [fixture.caskroomRoot]
+        )
+
+        XCTAssertNil(install)
     }
 
     @MainActor
     func testCheckForUpdatesTransitionsToHomebrewStateWhenInstalledViaHomebrew() async {
         let checker = UpdateChecker()
-        checker.overrideHomebrewInstalled = true
+        checker.overrideHomebrewInstall = .installed(HomebrewInstall(caskToken: "vocamac-nightly"))
 
         let mockRelease = GitHubRelease(
             tagName: "v99.99.99",
@@ -67,8 +95,9 @@ final class UpdateCheckerTests: XCTestCase {
 
         await checker.checkForUpdates(releaseProvider: { mockRelease })
 
-        if case .updateAvailableViaHomebrew(let info) = checker.updateState {
+        if case .updateAvailableViaHomebrew(let info, let install) = checker.updateState {
             XCTAssertEqual(info.tagName, "v99.99.99")
+            XCTAssertEqual(install.caskToken, "vocamac-nightly")
         } else {
             XCTFail("Expected .updateAvailableViaHomebrew but got \(String(describing: checker.updateState))")
         }
@@ -77,7 +106,7 @@ final class UpdateCheckerTests: XCTestCase {
     @MainActor
     func testCheckForUpdatesTransitionsToUpdateAvailableWhenNotHomebrew() async {
         let checker = UpdateChecker()
-        checker.overrideHomebrewInstalled = false
+        checker.overrideHomebrewInstall = .notInstalled
 
         let mockRelease = GitHubRelease(
             tagName: "v99.99.99",
@@ -105,5 +134,42 @@ final class UpdateCheckerTests: XCTestCase {
         } else {
             XCTFail("Expected .updateAvailable but got \(String(describing: checker.updateState))")
         }
+    }
+
+    private func makeHomebrewFixture(
+        caskToken: String,
+        version: String,
+        writeReceipt: Bool = true,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws -> (caskroomRoot: URL, appBundle: URL) {
+        let fileManager = FileManager.default
+        let root = fileManager.temporaryDirectory
+            .appendingPathComponent("VocaMacTests", isDirectory: true)
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let caskroomRoot = root.appendingPathComponent("Caskroom", isDirectory: true)
+        let appBundle = root
+            .appendingPathComponent("Applications", isDirectory: true)
+            .appendingPathComponent("VocaMac.app", isDirectory: true)
+        let caskRoot = caskroomRoot.appendingPathComponent(caskToken, isDirectory: true)
+        let metadataRoot = caskRoot.appendingPathComponent(".metadata", isDirectory: true)
+        let versionRoot = caskRoot.appendingPathComponent(version, isDirectory: true)
+        let stagedApp = versionRoot.appendingPathComponent("VocaMac.app", isDirectory: true)
+
+        addTeardownBlock {
+            try? fileManager.removeItem(at: root)
+        }
+
+        try fileManager.createDirectory(at: appBundle, withIntermediateDirectories: true)
+        try fileManager.createDirectory(at: metadataRoot, withIntermediateDirectories: true)
+        try fileManager.createDirectory(at: versionRoot, withIntermediateDirectories: true)
+        if writeReceipt {
+            let receipt = metadataRoot.appendingPathComponent("INSTALL_RECEIPT.json")
+            try Data(#"{"uninstall_artifacts":[{"app":["VocaMac.app"]}]}"#.utf8).write(to: receipt)
+        }
+        try fileManager.createSymbolicLink(at: stagedApp, withDestinationURL: appBundle)
+
+        XCTAssertTrue(fileManager.fileExists(atPath: appBundle.path), file: file, line: line)
+        return (caskroomRoot, appBundle)
     }
 }

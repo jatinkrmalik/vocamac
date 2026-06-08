@@ -109,19 +109,19 @@ struct UpdateDetailView: View {
                 }
                 .buttonStyle(.borderedProminent)
             }
-        case .updateAvailableViaHomebrew:
+        case .updateAvailableViaHomebrew(_, let install):
             VStack(alignment: .leading, spacing: 10) {
                 Text("Updates are managed by Homebrew.")
                     .foregroundStyle(.secondary)
                 HStack {
-                    Text("brew upgrade --cask vocamac")
+                    Text(install.upgradeCommand)
                         .font(.system(.callout, design: .monospaced))
                         .textSelection(.enabled)
                     Spacer()
                     Button("Copy Command") {
                         let pasteboard = NSPasteboard.general
                         pasteboard.clearContents()
-                        pasteboard.setString("brew upgrade --cask vocamac", forType: .string)
+                        pasteboard.setString(install.upgradeCommand, forType: .string)
                     }
                     .buttonStyle(.bordered)
                 }

@@ -25,6 +25,12 @@ brew install --cask vocamac-nightly
 brew upgrade --cask vocamac
 ```
 
+For nightly builds:
+
+```bash
+brew upgrade --cask vocamac-nightly
+```
+
 ## Uninstall
 
 ```bash
