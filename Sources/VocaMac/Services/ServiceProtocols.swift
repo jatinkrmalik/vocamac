@@ -138,3 +138,9 @@ extension SpeechTranscribing {
 protocol TextInjecting: AnyObject {
     func inject(text: String, preserveClipboard: Bool)
 }
+
+// MARK: - SnippetExpanding
+
+protocol SnippetExpanding: AnyObject {
+    func expand(in text: String, using snippets: [Snippet]) -> String
+}
