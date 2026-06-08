@@ -33,13 +33,14 @@ struct VocaTranscription: Identifiable {
         duration: TimeInterval,
         detectedLanguage: String,
         audioLengthSeconds: Double,
-        modelUsed: ModelSize
+        modelUsed: ModelSize,
+        timestamp: Date = Date()
     ) {
         self.id = UUID()
         self.text = text
         self.duration = duration
         self.detectedLanguage = detectedLanguage
-        self.timestamp = Date()
+        self.timestamp = timestamp
         self.audioLengthSeconds = audioLengthSeconds
         self.modelUsed = modelUsed
     }

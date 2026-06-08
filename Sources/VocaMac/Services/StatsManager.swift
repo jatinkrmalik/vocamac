@@ -15,22 +15,32 @@ class StatsManager: StatsManaging, ObservableObject {
     }
 
     private let fileManager = FileManager.default
-    private let statsFileName = "stats.json"
+    private let statsFileURL: URL
+    private let calendar: Calendar
 
-    init() {
-        loadStats()
-    }
+    private static let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        return formatter
+    }()
 
-    private var statsFileURL: URL {
-        let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let vMacDir = appSupport.appendingPathComponent("VocaMac", isDirectory: true)
+    init(statsFileURL: URL? = nil, calendar: Calendar = .current) {
+        if let statsFileURL {
+            self.statsFileURL = statsFileURL
+        } else {
+            let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+            let vMacDir = appSupport.appendingPathComponent("VocaMac", isDirectory: true)
 
-        // Ensure directory exists
-        if !fileManager.fileExists(atPath: vMacDir.path) {
-            try? fileManager.createDirectory(at: vMacDir, withIntermediateDirectories: true)
+            // Ensure directory exists
+            if !FileManager.default.fileExists(atPath: vMacDir.path) {
+                try? FileManager.default.createDirectory(at: vMacDir, withIntermediateDirectories: true)
+            }
+            self.statsFileURL = vMacDir.appendingPathComponent("stats.json")
         }
-
-        return vMacDir.appendingPathComponent(statsFileName)
+        self.calendar = calendar
+        loadStats()
     }
 
     private func loadStats() {
@@ -66,7 +76,7 @@ class StatsManager: StatsManaging, ObservableObject {
             .filter { !$0.isEmpty }
             .count
 
-        let dateKey = formatDate(transcription.timestamp)
+        let dateKey = Self.dateFormatter.string(from: transcription.timestamp)
 
         // Update basic counts
         stats.totalWords += words
@@ -98,8 +108,6 @@ class StatsManager: StatsManaging, ObservableObject {
             return
         }
 
-        let calendar = Calendar.current
-
         // Check if last usage was yesterday
         if calendar.isDateInYesterday(lastDate) {
             // Continuation of streak
@@ -116,11 +124,5 @@ class StatsManager: StatsManaging, ObservableObject {
         if stats.currentStreak > stats.bestStreak {
             stats.bestStreak = stats.currentStreak
         }
-    }
-
-    private func formatDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.string(from: date)
     }
 }

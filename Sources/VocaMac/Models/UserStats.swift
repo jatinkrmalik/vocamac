@@ -31,7 +31,8 @@ struct UserStats: Codable {
     /// Daily duration to calculate WPM history
     var dailyDurationSeconds: [String: Double] = [:]
 
-    /// Calculated average Words Per Minute (WPM)
+    /// Calculated average Words Per Minute (WPM).
+    /// Note: This is "words-per-minute-of-audio", dividing total words by total audio duration.
     var averageWPM: Double {
         guard totalAudioDurationSeconds > 0 else { return 0 }
         let minutes = totalAudioDurationSeconds / 60.0

@@ -10,15 +10,19 @@ import Combine
 final class StatsManagerTests: XCTestCase {
     var statsManager: StatsManager!
     var cancellables: Set<AnyCancellable>!
+    var tempFileURL: URL!
 
     @MainActor
     override func setUp() {
         super.setUp()
-        // Use a temporary file for testing persistence if needed, 
-        // but for logic tests we can just use a fresh instance.
-        statsManager = StatsManager()
-        statsManager.resetStats()
+        tempFileURL = FileManager.default.temporaryDirectory.appendingPathComponent("stats_test_\(UUID().uuidString).json")
+        statsManager = StatsManager(statsFileURL: tempFileURL)
         cancellables = []
+    }
+
+    override func tearDown() {
+        try? FileManager.default.removeItem(at: tempFileURL)
+        super.tearDown()
     }
 
     @MainActor
@@ -67,16 +71,61 @@ final class StatsManagerTests: XCTestCase {
         let today = Date()
         let yesterday = calendar.date(byAdding: .day, value: -1, to: today)!
 
-        // Record for yesterday
-        let t1 = VocaTranscription(text: "Yesterday", duration: 1.0, detectedLanguage: "en", audioLengthSeconds: 1.0, modelUsed: .tiny)
-        // Manually inject lastUsageDate to yesterday for testing
+        // 1. Record for yesterday
+        let t1 = VocaTranscription(
+            text: "Yesterday transcription",
+            duration: 1.0,
+            detectedLanguage: "en",
+            audioLengthSeconds: 1.0,
+            modelUsed: .tiny,
+            timestamp: yesterday
+        )
         statsManager.recordTranscription(t1)
-        
-        // We need to simulate that the last usage was actually yesterday.
-        // Since recordTranscription sets it to now, we'll manually adjust it for the test.
-        // This requires making some properties internal or using a mockable date provider.
-        // For now, let's just test that it starts at 1.
         XCTAssertEqual(statsManager.stats.currentStreak, 1)
+
+        // 2. Record for today
+        let t2 = VocaTranscription(
+            text: "Today transcription",
+            duration: 1.0,
+            detectedLanguage: "en",
+            audioLengthSeconds: 1.0,
+            modelUsed: .tiny,
+            timestamp: today
+        )
+        statsManager.recordTranscription(t2)
+        XCTAssertEqual(statsManager.stats.currentStreak, 2, "Streak should increment on consecutive days")
+        XCTAssertEqual(statsManager.stats.bestStreak, 2)
+    }
+
+    @MainActor
+    func testStreakBrokenAfterGap() {
+        let calendar = Calendar.current
+        let today = Date()
+        let threeDaysAgo = calendar.date(byAdding: .day, value: -3, to: today)!
+
+        // 1. Record for 3 days ago
+        let t1 = VocaTranscription(
+            text: "Old transcription",
+            duration: 1.0,
+            detectedLanguage: "en",
+            audioLengthSeconds: 1.0,
+            modelUsed: .tiny,
+            timestamp: threeDaysAgo
+        )
+        statsManager.recordTranscription(t1)
+        XCTAssertEqual(statsManager.stats.currentStreak, 1)
+
+        // 2. Record for today (2 day gap)
+        let t2 = VocaTranscription(
+            text: "Today transcription",
+            duration: 1.0,
+            detectedLanguage: "en",
+            audioLengthSeconds: 1.0,
+            modelUsed: .tiny,
+            timestamp: today
+        )
+        statsManager.recordTranscription(t2)
+        XCTAssertEqual(statsManager.stats.currentStreak, 1, "Streak should reset after a gap")
     }
 
     @MainActor

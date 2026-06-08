@@ -342,16 +342,10 @@ final class MockStatsManager: StatsManaging, ObservableObject {
 
     func recordTranscription(_ transcription: VocaTranscription) {
         recordCallCount += 1
-        // Simplified word count for testing
-        let words = transcription.text.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }.count
-        stats.totalWords += words
-        stats.totalTranscriptions += 1
-        stats.totalAudioDurationSeconds += transcription.audioLengthSeconds
     }
 
     func resetStats() {
         resetCallCount += 1
-        stats = UserStats()
     }
 }
 

@@ -8,6 +8,26 @@ import SwiftUI
 struct StatsSettingsTab: View {
     @EnvironmentObject var appState: AppState
 
+    private static let durationFormatter: DateComponentsFormatter = {
+        let formatter = DateComponentsFormatter()
+        formatter.allowedUnits = [.hour, .minute, .second]
+        formatter.unitsStyle = .abbreviated
+        formatter.zeroFormattingBehavior = .dropAll
+        return formatter
+    }()
+
+    private static let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+
+    private static let displayDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d, yyyy"
+        return formatter
+    }()
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
@@ -117,8 +137,6 @@ struct StatsSettingsTab: View {
                     .padding(8)
                 }
 
-                Spacer()
-
                 // Reset Button
                 Button(role: .destructive) {
                     appState.statsManager.resetStats()
@@ -134,17 +152,7 @@ struct StatsSettingsTab: View {
     }
 
     private func formatDuration(_ seconds: Double) -> String {
-        if seconds < 60 {
-            return "\(Int(seconds))s"
-        } else if seconds < 3600 {
-            let mins = Int(seconds / 60)
-            let secs = Int(seconds.truncatingRemainder(dividingBy: 60))
-            return "\(mins)m \(secs)s"
-        } else {
-            let hrs = Int(seconds / 3600)
-            let mins = Int((seconds.truncatingRemainder(dividingBy: 3600)) / 60)
-            return "\(hrs)h \(mins)m"
-        }
+        return Self.durationFormatter.string(from: seconds) ?? "\(Int(seconds))s"
     }
 
     private func recentDays() -> [String] {
@@ -153,15 +161,12 @@ struct StatsSettingsTab: View {
     }
 
     private func formatDateString(_ dateString: String) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        guard let date = formatter.date(from: dateString) else { return dateString }
+        guard let date = Self.dateFormatter.date(from: dateString) else { return dateString }
 
         if Calendar.current.isDateInToday(date) { return "Today" }
         if Calendar.current.isDateInYesterday(date) { return "Yesterday" }
 
-        formatter.dateFormat = "MMM d, yyyy"
-        return formatter.string(from: date)
+        return Self.displayDateFormatter.string(from: date)
     }
 }
 
