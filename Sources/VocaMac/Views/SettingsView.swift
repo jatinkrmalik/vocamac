@@ -337,7 +337,7 @@ struct ModelSettingsTab: View {
                         ForEach(appState.availableModels) { model in
                             ModelRow(model: model, appState: appState)
 
-                            if model.size != ModelSize.allCases.last {
+                            if model.id != appState.availableModels.last?.id {
                                 Divider()
                                     .padding(.horizontal, 4)
                             }
@@ -356,10 +356,7 @@ struct ModelSettingsTab: View {
                 }
 
                 if let recommended = appState.deviceRecommendedModel,
-                   let recommendedSize = ModelSize.allCases.first(where: { size in
-                       let prefix = "openai_whisper-\(size.rawValue)"
-                       return recommended == prefix || recommended.hasPrefix(prefix + "-")
-                   }) {
+                   let recommendedSize = appState.modelManager.modelSize(from: recommended) {
                     HStack {
                         Image(systemName: "sparkles")
                             .foregroundStyle(.blue)
@@ -430,10 +427,7 @@ struct ModelRow: View {
 
                     if model.isSupported,
                        let recommended = appState.deviceRecommendedModel {
-                        // Use exact prefix boundary matching to avoid cross-model
-                        // false positives (e.g. "large-v3" matching "large-v3_turbo")
-                        let prefix = "openai_whisper-\(model.size.rawValue)"
-                        if recommended == prefix || recommended.hasPrefix(prefix + "-") {
+                        if appState.modelManager.modelSize(from: recommended) == model.size {
                             Text("Recommended")
                                 .font(.caption2)
                                 .padding(.horizontal, 6)

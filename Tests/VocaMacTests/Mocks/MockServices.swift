@@ -284,27 +284,44 @@ final class MockModelManager: ModelManaging {
     }
 
     func isModelSupported(_ size: ModelSize) -> Bool {
-        supportedModels.contains(size)
+        if let supportedModelNames {
+            return supportedModelNames.contains(whisperKitModelName(for: size))
+                && !disabledModelNames.contains(whisperKitModelName(for: size))
+        }
+        return supportedModels.contains(size)
     }
 
     func whisperKitModelName(for size: ModelSize) -> String {
         switch size {
-        case .tiny:    return "openai_whisper-tiny"
-        case .base:    return "openai_whisper-base"
-        case .small:   return "openai_whisper-small"
-        case .medium:  return "openai_whisper-medium"
-        case .largeV3: return "openai_whisper-large-v3"
+        case .tiny:
+            return "openai_whisper-tiny"
+        case .base:
+            return "openai_whisper-base"
+        case .small:
+            return "openai_whisper-small"
+        case .largeV3LatestTurboCompact:
+            return "openai_whisper-large-v3-v20240930_turbo_632MB"
+        case .distilLargeV3Compact:
+            return "distil-whisper_distil-large-v3_594MB"
+        case .distilLargeV3TurboCompact:
+            return "distil-whisper_distil-large-v3_turbo_600MB"
+        case .largeV3LatestCompact:
+            return "openai_whisper-large-v3-v20240930_626MB"
+        case .largeV3Latest:
+            return "openai_whisper-large-v3-v20240930"
+        case .largeV3LatestTurbo:
+            return "openai_whisper-large-v3-v20240930_turbo"
+        case .largeV3:
+            return "openai_whisper-large-v3"
+        case .largeV3Turbo:
+            return "openai_whisper-large-v3_turbo"
+        case .medium:
+            return "openai_whisper-medium"
         }
     }
 
     func modelSize(from whisperKitName: String) -> ModelSize? {
-        for size in ModelSize.allCases {
-            let prefix = whisperKitModelName(for: size)
-            if whisperKitName == prefix || whisperKitName.hasPrefix(prefix + "-") {
-                return size
-            }
-        }
-        return nil
+        ModelSize.allCases.first { whisperKitModelName(for: $0) == whisperKitName }
     }
 
     func downloadModel(size: ModelSize, onProgress: @escaping (Double) -> Void) async throws {

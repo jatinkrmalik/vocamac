@@ -113,16 +113,18 @@ enum SystemInfo {
 
     // MARK: - Model Recommendation
 
-    /// Recommend the optimal whisper model size based on system capabilities
+    /// Recommend a default model family based on system capabilities.
+    ///
+    /// WhisperKit's runtime recommendation remains the source of truth for
+    /// actual model loading. This fallback is used for static system summaries.
     static func recommendModel(isAppleSilicon: Bool, memoryGB: Int) -> ModelSize {
         if isAppleSilicon {
-            // Apple Silicon is more memory-efficient and has Metal acceleration
             switch memoryGB {
             case ...7:   return .tiny
             case 8...15: return .base
             case 16...23: return .small
-            case 24...31: return .medium
-            case 32...:  return .medium  // large-v3 is very slow even on high-end machines
+            case 24...31: return .largeV3LatestTurboCompact
+            case 32...:  return .largeV3Latest
             default:     return .tiny
             }
         } else {

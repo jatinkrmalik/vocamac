@@ -267,16 +267,7 @@ final class AppState: ObservableObject {
             deviceRecommendedModel = recommendation.defaultModel
         }
 
-        // Initialize available models list
-        availableModels = ModelSize.allCases.map { size in
-            WhisperModelInfo(
-                size: size,
-                filePath: modelManager.modelFolder(for: size),
-                isDownloaded: modelManager.isModelDownloaded(size),
-                isActive: size.rawValue == selectedModelSize,
-                isSupported: modelManager.isModelSupported(size)
-            )
-        }
+        rebuildAvailableModels()
 
         // Validate that the recommended model maps to a supported ModelSize.
         // If the recommendation points to an unsupported model, fall back to
@@ -379,6 +370,67 @@ final class AppState: ObservableObject {
 
         // Check permissions
         checkPermissions()
+    }
+
+    /// Build the model list shown in Settings and onboarding.
+    ///
+    /// The base catalog is curated for M-series Macs, then extended with any
+    /// exact variants WhisperKit marks supported for the current device.
+    private func modelCatalog() -> [ModelSize] {
+        var catalog = ModelSize.standardCatalog
+
+        for size in ModelSize.allCases where modelManager.isModelSupported(size) {
+            if !catalog.contains(size) {
+                catalog.append(size)
+            }
+        }
+
+        if let selected = ModelSize(rawValue: selectedModelSize),
+           !catalog.contains(selected) {
+            catalog.append(selected)
+        }
+
+        return catalog
+    }
+
+    /// Recreate model UI state from the latest catalog and local cache status.
+    private func rebuildAvailableModels() {
+        availableModels = modelCatalog().map { size in
+            WhisperModelInfo(
+                size: size,
+                filePath: modelManager.modelFolder(for: size),
+                isDownloaded: modelManager.isModelDownloaded(size),
+                isActive: size.rawValue == selectedModelSize,
+                isSupported: modelManager.isModelSupported(size)
+            )
+        }
+    }
+
+    /// Resolve WhisperKit's recommended exact model variant into app metadata.
+    private func recommendedModelSize() -> ModelSize? {
+        guard let recommended = deviceRecommendedModel,
+              let size = modelManager.modelSize(from: recommended),
+              modelManager.isModelSupported(size) else {
+            return nil
+        }
+        return size
+    }
+
+    /// Pick a supported startup model when the stored preference is no longer valid.
+    private func startupFallbackModel(for preferred: ModelSize) -> ModelSize {
+        guard !modelManager.isModelSupported(preferred) else {
+            return preferred
+        }
+
+        if let downloadedSupported = availableModels.last(where: { $0.isSupported && $0.isDownloaded })?.size {
+            return downloadedSupported
+        }
+
+        if let recommended = recommendedModelSize() {
+            return recommended
+        }
+
+        return .tiny
     }
 
     // MARK: - Permission Handling (delegated to PermissionManager)
@@ -622,8 +674,19 @@ final class AppState: ObservableObject {
                 resolvedSize = targetSize
             } else {
                 let loadedName = (whisperService.loadedModelName ?? "").lowercased()
-                // Check from largest to smallest to avoid "base" matching inside "large-v3"
-                if loadedName.contains("large") {
+                if let loadedSize = modelManager.modelSize(from: whisperService.loadedModelName ?? "") {
+                    resolvedSize = loadedSize
+                } else if loadedName.contains("v20240930_turbo") {
+                    resolvedSize = .largeV3LatestTurbo
+                } else if loadedName.contains("v20240930") {
+                    resolvedSize = .largeV3Latest
+                } else if loadedName.contains("distil") && loadedName.contains("turbo") {
+                    resolvedSize = .distilLargeV3TurboCompact
+                } else if loadedName.contains("distil") {
+                    resolvedSize = .distilLargeV3Compact
+                } else if loadedName.contains("large") && loadedName.contains("turbo") {
+                    resolvedSize = .largeV3Turbo
+                } else if loadedName.contains("large") {
                     resolvedSize = .largeV3
                 } else if loadedName.contains("medium") {
                     resolvedSize = .medium
@@ -828,7 +891,13 @@ final class AppState: ObservableObject {
         // downloaded yet. We download it explicitly so the UI can show real
         // progress, rather than delegating to WhisperKit's opaque auto-select
         // which provides no progress callbacks and may pick a different model.
-        var modelToLoad = ModelSize(rawValue: selectedModelSize) ?? .tiny
+        let preferredModel = ModelSize(rawValue: selectedModelSize) ?? .tiny
+        var modelToLoad = startupFallbackModel(for: preferredModel)
+        if modelToLoad != preferredModel {
+            VocaLogger.warning(.appState, "Preferred model \(preferredModel.displayName) is not supported on this device — falling back to \(modelToLoad.displayName)")
+            selectedModelSize = modelToLoad.rawValue
+            rebuildAvailableModels()
+        }
 
         if !modelManager.isModelDownloaded(modelToLoad) {
             // Try bundled model for the preferred size first

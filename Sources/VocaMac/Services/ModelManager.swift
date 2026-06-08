@@ -59,7 +59,36 @@ final class ModelManager {
     }
 
     private func hasRequiredModelAssets(at directory: URL) -> Bool {
-        requiredModelDirectories.allSatisfy { fileManager.fileExists(atPath: directory.appendingPathComponent($0).path) }
+        requiredModelDirectories.allSatisfy { componentName in
+            Self.hasUsableCoreMLComponent(at: directory.appendingPathComponent(componentName, isDirectory: true))
+        }
+    }
+
+    /// Validate that a compiled CoreML component has both graph metadata and weights.
+    static func hasUsableCoreMLComponent(at directory: URL, fileManager: FileManager = .default) -> Bool {
+        var isDirectory: ObjCBool = false
+        guard fileManager.fileExists(atPath: directory.path, isDirectory: &isDirectory),
+              isDirectory.boolValue else {
+            return false
+        }
+
+        let metadata = directory.appendingPathComponent("metadata.json")
+        let hasMetadata = fileManager.fileExists(atPath: metadata.path)
+        let hasModelDefinition = [
+            "model.mil",
+            "model.mlmodel",
+            "coremldata.bin",
+        ].contains { fileName in
+            fileManager.fileExists(atPath: directory.appendingPathComponent(fileName).path)
+        }
+        let hasWeights = fileManager.fileExists(
+            atPath: directory
+                .appendingPathComponent("weights", isDirectory: true)
+                .appendingPathComponent("weight.bin")
+                .path
+        )
+
+        return hasMetadata && hasModelDefinition && hasWeights
     }
 
     private func hasRequiredTokenizerAssets(at directory: URL) -> Bool {
@@ -203,11 +232,30 @@ final class ModelManager {
     /// Map a ModelSize enum to WhisperKit model variant name
     func whisperKitModelName(for size: ModelSize) -> String {
         switch size {
-        case .tiny:    return "openai_whisper-tiny"
-        case .base:    return "openai_whisper-base"
-        case .small:   return "openai_whisper-small"
-        case .medium:  return "openai_whisper-medium"
-        case .largeV3: return "openai_whisper-large-v3"
+        case .tiny:
+            return "openai_whisper-tiny"
+        case .base:
+            return "openai_whisper-base"
+        case .small:
+            return "openai_whisper-small"
+        case .largeV3LatestTurboCompact:
+            return "openai_whisper-large-v3-v20240930_turbo_632MB"
+        case .distilLargeV3Compact:
+            return "distil-whisper_distil-large-v3_594MB"
+        case .distilLargeV3TurboCompact:
+            return "distil-whisper_distil-large-v3_turbo_600MB"
+        case .largeV3LatestCompact:
+            return "openai_whisper-large-v3-v20240930_626MB"
+        case .largeV3Latest:
+            return "openai_whisper-large-v3-v20240930"
+        case .largeV3LatestTurbo:
+            return "openai_whisper-large-v3-v20240930_turbo"
+        case .largeV3:
+            return "openai_whisper-large-v3"
+        case .largeV3Turbo:
+            return "openai_whisper-large-v3_turbo"
+        case .medium:
+            return "openai_whisper-medium"
         }
     }
 
@@ -220,7 +268,7 @@ final class ModelManager {
     /// Get the local folder path for a downloaded or installed model
     func modelFolder(for size: ModelSize) -> URL? {
         let modelDir = installedModelDirectory(for: size)
-        if fileManager.fileExists(atPath: modelDir.path) {
+        if fileManager.fileExists(atPath: modelDir.path), hasRequiredModelAssets(at: modelDir) {
             return modelDir
         }
         return nil
@@ -233,40 +281,21 @@ final class ModelManager {
 
     /// Check if a model size is supported on this device.
     ///
-    /// Uses exact prefix boundary matching: "openai_whisper-large-v3" matches
-    /// versioned variants like "openai_whisper-large-v3-v20240930_626MB" but NOT
-    /// different models like "openai_whisper-large-v3_turbo-v20240930_626MB".
-    /// Also checks the disabled list — if any exact variant is disabled, the model
-    /// is considered unsupported to avoid recommending models the device can't run.
+    /// Uses exact model matching so distinct WhisperKit variants remain distinct.
     func isModelSupported(_ size: ModelSize) -> Bool {
         let rec = WhisperKit.recommendedModels()
-        let modelPrefix = whisperKitModelName(for: size)
+        let modelName = whisperKitModelName(for: size)
 
-        // Match exact model name or versioned variants (prefix + "-")
-        // but not different models that share a prefix (e.g. large-v3_turbo)
-        let matchesModel: (String) -> Bool = { name in
-            name == modelPrefix || name.hasPrefix(modelPrefix + "-")
-        }
-
-        // If any exact variant of this model is in the disabled list, it's unsupported
-        if rec.disabled.contains(where: matchesModel) {
+        if rec.disabled.contains(modelName) {
             return false
         }
 
-        return rec.supported.contains(where: matchesModel)
+        return rec.supported.contains(modelName)
     }
 
     /// Map a WhisperKit model name back to a ModelSize, if it matches one of our known sizes.
-    ///
-    /// Uses exact prefix boundary matching, same as `isModelSupported`.
     func modelSize(from whisperKitName: String) -> ModelSize? {
-        for size in ModelSize.allCases {
-            let prefix = whisperKitModelName(for: size)
-            if whisperKitName == prefix || whisperKitName.hasPrefix(prefix + "-") {
-                return size
-            }
-        }
-        return nil
+        ModelSize.allCases.first { whisperKitModelName(for: $0) == whisperKitName }
     }
 
     // MARK: - Model Download
@@ -412,8 +441,12 @@ final class ModelManager {
             // survive temp directory cleanup.
             try consolidateWhisperKitDownload(for: size)
 
-            onProgress(1.0)
             let installedDir = installedModelDirectory(for: size)
+            guard hasRequiredModelAssets(at: installedDir) else {
+                throw ModelManagerError.missingModelDirectory(installedDir.path)
+            }
+
+            onProgress(1.0)
             VocaLogger.info(.modelManager, "Model '\(whisperKitModelName(for: size))' downloaded successfully to: \(installedDir.path)")
         } catch {
             VocaLogger.error(.modelManager, "Download failed for '\(whisperKitModelName(for: size))': \(error.localizedDescription)")
