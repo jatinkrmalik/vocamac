@@ -1,6 +1,6 @@
 ---
 title: "Smart Model Selection"
-subtitle: "Auto-detects your hardware (Apple Silicon, Intel, RAM) and recommends the optimal Whisper model."
+subtitle: "Auto-detects your Apple Silicon hardware and RAM, then recommends the optimal Whisper model."
 description: "VocaMac automatically detects your Mac hardware and recommends the best Whisper model for your system. Choose from Tiny to Large v3 based on your needs."
 keywords: "whisper model selection, auto detect hardware macOS, apple silicon whisper, coreml speech model, best whisper model mac, RAM based model recommendation"
 icon: "🧠"
@@ -8,9 +8,11 @@ icon: "🧠"
 
 ## Intelligent Hardware Detection
 
-Every Mac is different. A MacBook Air with Apple Silicon has different capabilities than an Intel Mac mini with 8GB RAM. VocaMac detects your exact hardware configuration and recommends the Whisper model that delivers the best balance of accuracy and speed on your specific machine.
+Every Apple Silicon Mac is different. An 8 GB MacBook Air has very different headroom than a 32 GB Mac Studio. VocaMac detects your exact hardware configuration and recommends the Whisper model that delivers the best balance of accuracy and speed on your specific machine.
 
-On first launch, VocaMac analyzes your processor type (Apple Silicon or Intel), CPU core count, GPU availability, and installed RAM. It then suggests the optimal model tier. You remain free to choose any model, but the recommendation gets you great results immediately without guesswork.
+On first launch, VocaMac analyzes your chip generation, CPU core count, Neural Engine availability, and installed RAM. It then suggests the optimal model tier. You remain free to choose any model, but the recommendation gets you great results immediately without guesswork.
+
+> **Note:** VocaMac is Apple Silicon only. The released DMG does not run on Intel Macs.
 
 ## Five Model Tiers
 
@@ -37,10 +39,10 @@ The most accurate model available. Peak performance on Apple Silicon Macs with 3
 
 VocaMac provides tailored suggestions:
 
-- **MacBook Air with Apple Silicon (8GB)**: Base or Small model recommended
-- **MacBook Pro with Apple Silicon (16GB)**: Small or Medium model recommended
-- **Mac mini with Intel (8GB RAM)**: Tiny or Base model recommended
-- **Mac Studio with Apple Silicon (32GB)**: Medium or Large v3 model recommended
+- **MacBook Air (M1/M2, 8 GB)**: Base or Small model recommended
+- **MacBook Pro (M1/M2/M3, 16 GB)**: Small or Medium model recommended
+- **Mac mini (M2, 16 GB)**: Small or Medium model recommended
+- **Mac Studio (M2/M3 Max, 32 GB+)**: Medium or Large v3 model recommended
 
 These recommendations balance your hardware capabilities with practical transcription speeds. Your actual choice depends on your accuracy requirements and tolerance for processing time.
 
@@ -56,8 +58,8 @@ Model storage uses your local disk space. VocaMac shows disk usage for each mode
 
 All Whisper models in VocaMac are converted to Apple's CoreML format. This optimization ensures:
 
-- Native execution on Apple Silicon using Neural Engine
-- Efficient Intel compatibility through Intel AMX (Apple Mac compatible) instructions
+- Native execution on Apple Silicon using the Neural Engine
+- GPU offload through Metal Performance Shaders for compute-heavy ops
 - Minimal energy consumption (important for battery life on laptops)
 - No cloud dependencies or external API calls
 - Complete privacy (all processing happens locally)

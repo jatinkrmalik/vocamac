@@ -641,15 +641,10 @@ struct HotkeyConfigStep: View {
                         .fontWeight(.semibold)
                         .foregroundStyle(.secondary)
 
-                    Picker("Key", selection: $appState.hotKeyCode) {
-                        ForEach(KeyCodeReference.commonHotKeys, id: \.keyCode) { hotKey in
-                            Text(hotKey.name).tag(hotKey.keyCode)
-                        }
-                    }
-
-                    Text("Press this key to start recording.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    HotKeySelectionControl(
+                        pickerLabel: "Key",
+                        footerText: "VocaMac reserves this key while running."
+                    )
                 }
 
                 if appState.activationMode == .doubleTapToggle {
@@ -665,7 +660,12 @@ struct HotkeyConfigStep: View {
                             Slider(
                                 value: $appState.doubleTapThreshold,
                                 in: 0.2...0.8,
-                                step: 0.05
+                                step: 0.05,
+                                onEditingChanged: { isEditing in
+                                    if !isEditing {
+                                        appState.syncHotKeyConfiguration()
+                                    }
+                                }
                             )
                             Text("\(String(format: "%.2f", appState.doubleTapThreshold))s")
                                 .monospacedDigit()
@@ -685,6 +685,14 @@ struct HotkeyConfigStep: View {
             Spacer()
         }
         .padding()
+        // Keep the live listener aligned with wizard fields.
+        // Completion syncs the full persisted config.
+        .onChange(of: appState.activationMode) { _ in
+            appState.syncHotKeyConfiguration()
+        }
+        .onChange(of: appState.hotKeyCode) { _ in
+            appState.syncHotKeyConfiguration()
+        }
     }
 }
 

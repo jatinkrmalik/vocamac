@@ -65,8 +65,8 @@ struct GeneralSettingsTab: View {
                     }
                 }
                 .pickerStyle(.radioGroup)
-                .onChange(of: appState.activationMode) { newMode in
-                    appState.hotKeyManager.updateConfiguration(mode: newMode)
+                .onChange(of: appState.activationMode) { _ in
+                    appState.syncHotKeyConfiguration()
                 }
 
                 Text(appState.activationMode.description)
@@ -76,14 +76,10 @@ struct GeneralSettingsTab: View {
 
             // Hotkey
             Section("Hotkey") {
-                Picker("Activation Key", selection: $appState.hotKeyCode) {
-                    ForEach(KeyCodeReference.commonHotKeys, id: \.keyCode) { hotKey in
-                        Text(hotKey.name).tag(hotKey.keyCode)
-                    }
-                }
-                .onChange(of: appState.hotKeyCode) { newCode in
-                    appState.hotKeyManager.updateConfiguration(keyCode: newCode)
-                }
+                HotKeySelectionControl(
+                    pickerLabel: "Activation Key",
+                    footerText: "Choose a preset or record a key. VocaMac reserves this key while running."
+                )
 
                 if appState.activationMode == .doubleTapToggle {
                     HStack {
@@ -91,14 +87,16 @@ struct GeneralSettingsTab: View {
                         Slider(
                             value: $appState.doubleTapThreshold,
                             in: 0.2...0.8,
-                            step: 0.05
+                            step: 0.05,
+                            onEditingChanged: { isEditing in
+                                if !isEditing {
+                                    appState.syncHotKeyConfiguration()
+                                }
+                            }
                         )
                         Text("\(String(format: "%.2f", appState.doubleTapThreshold))s")
                             .monospacedDigit()
                             .frame(width: 40)
-                    }
-                    .onChange(of: appState.doubleTapThreshold) { newVal in
-                        appState.hotKeyManager.updateConfiguration(doubleTapThreshold: newVal)
                     }
 
                     Text("Shorter = faster double-tap required. Longer = more forgiving.")
@@ -736,6 +734,9 @@ struct AudioSettingsTab: View {
                     Text("60 seconds").tag(60)
                     Text("120 seconds").tag(120)
                     Text("300 seconds (5 min)").tag(300)
+                }
+                .onChange(of: appState.maxRecordingDuration) { _ in
+                    appState.syncHotKeyConfiguration()
                 }
 
                 Text("Recording will automatically stop after this duration.")

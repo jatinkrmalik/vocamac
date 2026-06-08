@@ -1,0 +1,67 @@
+# Updates the Homebrew tap cask (jatinkrmalik/homebrew-vocamac) when a GitHub Release is published.
+# Downloads the release DMG, computes its sha256, and commits the updated version+checksum to the tap repo.
+name: Update Homebrew Cask
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  update-cask:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main repo
+        uses: actions/checkout@v4
+
+      - name: Extract version from release tag
+        id: version
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          VERSION="${TAG#v}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Extracted version: ${VERSION}"
+
+      - name: Download DMG artifact
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          DMG_URL="https://github.com/jatinkrmalik/vocamac/releases/download/v${VERSION}/VocaMac-${VERSION}-arm64.dmg"
+          curl -sL -o vocamac.dmg "$DMG_URL"
+          echo "Downloaded DMG from ${DMG_URL}"
+
+      - name: Compute DMG sha256
+        id: checksum
+        run: |
+          SHA256=$(shasum -a 256 vocamac.dmg | cut -d' ' -f1)
+          echo "sha256=${SHA256}" >> "$GITHUB_OUTPUT"
+          echo "Computed sha256: ${SHA256}"
+
+      - name: Checkout tap repo
+        uses: actions/checkout@v4
+        with:
+          repository: jatinkrmalik/homebrew-vocamac
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: homebrew-vocamac
+
+      - name: Update cask file
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          SHA256="${{ steps.checksum.outputs.sha256 }}"
+          CASK_FILE="homebrew-vocamac/Casks/vocamac.rb"
+
+          # Update the version line
+          sed -i "s/^  version \".*\"/  version \"${VERSION}\"/" "$CASK_FILE"
+          # Update the sha256 line
+          sed -i "s/^  sha256 \".*\"/  sha256 \"${SHA256}\"/" "$CASK_FILE"
+
+          echo "Updated ${CASK_FILE}:"
+          grep -E "^\s+(version|sha256)" "$CASK_FILE"
+
+      - name: Commit and push to tap repo
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          cd homebrew-vocamac
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Casks/vocamac.rb
+          git commit -m "chore: update vocamac to v${VERSION}"
+          git push

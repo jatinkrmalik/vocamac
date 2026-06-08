@@ -110,6 +110,9 @@ final class AppState: ObservableObject {
 
     /// Custom text snippets for expansion
     @Published var snippets: [Snippet] = []
+    private var hotKeySafetyTimeout: Double {
+        Double(maxRecordingDuration) + 5.0
+    }
 
     // MARK: - Services
 
@@ -381,7 +384,7 @@ final class AppState: ObservableObject {
                 keyCode: self.hotKeyCode,
                 mode: self.activationMode,
                 doubleTapThreshold: self.doubleTapThreshold,
-                safetyTimeout: Double(self.maxRecordingDuration) + 5.0
+                safetyTimeout: self.hotKeySafetyTimeout
             )
             VocaLogger.info(.appState, "Hotkey listener started after permission grant")
         }
@@ -413,6 +416,21 @@ final class AppState: ObservableObject {
     func openMicrophoneSettings() { permissionManager.openMicrophoneSettings() }
     func requestAccessibilityPermission() { permissionManager.requestAccessibilityPermission() }
     func requestInputMonitoringPermission() { permissionManager.requestInputMonitoringPermission() }
+
+    // MARK: - Hotkey Configuration
+
+    /// Apply persisted hotkey settings to the active listener.
+    /// `@AppStorage` updates save preferences immediately, but an already-running
+    /// event tap also needs its in-memory configuration refreshed.
+    func syncHotKeyConfiguration() {
+        hotKeyManager.updateConfiguration(
+            keyCode: hotKeyCode,
+            mode: activationMode,
+            doubleTapThreshold: doubleTapThreshold,
+            safetyTimeout: hotKeySafetyTimeout
+        )
+        VocaLogger.debug(.appState, "Hotkey configuration synced (keyCode=\(hotKeyCode), mode=\(activationMode.rawValue))")
+    }
 
     // MARK: - Force Recovery
 
@@ -479,11 +497,21 @@ final class AppState: ObservableObject {
         // Start recording immediately for instant responsiveness.
         // The start sound is played concurrently — any brief bleed into the
         // mic buffer is negligible and handled well by WhisperKit's noise model.
-        audioEngine.startRecording(
+        let didStartRecording = audioEngine.startRecording(
             silenceThreshold: Float(silenceThreshold),
             silenceDuration: silenceDuration,
             maxDuration: TimeInterval(maxRecordingDuration)
         )
+
+        guard didStartRecording else {
+            VocaLogger.warning(.appState, "Audio engine failed to start — resetting recording state")
+            isRecording = false
+            audioLevel = 0.0
+            cursorOverlay.hide()
+            hotKeyManager.resetKeyState()
+            appStatus = .idle
+            return
+        }
 
         // Play start sound after mic is active (fire-and-forget)
         if soundEffectsEnabled {
@@ -773,7 +801,7 @@ final class AppState: ObservableObject {
             keyCode: hotKeyCode,
             mode: activationMode,
             doubleTapThreshold: doubleTapThreshold,
-            safetyTimeout: Double(maxRecordingDuration) + 5.0
+            safetyTimeout: hotKeySafetyTimeout
         )
         if hotKeyManager.isListening {
             VocaLogger.info(.appState, "Hotkey listener active (keyCode=\(hotKeyCode), mode=\(activationMode.rawValue))")
@@ -786,6 +814,10 @@ final class AppState: ObservableObject {
         VocaLogger.info(.appState, "Startup complete!")
     }
     func completeOnboarding() {
+        syncHotKeyConfiguration()
+        if !isRecording {
+            hotKeyManager.resetKeyState()
+        }
         hasCompletedOnboarding = true
         VocaLogger.info(.appState, "Onboarding completed")
     }

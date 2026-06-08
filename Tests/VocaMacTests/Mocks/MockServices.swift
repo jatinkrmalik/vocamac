@@ -22,14 +22,17 @@ final class MockAudioEngine: AudioRecording {
     var lastMaxDuration: TimeInterval?
     var stopRecordingResult: [Float] = []
     var forceResetCallCount = 0
+    var startRecordingResult = true
 
     private var permissionStatus: PermissionStatus = .granted
 
-    func startRecording(silenceThreshold: Float, silenceDuration: Double, maxDuration: TimeInterval) {
-        isCurrentlyRecording = true
+    @discardableResult
+    func startRecording(silenceThreshold: Float, silenceDuration: Double, maxDuration: TimeInterval) -> Bool {
+        isCurrentlyRecording = startRecordingResult
         lastSilenceThreshold = silenceThreshold
         lastSilenceDuration = silenceDuration
         lastMaxDuration = maxDuration
+        return startRecordingResult
     }
 
     @discardableResult
@@ -96,6 +99,7 @@ final class MockHotKeyManager: HotKeyMonitoring {
     var lastDoubleTapThreshold: Double?
     var lastSafetyTimeout: Double?
     var resetKeyStateCallCount = 0
+    var updateConfigurationCallCount = 0
 
     private var accessibilityPermission = false
 
@@ -125,6 +129,19 @@ final class MockHotKeyManager: HotKeyMonitoring {
     }
 
     func _updateConfiguration(keyCode: Int?, mode: ActivationMode?, doubleTapThreshold: Double?, safetyTimeout: Double?) {
+        updateConfigurationCallCount += 1
+        if let keyCode = keyCode {
+            lastKeyCode = keyCode
+        }
+        if let mode = mode {
+            lastMode = mode
+        }
+        if let doubleTapThreshold = doubleTapThreshold {
+            lastDoubleTapThreshold = doubleTapThreshold
+        }
+        if let safetyTimeout = safetyTimeout {
+            lastSafetyTimeout = safetyTimeout
+        }
     }
 }
 

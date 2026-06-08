@@ -32,7 +32,7 @@ WhisperKit, the framework powering VocaMac, was specifically engineered to take 
 
 ## Unmatched Performance
 
-Benchmark after benchmark shows the same pattern. On an M1 Mac, medium-sized Whisper models transcribe audio roughly 3 to 5 times faster than real time. A 30-second audio clip finishes transcribing in 6 to 10 seconds. Intel-based Macs using CPU-only processing take 90 seconds or more for the same task.
+Benchmark after benchmark shows the same pattern. On an M1 Mac, medium-sized Whisper models transcribe audio roughly 3 to 5 times faster than real time. A 30-second audio clip finishes transcribing in 6 to 10 seconds. CPU-only inference on machines without a Neural Engine can take 90 seconds or more for the same task — which is exactly why VocaMac ships for Apple Silicon only.
 
 This performance gap only widens with larger, more accurate Whisper models. The base model runs instantly. The small model takes a few seconds. The medium model, which offers near-human accuracy, completes in under a minute on Apple Silicon. Cloud-based services may offer similar speed, but they require internet, demand subscription fees, and raise privacy concerns.
 

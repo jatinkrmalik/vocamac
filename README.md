@@ -37,11 +37,11 @@
 - **⌨️ System-Wide Text Injection** - Transcribed text is typed wherever your cursor is: browsers, Slack, VS Code, spreadsheets, terminals - everywhere.
 - **🎯 Push-to-Talk** - Hold a hotkey (default: Right Option) to record. Release to transcribe.
 - **👆 Double-Tap Toggle** - Double-tap the hotkey to start/stop recording.
-- **🧠 Smart Model Selection** - Auto-detects your hardware (Apple Silicon/Intel, RAM) and recommends the best whisper model via WhisperKit.
+- **🧠 Smart Model Selection** - Auto-detects your Apple Silicon chip and RAM, then recommends the best whisper model via WhisperKit.
 - **⚡ Native Apple Acceleration** - CoreML + Metal + Neural Engine acceleration on Apple Silicon. No manual setup.
 - **📊 Visual Feedback** - Menu bar icon changes color during recording and processing. Audio level indicator shows input.
 - **🔄 Auto-Updates** - Built-in update checker queries GitHub Releases on launch and lets you download and install the latest version in one click from within the app.
-- **⚙️ Configurable** - Choose hotkeys, models, languages, silence detection thresholds, and more.
+- **⚙️ Configurable** - Choose hotkey presets or record a custom activation key reserved by VocaMac while it runs, models, languages, silence detection thresholds, and more.
 
 ---
 
@@ -106,7 +106,7 @@ Same accuracy, dramatically better Apple platform integration.
 ## 📋 Requirements
 
 - **macOS 13 (Ventura)** or later
-- **Apple Silicon** (M1/M2/M3/M4)
+- **Apple Silicon Mac** (M1/M2/M3/M4) — **Intel Macs are not supported.** The released DMG is built for `arm64` only.
 - **Xcode 15+** or Swift 5.9+ (only for building from source)
 
 ### Permissions
@@ -251,7 +251,7 @@ Open Settings from the menu bar popover or with **⌘,**
 
 ### General
 - **Activation mode** - Push-to-Talk or Double-Tap Toggle
-- **Hotkey** - Choose from Right Option, Right Command, Fn, function keys, etc.
+- **Hotkey** - Choose from common presets or record a custom activation key directly from your keyboard. The selected key is consumed by VocaMac while the app is running.
 - **Language** - Auto-detect or specify (English, Spanish, French, German, Chinese, Japanese, and more)
 - **Launch at login**
 
@@ -450,6 +450,16 @@ Release builds of VocaMac are **Developer ID signed and notarized** by Apple. Ac
 ## 📄 License
 
 AGPL-3.0 License - see [LICENSE](LICENSE) for details.
+
+## Star History
+
+<a href="https://www.star-history.com/?repos=jatinkrmalik%2Fvocamac&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=jatinkrmalik/vocamac&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=jatinkrmalik/vocamac&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=jatinkrmalik/vocamac&type=date&legend=top-left" />
+ </picture>
+</a>
 
 ---
 

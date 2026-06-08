@@ -67,16 +67,16 @@ final class PermissionManager: ObservableObject {
     /// Check Input Monitoring permission using multiple strategies since no
     /// single approach is 100% reliable:
     /// 1. If HotKeyManager created a tap, check if macOS has disabled it (revocation)
-    /// 2. Try creating a fresh `.cghidEventTap` (same type HotKeyManager uses)
+    /// 2. Try creating a fresh `.cghidEventTap` to trigger/check Input Monitoring
     private func checkInputMonitoringPermission() -> Bool {
         // Strategy 1: If HotKeyManager has an active tap, check if macOS disabled it.
         if hotKeyManager.isListening, let tap = hotKeyManager.eventTap {
             return CGEvent.tapIsEnabled(tap: tap)
         }
 
-        // Strategy 2: Try creating a fresh .cghidEventTap — the same type
-        // HotKeyManager uses. More accurate than .cgSessionEventTap which
-        // may inherit Terminal's permissions when launched from CLI.
+        // Strategy 2: Try creating a fresh .cghidEventTap. This probes Input
+        // Monitoring more accurately than .cgSessionEventTap, which may inherit
+        // Terminal's permissions when launched from CLI.
         let tap = CGEvent.tapCreate(
             tap: .cghidEventTap,
             place: .headInsertEventTap,

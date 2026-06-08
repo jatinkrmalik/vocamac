@@ -176,7 +176,7 @@
                 <a href="/features/smart-model-selection/" class="feature-card">
                     <div class="feature-card__icon">🧠</div>
                     <h3>Smart Model Selection</h3>
-                    <p>Auto-detects your hardware (Apple Silicon, Intel, RAM) and recommends the optimal Whisper model.</p>
+                    <p>Auto-detects your Apple Silicon chip and RAM, then recommends the optimal Whisper model.</p>
                 </a>
                 <a href="/features/apple-silicon-native/" class="feature-card">
                     <div class="feature-card__icon">⚡</div>
@@ -521,7 +521,7 @@
                 </details>
                 <details class="faq__item">
                     <summary>Which Macs are supported?</summary>
-                    <p>VocaMac works on any Mac running macOS 13 (Ventura) or later. It runs on both Apple Silicon (M1/M2/M3/M4) and Intel Macs, though Apple Silicon provides significantly better performance thanks to CoreML and Neural Engine acceleration.</p>
+                    <p>VocaMac requires an <strong>Apple Silicon Mac</strong> (M1, M2, M3, or M4) running macOS 13 (Ventura) or later. The released DMG is built for <code>arm64</code> only and will not install on Intel Macs. WhisperKit relies on the Apple Neural Engine and CoreML for hardware-accelerated transcription, so Intel Macs are not supported.</p>
                 </details>
                 <details class="faq__item">
                     <summary>How does it inject text into other apps?</summary>
