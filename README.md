@@ -129,7 +129,7 @@ VocaMac requires three macOS permissions:
 
 ```bash
 brew tap jatinkrmalik/vocamac
-brew trust --cask jatinkrmalik/vocamac/vocamac
+brew trust jatinkrmalik/vocamac
 brew install --cask vocamac
 ```
 
@@ -198,7 +198,7 @@ Nightly builds are automated builds from the latest `main` branch, published eve
 **Via Homebrew (recommended):**
 ```bash
 brew tap jatinkrmalik/vocamac
-brew trust --cask jatinkrmalik/vocamac/vocamac-nightly
+brew trust jatinkrmalik/vocamac
 brew install --cask vocamac-nightly
 ```
 
