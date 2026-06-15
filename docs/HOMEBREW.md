@@ -16,7 +16,7 @@ Since VocaMac is a native macOS `.app` primarily distributed via Homebrew (with 
 ```bash
 # Install
 brew tap jatinkrmalik/vocamac
-brew trust --cask jatinkrmalik/vocamac/vocamac
+brew trust jatinkrmalik/vocamac
 brew install --cask vocamac
 
 # Upgrade to latest version
@@ -29,13 +29,15 @@ brew untap jatinkrmalik/vocamac
 
 After installation, VocaMac appears in `/Applications/VocaMac.app`. Launch it from Spotlight or the Applications folder.
 
+`brew trust jatinkrmalik/vocamac` trusts the whole VocaMac tap. This is intentional: the stable and nightly casks conflict with each other, so Homebrew may load both cask definitions while resolving an install.
+
 ## Nightly Builds
 
 A nightly cask is also available, built daily from the latest `main` branch:
 
 ```bash
 brew tap jatinkrmalik/vocamac
-brew trust --cask jatinkrmalik/vocamac/vocamac-nightly
+brew trust jatinkrmalik/vocamac
 brew install --cask vocamac-nightly
 ```
 
@@ -45,7 +47,7 @@ The nightly cask uses `version :latest` and `sha256 :no_check` because the DMG c
 
 ```bash
 brew uninstall --cask vocamac
-brew trust --cask jatinkrmalik/vocamac/vocamac-nightly
+brew trust jatinkrmalik/vocamac
 brew install --cask vocamac-nightly
 ```
 
@@ -85,7 +87,7 @@ Users can then install with:
 
 ```bash
 brew tap jatinkrmalik/vocamac
-brew trust --cask jatinkrmalik/vocamac/vocamac
+brew trust jatinkrmalik/vocamac
 brew install --cask vocamac
 ```
 
@@ -96,7 +98,7 @@ Before pushing a cask update to the tap, test it from a tap checkout against a r
 ```bash
 brew tap jatinkrmalik/vocamac
 cp homebrew/Casks/vocamac.rb "$(brew --repository jatinkrmalik/vocamac)/Casks/vocamac.rb"
-brew trust --cask jatinkrmalik/vocamac/vocamac
+brew trust jatinkrmalik/vocamac
 brew install --cask vocamac
 ```
 
@@ -243,18 +245,18 @@ A previous installation exists at `/Applications/VocaMac.app`.
 **Fix:** Remove the existing app first:
 ```bash
 rm -rf /Applications/VocaMac.app
-brew trust --cask jatinkrmalik/vocamac/vocamac
+brew trust jatinkrmalik/vocamac
 brew install --cask vocamac
 ```
 
 ### Homebrew refuses to load the cask from an untrusted tap
 
-Homebrew 6 requires explicit trust for casks from third-party taps.
+Homebrew 6 requires explicit trust for casks from third-party taps. Trust the VocaMac tap rather than only one cask, because the stable and nightly casks declare `conflicts_with` and Homebrew may load the other cask while resolving an install.
 
-**Fix:** Trust the VocaMac cask, then install again:
+**Fix:** Trust the VocaMac tap, then install again:
 
 ```bash
-brew trust --cask jatinkrmalik/vocamac/vocamac
+brew trust jatinkrmalik/vocamac
 brew install --cask vocamac
 ```
 
