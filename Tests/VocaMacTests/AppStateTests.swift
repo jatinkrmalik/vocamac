@@ -259,3 +259,115 @@ final class AppStateOnboardingTests: XCTestCase {
         XCTAssertEqual(mocks.whisperService.loadedModelName, "openai_whisper-tiny")
     }
 }
+
+// MARK: - AppState Model Loading Tests
+
+final class AppStateModelLoadingTests: XCTestCase {
+
+    override func setUp() {
+        super.setUp()
+        UserDefaults.standard.removeObject(forKey: "vocamac.selectedModelSize")
+    }
+
+    override func tearDown() {
+        UserDefaults.standard.removeObject(forKey: "vocamac.selectedModelSize")
+        super.tearDown()
+    }
+
+    @MainActor
+    func testSetupKeepsLargeSupportedWhenMediumIsNotRecommended() {
+        let modelManager = MockModelManager()
+        modelManager.defaultModel = "openai_whisper-large-v3-v20240930"
+        modelManager.supportedModelNames = [
+            "openai_whisper-tiny",
+            "openai_whisper-base",
+            "openai_whisper-small",
+            "openai_whisper-large-v3-v20240930",
+            "openai_whisper-large-v3-v20240930_626MB",
+        ]
+
+        let (appState, _) = AppState.makeTestState(modelManager: modelManager)
+
+        XCTAssertEqual(appState.deviceRecommendedModel, "openai_whisper-large-v3-v20240930")
+        XCTAssertNil(appState.availableModels.first(where: { $0.size == .medium }))
+        XCTAssertEqual(
+            appState.availableModels.first(where: { $0.size == .largeV3Latest })?.isSupported,
+            true
+        )
+    }
+
+    @MainActor
+    func testFailedModelSwitchShowsErrorAndRestoresPreviousModel() async {
+        UserDefaults.standard.set(ModelSize.small.rawValue, forKey: "vocamac.selectedModelSize")
+
+        let modelManager = MockModelManager()
+        modelManager.downloadedModels = [.small, .medium]
+
+        let whisperService = MockWhisperService()
+        whisperService.loadedModelName = "openai_whisper-small"
+        whisperService.isModelLoaded = true
+        let loadError = NSError(
+            domain: "VocaMacTests",
+            code: 1,
+            userInfo: [NSLocalizedDescriptionKey: "CoreML rejected model"]
+        )
+        whisperService.loadResponses = [
+            .failure(loadError),
+            .success("openai_whisper-small"),
+        ]
+
+        let (appState, mocks) = AppState.makeTestState(
+            modelManager: modelManager,
+            whisperService: whisperService
+        )
+
+        await appState.loadModel(.medium)
+
+        XCTAssertEqual(
+            mocks.whisperService.loadRequests.map { $0.name },
+            ["openai_whisper-medium", "openai_whisper-small"]
+        )
+        XCTAssertEqual(appState.appStatus, .error)
+        XCTAssertTrue(appState.errorMessage?.contains("Failed to load Medium") == true)
+        XCTAssertEqual(appState.currentModel?.size, .small)
+        XCTAssertEqual(appState.selectedModelSize, ModelSize.small.rawValue)
+        XCTAssertEqual(
+            appState.availableModels.first(where: { $0.size == .small })?.isActive,
+            true
+        )
+        XCTAssertEqual(
+            appState.availableModels.first(where: { $0.size == .medium })?.isLoading,
+            false
+        )
+    }
+
+    @MainActor
+    func testStartupFallsBackFromUnsupportedMediumPreference() async {
+        UserDefaults.standard.set(ModelSize.medium.rawValue, forKey: "vocamac.selectedModelSize")
+
+        let modelManager = MockModelManager()
+        modelManager.defaultModel = "openai_whisper-large-v3-v20240930"
+        modelManager.supportedModelNames = [
+            "openai_whisper-tiny",
+            "openai_whisper-base",
+            "openai_whisper-small",
+            "openai_whisper-large-v3-v20240930",
+        ]
+        modelManager.downloadedModels = [.small, .medium]
+
+        let whisperService = MockWhisperService()
+        whisperService.loadedModelName = nil
+        whisperService.isModelLoaded = false
+
+        let (appState, mocks) = AppState.makeTestState(
+            modelManager: modelManager,
+            whisperService: whisperService
+        )
+
+        await appState.performStartup()
+
+        XCTAssertEqual(mocks.whisperService.loadRequests.first?.name, "openai_whisper-small")
+        XCTAssertEqual(appState.selectedModelSize, ModelSize.small.rawValue)
+        XCTAssertEqual(appState.currentModel?.size, .small)
+    }
+}

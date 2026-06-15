@@ -255,6 +255,11 @@ final class WhisperService: @unchecked Sendable {
     /// Map a model name string to our ModelSize enum
     private func modelSizeFromName(_ name: String) -> ModelSize {
         let lowered = name.lowercased()
+        if lowered.contains("v20240930") && lowered.contains("turbo") { return .largeV3LatestTurbo }
+        if lowered.contains("v20240930") { return .largeV3Latest }
+        if lowered.contains("distil") && lowered.contains("turbo") { return .distilLargeV3TurboCompact }
+        if lowered.contains("distil") { return .distilLargeV3Compact }
+        if lowered.contains("large") && lowered.contains("turbo") { return .largeV3Turbo }
         if lowered.contains("large") { return .largeV3 }
         if lowered.contains("medium") { return .medium }
         if lowered.contains("small") { return .small }
