@@ -696,8 +696,15 @@ struct HotkeyConfigStep: View {
 
 struct QuickTestStep: View {
     @EnvironmentObject var appState: AppState
-    @State private var isRecording = false
-    @State private var testResult: String?
+    @State private var testTranscription: VocaTranscription?
+
+    private var isRecording: Bool {
+        appState.appStatus == .recording || appState.isRecording
+    }
+
+    private var isProcessing: Bool {
+        appState.appStatus == .processing
+    }
 
     var body: some View {
         VStack(spacing: 16) {
@@ -709,60 +716,66 @@ struct QuickTestStep: View {
 
             Spacer()
 
-            VStack(spacing: 16) {
+            VStack(spacing: 18) {
                 // Recording button
                 Button(action: toggleRecording) {
                     VStack(spacing: 8) {
-                        Image(systemName: isRecording ? "stop.circle.fill" : "mic.circle.fill")
+                        Image(systemName: buttonIconName)
                             .font(.system(size: 48))
-                            .foregroundStyle(isRecording ? .red : .blue)
+                            .foregroundStyle(buttonColor)
 
-                        Text(isRecording ? "Recording..." : "Click to Record")
+                        Text(buttonTitle)
                             .font(.body)
                             .fontWeight(.semibold)
 
-                        if isRecording {
-                            HStack(spacing: 8) {
-                                Circle()
-                                    .fill(.red)
-                                    .frame(width: 8)
-                                    .scaleEffect(1.2)
-
-                                Text("Recording audio...")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
+                        Text(buttonSubtitle)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
+                    .frame(maxWidth: .infinity)
                 }
-                .disabled(appState.appStatus == .processing)
+                .buttonStyle(.plain)
+                .disabled(isProcessing)
+
+                recordingStatusPanel
 
                 // Test result display
-                if let result = testResult {
+                if let result = testTranscription {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 8) {
                             Image(systemName: "checkmark.circle.fill")
                                 .foregroundStyle(.green)
-                            Text("Transcription Result")
+                            Text(appState.translationEnabled ? "Translation Result" : "Transcription Result")
                                 .font(.caption)
                                 .fontWeight(.semibold)
+
+                            Spacer()
+
+                            Text(String(format: "%.1fs audio", result.audioLengthSeconds))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
                         }
 
-                        Text(result)
+                        Text(result.text.isEmpty ? "No speech detected. Try recording a slightly longer phrase." : result.text)
                             .font(.subheadline)
+                            .foregroundStyle(result.text.isEmpty ? .secondary : .primary)
                             .lineLimit(4)
                             .padding()
-                            .background(Color.green.opacity(0.1))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(result.text.isEmpty ? Color.gray.opacity(0.08) : Color.green.opacity(0.1))
                             .cornerRadius(6)
                     }
-                } else if appState.appStatus == .processing {
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                } else if let error = appState.errorMessage {
                     HStack(spacing: 8) {
-                        ProgressView()
-                            .scaleEffect(0.8, anchor: .center)
-                        Text("Transcribing...")
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.yellow)
+                        Text(error)
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                            .lineLimit(3)
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
             .frame(maxWidth: .infinity)
@@ -785,20 +798,96 @@ struct QuickTestStep: View {
             Spacer()
         }
         .padding()
+        .onAppear {
+            testTranscription = nil
+        }
+        .onChange(of: appState.lastTranscription?.id) { _ in
+            testTranscription = appState.lastTranscription
+        }
     }
 
     private func toggleRecording() {
         if isRecording {
             Task { @MainActor in
                 await appState.stopRecordingAndTranscribe()
-                isRecording = false
+                testTranscription = appState.lastTranscription
             }
         } else {
             Task { @MainActor in
+                testTranscription = nil
                 await appState.startRecording()
-                isRecording = true
             }
         }
+    }
+
+    private var buttonIconName: String {
+        if isProcessing { return "waveform.circle.fill" }
+        return isRecording ? "stop.circle.fill" : "mic.circle.fill"
+    }
+
+    private var buttonTitle: String {
+        if isProcessing { return "Transcribing..." }
+        return isRecording ? "Stop Recording" : "Click to Record"
+    }
+
+    private var buttonSubtitle: String {
+        if isProcessing { return "Converting your speech into text" }
+        return isRecording ? "Voice is being captured" : "Say a short phrase, then stop"
+    }
+
+    private var buttonColor: Color {
+        if isProcessing { return .purple }
+        return isRecording ? .red : .blue
+    }
+
+    @ViewBuilder
+    private var recordingStatusPanel: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: statusIconName)
+                    .foregroundStyle(buttonColor)
+                Text(statusText)
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                Spacer()
+            }
+
+            if isRecording {
+                VStack(alignment: .leading, spacing: 6) {
+                    ProgressView(value: Double(appState.audioLevel), total: 1.0)
+                        .progressViewStyle(.linear)
+                    Text("Input level")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            } else if isProcessing {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .scaleEffect(0.8, anchor: .center)
+                    Text("Keep this window open while the result appears here.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            } else if testTranscription == nil {
+                Text("Your test transcript will appear here before you finish setup.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .cornerRadius(8)
+    }
+
+    private var statusIconName: String {
+        if isProcessing { return "text.magnifyingglass" }
+        return isRecording ? "waveform" : "text.bubble"
+    }
+
+    private var statusText: String {
+        if isProcessing { return appState.translationEnabled ? "Producing translation" : "Producing transcript" }
+        return isRecording ? "Listening now" : "Ready for a test"
     }
 }
 
@@ -911,8 +1000,10 @@ extension View {
 }
 
 #if DEBUG
-#Preview {
-    OnboardingView()
-        .environmentObject(AppState.production())
+struct OnboardingView_Previews: PreviewProvider {
+    static var previews: some View {
+        OnboardingView()
+            .environmentObject(AppState.production())
+    }
 }
 #endif
