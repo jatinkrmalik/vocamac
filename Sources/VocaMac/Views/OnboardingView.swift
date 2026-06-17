@@ -792,11 +792,13 @@ struct QuickTestStep: View {
             Task { @MainActor in
                 await appState.stopRecordingAndTranscribe()
                 isRecording = false
+                testResult = appState.lastTranscription?.text
             }
         } else {
             Task { @MainActor in
+                testResult = nil
                 await appState.startRecording()
-                isRecording = true
+                isRecording = appState.appStatus == .recording || appState.isRecording
             }
         }
     }
