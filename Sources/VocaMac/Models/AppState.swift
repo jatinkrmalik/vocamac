@@ -110,6 +110,8 @@ final class AppState: ObservableObject {
     @AppStorage("vocamac.translationEnabled") var translationEnabled: Bool = false
     @AppStorage("vocamac.logLevel") var logLevel: String = "info"
 
+    /// Custom text snippets for expansion
+    @Published var snippets: [Snippet] = []
     private var hotKeySafetyTimeout: Double {
         Double(maxRecordingDuration) + 5.0
     }
@@ -123,6 +125,7 @@ final class AppState: ObservableObject {
     let modelManager: ModelManaging
     let soundManager: SoundPlaying
     let cursorOverlay: CursorOverlayManaging
+    let snippetExpander: SnippetExpanding
     let updateChecker = UpdateChecker()
     let permissionManager: any PermissionManaging
 
@@ -153,6 +156,7 @@ final class AppState: ObservableObject {
         modelManager: ModelManaging = ModelManager(),
         soundManager: SoundPlaying = SoundManager(),
         cursorOverlay: CursorOverlayManaging,
+        snippetExpander: SnippetExpanding = SnippetExpander(),
         permissionManager: (any PermissionManaging)? = nil,
         skipSystemIntegration: Bool = false
     ) {
@@ -163,10 +167,12 @@ final class AppState: ObservableObject {
         self.modelManager = modelManager
         self.soundManager = soundManager
         self.cursorOverlay = cursorOverlay
+        self.snippetExpander = snippetExpander
         self.permissionManager = permissionManager ?? PermissionManager(audioEngine: audioEngine, hotKeyManager: hotKeyManager)
         self.skipSystemIntegration = skipSystemIntegration
 
         VocaLogger.info(.appState, "Initializing... id=\(ObjectIdentifier(self))")
+        loadSnippets()
         if !skipSystemIntegration {
             syncLaunchAtLogin()
         }
@@ -366,6 +372,14 @@ final class AppState: ObservableObject {
         // Forward PermissionManager state changes to trigger SwiftUI updates
         permissionManager.objectWillChangePublisher
             .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &cancellables)
+
+        // Auto-save snippets when changed
+        $snippets
+            .dropFirst()
+            .sink { [weak self] _ in
+                self?.saveSnippets()
+            }
             .store(in: &cancellables)
 
         // Check permissions
@@ -588,8 +602,9 @@ final class AppState: ObservableObject {
             // by WhisperService to remove hallucination tokens like [BLANK_AUDIO])
             let trimmedText = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
             if !trimmedText.isEmpty {
+                let expandedText = expandSnippets(in: trimmedText)
                 textInjector.inject(
-                    text: trimmedText,
+                    text: expandedText,
                     preserveClipboard: preserveClipboard
                 )
             } else {
@@ -951,5 +966,30 @@ final class AppState: ObservableObject {
         }
         hasCompletedOnboarding = true
         VocaLogger.info(.appState, "Onboarding completed")
+    }
+
+    // MARK: - Snippets Management
+
+    private func loadSnippets() {
+        if let data = UserDefaults.standard.data(forKey: "vocamac.snippets") {
+            do {
+                snippets = try JSONDecoder().decode([Snippet].self, from: data)
+            } catch {
+                VocaLogger.error(.appState, "Failed to decode snippets: \(error)")
+            }
+        }
+    }
+
+    func saveSnippets() {
+        do {
+            let encoded = try JSONEncoder().encode(snippets)
+            UserDefaults.standard.set(encoded, forKey: "vocamac.snippets")
+        } catch {
+            VocaLogger.error(.appState, "Failed to encode snippets: \(error)")
+        }
+    }
+
+    func expandSnippets(in text: String) -> String {
+        return snippetExpander.expand(in: text, using: snippets)
     }
 }
