@@ -109,6 +109,23 @@ struct UpdateDetailView: View {
                 }
                 .buttonStyle(.borderedProminent)
             }
+        case .updateAvailableViaHomebrew(_, let install):
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Updates are managed by Homebrew.")
+                    .foregroundStyle(.secondary)
+                HStack {
+                    Text(install.upgradeCommand)
+                        .font(.system(.callout, design: .monospaced))
+                        .textSelection(.enabled)
+                    Spacer()
+                    Button("Copy Command") {
+                        let pasteboard = NSPasteboard.general
+                        pasteboard.clearContents()
+                        pasteboard.setString(install.upgradeCommand, forType: .string)
+                    }
+                    .buttonStyle(.bordered)
+                }
+            }
         case .downloading(let progress, let bytesDownloaded, let totalBytes, let eta):
             VStack(alignment: .leading, spacing: 8) {
                 HStack {

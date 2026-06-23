@@ -139,7 +139,22 @@ final class AppStateOnboardingTests: XCTestCase {
 
     override func setUp() {
         super.setUp()
-        UserDefaults.standard.removeObject(forKey: "vocamac.hasCompletedOnboarding")
+        clearPersistedSettings()
+    }
+
+    override func tearDown() {
+        clearPersistedSettings()
+        super.tearDown()
+    }
+
+    private func clearPersistedSettings() {
+        [
+            "vocamac.hasCompletedOnboarding",
+            "vocamac.activationMode",
+            "vocamac.hotKeyCode",
+            "vocamac.doubleTapThreshold",
+            "vocamac.maxRecordingDuration",
+        ].forEach { UserDefaults.standard.removeObject(forKey: $0) }
     }
 
     @MainActor
@@ -156,6 +171,66 @@ final class AppStateOnboardingTests: XCTestCase {
         appState.completeOnboarding()
 
         XCTAssertTrue(appState.hasCompletedOnboarding)
+    }
+
+    @MainActor
+    func testCompleteOnboardingSyncsHotKeyConfiguration() {
+        let (appState, mocks) = AppState.makeTestState()
+        appState.activationMode = .doubleTapToggle
+        appState.hotKeyCode = 58
+        appState.doubleTapThreshold = 0.55
+        appState.maxRecordingDuration = 120
+
+        appState.completeOnboarding()
+
+        XCTAssertEqual(mocks.hotKeyManager.updateConfigurationCallCount, 1)
+        XCTAssertEqual(mocks.hotKeyManager.lastMode, .doubleTapToggle)
+        XCTAssertEqual(mocks.hotKeyManager.lastKeyCode, 58)
+        XCTAssertEqual(mocks.hotKeyManager.lastDoubleTapThreshold, 0.55)
+        XCTAssertEqual(mocks.hotKeyManager.lastSafetyTimeout, 125.0)
+        XCTAssertEqual(mocks.hotKeyManager.resetKeyStateCallCount, 1)
+    }
+
+    @MainActor
+    func testCompleteOnboardingDoesNotResetHotKeyStateWhileRecording() {
+        let (appState, mocks) = AppState.makeTestState()
+        appState.isRecording = true
+
+        appState.completeOnboarding()
+
+        XCTAssertEqual(mocks.hotKeyManager.updateConfigurationCallCount, 1)
+        XCTAssertEqual(mocks.hotKeyManager.resetKeyStateCallCount, 0)
+        XCTAssertTrue(appState.hasCompletedOnboarding)
+    }
+
+    @MainActor
+    func testSyncHotKeyConfigurationAppliesCurrentSettings() {
+        let (appState, mocks) = AppState.makeTestState()
+        appState.activationMode = .doubleTapToggle
+        appState.hotKeyCode = 54
+        appState.doubleTapThreshold = 0.3
+        appState.maxRecordingDuration = 30
+
+        appState.syncHotKeyConfiguration()
+
+        XCTAssertEqual(mocks.hotKeyManager.updateConfigurationCallCount, 1)
+        XCTAssertEqual(mocks.hotKeyManager.lastMode, .doubleTapToggle)
+        XCTAssertEqual(mocks.hotKeyManager.lastKeyCode, 54)
+        XCTAssertEqual(mocks.hotKeyManager.lastDoubleTapThreshold, 0.3)
+        XCTAssertEqual(mocks.hotKeyManager.lastSafetyTimeout, 35.0)
+    }
+
+    @MainActor
+    func testSyncHotKeyConfigurationAppliesDefaultSettings() {
+        let (appState, mocks) = AppState.makeTestState()
+
+        appState.syncHotKeyConfiguration()
+
+        XCTAssertEqual(mocks.hotKeyManager.updateConfigurationCallCount, 1)
+        XCTAssertEqual(mocks.hotKeyManager.lastMode, .pushToTalk)
+        XCTAssertEqual(mocks.hotKeyManager.lastKeyCode, 61)
+        XCTAssertEqual(mocks.hotKeyManager.lastDoubleTapThreshold, 0.4)
+        XCTAssertEqual(mocks.hotKeyManager.lastSafetyTimeout, 65.0)
     }
 
     @MainActor
@@ -182,5 +257,117 @@ final class AppStateOnboardingTests: XCTestCase {
         // ensuredTokenizerSizes is empty confirms we removed the incorrect check.
         XCTAssertEqual(mocks.modelManager.ensuredTokenizerSizes, [])
         XCTAssertEqual(mocks.whisperService.loadedModelName, "openai_whisper-tiny")
+    }
+}
+
+// MARK: - AppState Model Loading Tests
+
+final class AppStateModelLoadingTests: XCTestCase {
+
+    override func setUp() {
+        super.setUp()
+        UserDefaults.standard.removeObject(forKey: "vocamac.selectedModelSize")
+    }
+
+    override func tearDown() {
+        UserDefaults.standard.removeObject(forKey: "vocamac.selectedModelSize")
+        super.tearDown()
+    }
+
+    @MainActor
+    func testSetupKeepsLargeSupportedWhenMediumIsNotRecommended() {
+        let modelManager = MockModelManager()
+        modelManager.defaultModel = "openai_whisper-large-v3-v20240930"
+        modelManager.supportedModelNames = [
+            "openai_whisper-tiny",
+            "openai_whisper-base",
+            "openai_whisper-small",
+            "openai_whisper-large-v3-v20240930",
+            "openai_whisper-large-v3-v20240930_626MB",
+        ]
+
+        let (appState, _) = AppState.makeTestState(modelManager: modelManager)
+
+        XCTAssertEqual(appState.deviceRecommendedModel, "openai_whisper-large-v3-v20240930")
+        XCTAssertNil(appState.availableModels.first(where: { $0.size == .medium }))
+        XCTAssertEqual(
+            appState.availableModels.first(where: { $0.size == .largeV3Latest })?.isSupported,
+            true
+        )
+    }
+
+    @MainActor
+    func testFailedModelSwitchShowsErrorAndRestoresPreviousModel() async {
+        UserDefaults.standard.set(ModelSize.small.rawValue, forKey: "vocamac.selectedModelSize")
+
+        let modelManager = MockModelManager()
+        modelManager.downloadedModels = [.small, .medium]
+
+        let whisperService = MockWhisperService()
+        whisperService.loadedModelName = "openai_whisper-small"
+        whisperService.isModelLoaded = true
+        let loadError = NSError(
+            domain: "VocaMacTests",
+            code: 1,
+            userInfo: [NSLocalizedDescriptionKey: "CoreML rejected model"]
+        )
+        whisperService.loadResponses = [
+            .failure(loadError),
+            .success("openai_whisper-small"),
+        ]
+
+        let (appState, mocks) = AppState.makeTestState(
+            modelManager: modelManager,
+            whisperService: whisperService
+        )
+
+        await appState.loadModel(.medium)
+
+        XCTAssertEqual(
+            mocks.whisperService.loadRequests.map { $0.name },
+            ["openai_whisper-medium", "openai_whisper-small"]
+        )
+        XCTAssertEqual(appState.appStatus, .error)
+        XCTAssertTrue(appState.errorMessage?.contains("Failed to load Medium") == true)
+        XCTAssertEqual(appState.currentModel?.size, .small)
+        XCTAssertEqual(appState.selectedModelSize, ModelSize.small.rawValue)
+        XCTAssertEqual(
+            appState.availableModels.first(where: { $0.size == .small })?.isActive,
+            true
+        )
+        XCTAssertEqual(
+            appState.availableModels.first(where: { $0.size == .medium })?.isLoading,
+            false
+        )
+    }
+
+    @MainActor
+    func testStartupFallsBackFromUnsupportedMediumPreference() async {
+        UserDefaults.standard.set(ModelSize.medium.rawValue, forKey: "vocamac.selectedModelSize")
+
+        let modelManager = MockModelManager()
+        modelManager.defaultModel = "openai_whisper-large-v3-v20240930"
+        modelManager.supportedModelNames = [
+            "openai_whisper-tiny",
+            "openai_whisper-base",
+            "openai_whisper-small",
+            "openai_whisper-large-v3-v20240930",
+        ]
+        modelManager.downloadedModels = [.small, .medium]
+
+        let whisperService = MockWhisperService()
+        whisperService.loadedModelName = nil
+        whisperService.isModelLoaded = false
+
+        let (appState, mocks) = AppState.makeTestState(
+            modelManager: modelManager,
+            whisperService: whisperService
+        )
+
+        await appState.performStartup()
+
+        XCTAssertEqual(mocks.whisperService.loadRequests.first?.name, "openai_whisper-small")
+        XCTAssertEqual(appState.selectedModelSize, ModelSize.small.rawValue)
+        XCTAssertEqual(appState.currentModel?.size, .small)
     }
 }

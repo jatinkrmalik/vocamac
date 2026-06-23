@@ -57,10 +57,19 @@ struct UpdateInfo: Equatable {
     let sha256: String?
 }
 
+struct HomebrewInstall: Equatable {
+    let caskToken: String
+
+    var upgradeCommand: String {
+        "brew upgrade --cask \(caskToken)"
+    }
+}
+
 enum UpdateState: Equatable {
     case idle
     case checking
     case updateAvailable(UpdateInfo)
+    case updateAvailableViaHomebrew(info: UpdateInfo, install: HomebrewInstall)
     case upToDate
     case downloading(progress: Double, bytesDownloaded: Int64, totalBytes: Int64, estimatedSecondsRemaining: Double)
     case verifying

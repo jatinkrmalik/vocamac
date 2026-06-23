@@ -284,7 +284,7 @@ struct TranscriptionResult: Identifiable {
 struct UserSettings {
     // Activation
     var activationMode: ActivationMode = .pushToTalk
-    var hotKeyCode: Int = 61                    // Right Option key
+    var hotKeyCode: Int = 61                    // Right Option by default; selected key is reserved while running
     var doubleTapThreshold: Double = 0.4        // seconds
 
     // Audio
@@ -292,6 +292,7 @@ struct UserSettings {
     var silenceDuration: Double = 2.0           // seconds of silence to auto-stop
     var maxRecordingDuration: Int = 60          // seconds
     var selectedAudioDeviceID: String?          // nil = system default
+    var selectedAudioDeviceName: String?        // last known display name for unavailable-device messaging
 
     // Model
     var selectedModelSize: ModelSize = .tiny
@@ -397,8 +398,10 @@ enum UpdateState: Equatable {
     case idle
     case checking
     case updateAvailable(UpdateInfo)
+    case updateAvailableViaHomebrew(info: UpdateInfo, install: HomebrewInstall)
     case upToDate
-    case downloading(progress: Double)
+    case downloading(progress: Double, bytesDownloaded: Int64, totalBytes: Int64, estimatedSecondsRemaining: Double)
+    case verifying
     case readyToInstall(dmgPath: URL)
     case error(String)
 }

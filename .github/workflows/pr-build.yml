@@ -160,8 +160,15 @@ jobs:
       # ── Build & Package ─────────────────────────────────────────────────────
       - name: Set PR build version
         run: |
-          # Tag the build so it's identifiable (e.g., 0.5.0-pr.106+abc1234)
-          BASE_VERSION="${APP_VERSION:-0.5.0}"
+          # Tag the build so it's identifiable (e.g., 0.6.2-pr.106+abc1234)
+          BASE_VERSION="${APP_VERSION:-}"
+          if [ -z "$BASE_VERSION" ]; then
+            BASE_VERSION="$(grep '^APP_VERSION=' scripts/build.sh | sed 's/.*:-\(.*\)}.*/\1/' | head -1 || true)"
+          fi
+          if [ -z "$BASE_VERSION" ]; then
+            echo "❌ Unable to determine base app version from scripts/build.sh" >&2
+            exit 1
+          fi
           PR_VERSION="${BASE_VERSION}-pr.${{ steps.pr.outputs.pr_number }}+${{ steps.pr.outputs.short_sha }}"
           echo "APP_VERSION=$PR_VERSION" >> "$GITHUB_ENV"
           echo "📦 Build version: $PR_VERSION"

@@ -152,8 +152,9 @@ HotKey Triggered (stop)
 
 **Implementation Approach:**
 - Uses `CGEvent.tapCreate()` to create a Mach port event tap
-- Tap is inserted at `.cghidEventTap` level for system-wide coverage
-- Callback processes `keyDown` and `keyUp` events for the configured hotkey
+- Tap is inserted at `.cgSessionEventTap` level for user-session coverage
+- The tap acts as an event filter and consumes only the configured hotkey events so they don't leak into the frontmost app
+- Callback processes `keyDown`/`keyUp` events for regular keys and `flagsChanged` events for modifier keys
 
 **Activation Modes:**
 
@@ -176,9 +177,9 @@ On keyUp:
   (Used only for push-to-talk mode)
 ```
 
-**Default Hotkey:** Right Option (keyCode 61)
+**Default Hotkey:** Right Option (keyCode 61). Users can choose a preset or record any single activation key from Settings; the selected key is reserved by VocaMac while the app is running.
 
-**Required Permission:** Accessibility (System Settings → Privacy & Security → Accessibility)
+**Required Permissions:** Accessibility and Input Monitoring (System Settings → Privacy & Security)
 
 #### 3.2.4 `AudioEngine` - Microphone Capture
 
@@ -245,7 +246,7 @@ audioData: [Float]
 **Metal Acceleration:**
 - Enabled by default on Apple Silicon when WhisperKit is compiled with Metal support
 - Compile flag: `WHISPER_METAL=1` or `CoreML_METAL=1`
-- Falls back to CPU on Intel Macs
+- VocaMac targets Apple Silicon only; Intel Macs are not a supported runtime
 
 #### 3.2.6 `ModelManager` - Model Lifecycle Management
 
@@ -285,7 +286,7 @@ audioData: [Float]
 **Responsibility:** Detect system hardware capabilities and recommend optimal model size.
 
 **Detection Points:**
-- CPU architecture: `uname()` → arm64 (Apple Silicon) or x86_64 (Intel)
+- CPU architecture: `uname()` → arm64 (Apple Silicon) — the only supported runtime target
 - Physical RAM: `ProcessInfo.processInfo.physicalMemory`
 - Processor name: `sysctlbyname("machdep.cpu.brand_string")`
 - Core count: `ProcessInfo.processInfo.activeProcessorCount`
@@ -296,12 +297,12 @@ Apple Silicon:
   RAM ≤ 8 GB  → tiny  (safe default)
   RAM = 16 GB → small (good balance)
   RAM ≥ 24 GB → medium (high quality)
-
-Intel:
-  RAM ≤ 8 GB  → tiny
-  RAM = 16 GB → base
-  RAM ≥ 32 GB → small
 ```
+
+> The `recommendModel` function in `SystemInfo.swift` retains a defensive
+> Intel branch (smaller models, no Metal). It exists only to keep the
+> code valid if someone compiles from source on Intel; the released binary
+> is `arm64`-only and Intel Macs are not a supported configuration.
 
 #### 3.2.8 `TextInjector` - System-Wide Text Insertion
 
@@ -336,9 +337,9 @@ CGEventSource(stateID: .hidSystemState)
 
 #### 3.2.9 `UpdateChecker` - GitHub Release Updates
 
-**Responsibility:** Detect new stable releases from GitHub, download the latest signed DMG, verify integrity, and guide the user through drag-to-replace installation.
+**Responsibility:** Detect new stable releases from GitHub and manage updates. For Homebrew-installed copies, it shows a `brew upgrade` command instead of in-app DMG downloads.
 
-**Update Flow:**
+**Update Flow (DMG installs):**
 ```
 On launch (max once every 24h)
   → GET /repos/jatinkrmalik/vocamac/releases/latest
@@ -348,6 +349,14 @@ On launch (max once every 24h)
   → Download DMG with progress
   → Verify SHA-256 using assets[].digest
   → Open DMG in Finder (user drags app to /Applications)
+```
+
+**Update Flow (Homebrew installs):**
+```
+On launch (max once every 24h)
+  → Detect /Caskroom/ in Bundle.main.bundlePath
+  → If newer release available: show "brew upgrade --cask vocamac" banner
+  → User copies command and upgrades via Homebrew
 ```
 
 **Manual Check:**
@@ -494,8 +503,8 @@ swift build -c release
 
 ### 7.3 Distribution Strategy
 
-1. **GitHub Releases** — Developer ID signed & notarized DMG and ZIP, built by CI
-2. **Homebrew Cask** - `brew install --cask vocamac` (planned)
+1. **Homebrew Cask** — `brew install --cask vocamac` (recommended, see `docs/HOMEBREW.md`)
+2. **GitHub Releases** — Developer ID signed & notarized DMG and ZIP, built by CI
 3. **Mac App Store** - Future consideration (requires sandbox compliance)
 
 ---

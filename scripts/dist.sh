@@ -36,8 +36,13 @@ for arg in "$@"; do
     esac
 done
 
-# Get version from APP_VERSION env var (if set) or from build.sh's Info.plist template
-VERSION="${APP_VERSION:-$(grep -A1 'CFBundleShortVersionString' scripts/build.sh | grep '<string>' | sed 's/.*<string>\(.*\)<\/string>/\1/' | head -1)}"
+# Get version from APP_VERSION env var (if set) or from build.sh's default APP_VERSION.
+DEFAULT_APP_VERSION="$(grep '^APP_VERSION=' scripts/build.sh | sed 's/.*:-\(.*\)}.*/\1/' | head -1 || true)"
+VERSION="${APP_VERSION:-$DEFAULT_APP_VERSION}"
+if [ -z "$VERSION" ]; then
+    echo "❌ Unable to determine app version. Set APP_VERSION or update scripts/build.sh." >&2
+    exit 1
+fi
 ARCH=$(uname -m)
 APP_NAME="VocaMac"
 DMG_NAME="${APP_NAME}-${VERSION}-${ARCH}.dmg"

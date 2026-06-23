@@ -37,11 +37,11 @@
 - **⌨️ System-Wide Text Injection** - Transcribed text is typed wherever your cursor is: browsers, Slack, VS Code, spreadsheets, terminals - everywhere.
 - **🎯 Push-to-Talk** - Hold a hotkey (default: Right Option) to record. Release to transcribe.
 - **👆 Double-Tap Toggle** - Double-tap the hotkey to start/stop recording.
-- **🧠 Smart Model Selection** - Auto-detects your hardware (Apple Silicon/Intel, RAM) and recommends the best whisper model via WhisperKit.
+- **🧠 Smart Model Selection** - Auto-detects your Apple Silicon chip and RAM, then recommends the best whisper model via WhisperKit.
 - **⚡ Native Apple Acceleration** - CoreML + Metal + Neural Engine acceleration on Apple Silicon. No manual setup.
 - **📊 Visual Feedback** - Menu bar icon changes color during recording and processing. Audio level indicator shows input.
 - **🔄 Auto-Updates** - Built-in update checker queries GitHub Releases on launch and lets you download and install the latest version in one click from within the app.
-- **⚙️ Configurable** - Choose hotkeys, models, languages, silence detection thresholds, and more.
+- **⚙️ Configurable** - Choose hotkey presets or record a custom activation key reserved by VocaMac while it runs, models, languages, silence detection thresholds, and more.
 
 ---
 
@@ -106,7 +106,7 @@ Same accuracy, dramatically better Apple platform integration.
 ## 📋 Requirements
 
 - **macOS 13 (Ventura)** or later
-- **Apple Silicon** (M1/M2/M3/M4)
+- **Apple Silicon Mac** (M1/M2/M3/M4) — **Intel Macs are not supported.** VocaMac is built for `arm64` only.
 - **Xcode 15+** or Swift 5.9+ (only for building from source)
 
 ### Permissions
@@ -125,7 +125,23 @@ VocaMac requires three macOS permissions:
 
 ## 🚀 Quick Start
 
-### Option 1: Download DMG (Recommended)
+### Option 1: Install via Homebrew (Recommended)
+
+```bash
+brew tap jatinkrmalik/vocamac
+brew trust jatinkrmalik/vocamac
+brew install --cask vocamac
+```
+
+Homebrew installs VocaMac to `/Applications/VocaMac.app`. Launch it from Spotlight or your Applications folder. Updates are a single command away:
+
+```bash
+brew upgrade --cask vocamac
+```
+
+> **Why Homebrew?** Terminal-based install. One-command updates. Permissions persist across upgrades. No manual DMG downloads. See [`docs/HOMEBREW.md`](docs/HOMEBREW.md) for the full Homebrew guide.
+
+### Option 2: Download DMG
 
 1. **Download** the latest `VocaMac-x.x.x-arm64.dmg` from the [Releases page](https://github.com/jatinkrmalik/vocamac/releases)
 2. **Open** the DMG and drag VocaMac to Applications
@@ -134,7 +150,7 @@ VocaMac requires three macOS permissions:
 
 > VocaMac is **Developer ID signed and notarized** by Apple — macOS will open it without any security warnings.
 
-### Option 2: Build from Source (Recommended)
+### Option 3: Build from Source
 
 ```bash
 git clone https://github.com/jatinkrmalik/vocamac.git
@@ -144,7 +160,7 @@ make install
 
 This builds VocaMac, installs it to `/Applications`, and launches it. Permissions are granted directly to VocaMac, just like the DMG method.
 
-### Option 3: CLI Commands (For Developers)
+### Option 4: CLI Commands (For Developers)
 
 ```bash
 git clone https://github.com/jatinkrmalik/vocamac.git
@@ -179,6 +195,14 @@ Nightly builds are automated builds from the latest `main` branch, published eve
 
 **How to install:**
 
+**Via Homebrew (recommended):**
+```bash
+brew tap jatinkrmalik/vocamac
+brew trust jatinkrmalik/vocamac
+brew install --cask vocamac-nightly
+```
+
+**Or via DMG:**
 1. Download the latest `VocaMac-nightly-*.dmg` from the [Nightly Release](https://github.com/jatinkrmalik/vocamac/releases/tag/nightly)
 2. Open the DMG and drag VocaMac to Applications
 3. Grant permissions when prompted (same as a stable release)
@@ -251,7 +275,7 @@ Open Settings from the menu bar popover or with **⌘,**
 
 ### General
 - **Activation mode** - Push-to-Talk or Double-Tap Toggle
-- **Hotkey** - Choose from Right Option, Right Command, Fn, function keys, etc.
+- **Hotkey** - Choose from common presets or record a custom activation key directly from your keyboard. The selected key is consumed by VocaMac while the app is running.
 - **Language** - Auto-detect or specify (English, Spanish, French, German, Chinese, Japanese, and more)
 - **Launch at login**
 
@@ -450,6 +474,16 @@ Release builds of VocaMac are **Developer ID signed and notarized** by Apple. Ac
 ## 📄 License
 
 AGPL-3.0 License - see [LICENSE](LICENSE) for details.
+
+## Star History
+
+<a href="https://www.star-history.com/?repos=jatinkrmalik%2Fvocamac&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=jatinkrmalik/vocamac&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=jatinkrmalik/vocamac&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=jatinkrmalik/vocamac&type=date&legend=top-left" />
+ </picture>
+</a>
 
 ---
 

@@ -99,6 +99,8 @@ final class AppState: ObservableObject {
     @AppStorage("vocamac.silenceThreshold") var silenceThreshold: Double = 0.01
     @AppStorage("vocamac.silenceDuration") var silenceDuration: Double = 2.0
     @AppStorage("vocamac.maxRecordingDuration") var maxRecordingDuration: Int = 60
+    @AppStorage("vocamac.selectedAudioDeviceID") var selectedAudioDeviceID: String = ""
+    @AppStorage("vocamac.selectedAudioDeviceName") var selectedAudioDeviceName: String = ""
     @AppStorage("vocamac.selectedModelSize") var selectedModelSize: String = ModelSize.tiny.rawValue
     @AppStorage("vocamac.selectedLanguage") var selectedLanguage: String = "auto"
     @AppStorage("vocamac.launchAtLogin") var launchAtLogin: Bool = false
@@ -107,6 +109,10 @@ final class AppState: ObservableObject {
     @AppStorage("vocamac.showCursorIndicator") var showCursorIndicator: Bool = true
     @AppStorage("vocamac.translationEnabled") var translationEnabled: Bool = false
     @AppStorage("vocamac.logLevel") var logLevel: String = "info"
+
+    private var hotKeySafetyTimeout: Double {
+        Double(maxRecordingDuration) + 5.0
+    }
 
     // MARK: - Services
 
@@ -275,29 +281,7 @@ final class AppState: ObservableObject {
             deviceRecommendedModel = recommendation.defaultModel
         }
 
-        // Initialize available models list
-        availableModels = ModelSize.allCases.map { size in
-            WhisperModelInfo(
-                size: size,
-                filePath: modelManager.modelFolder(for: size),
-                isDownloaded: modelManager.isModelDownloaded(size),
-                isActive: size.rawValue == selectedModelSize,
-                isSupported: modelManager.isModelSupported(size)
-            )
-        }
-
-        // Enforce monotonic support ordering: if a smaller model is unsupported,
-        // all larger models must also be unsupported. This prevents contradictory
-        // UI states like Medium="Too Large" but Large v3="Recommended".
-        var foundUnsupported = false
-        for i in availableModels.indices {
-            if !availableModels[i].isSupported {
-                foundUnsupported = true
-            }
-            if foundUnsupported {
-                availableModels[i].isSupported = false
-            }
-        }
+        rebuildAvailableModels()
 
         // Validate that the recommended model maps to a supported ModelSize.
         // If the recommendation points to an unsupported model, fall back to
@@ -388,7 +372,7 @@ final class AppState: ObservableObject {
                 keyCode: self.hotKeyCode,
                 mode: self.activationMode,
                 doubleTapThreshold: self.doubleTapThreshold,
-                safetyTimeout: Double(self.maxRecordingDuration) + 5.0
+                safetyTimeout: self.hotKeySafetyTimeout
             )
             VocaLogger.info(.appState, "Hotkey listener started after permission grant")
         }
@@ -402,6 +386,67 @@ final class AppState: ObservableObject {
         checkPermissions()
     }
 
+    /// Build the model list shown in Settings and onboarding.
+    ///
+    /// The base catalog is curated for M-series Macs, then extended with any
+    /// exact variants WhisperKit marks supported for the current device.
+    private func modelCatalog() -> [ModelSize] {
+        var catalog = ModelSize.standardCatalog
+
+        for size in ModelSize.allCases where modelManager.isModelSupported(size) {
+            if !catalog.contains(size) {
+                catalog.append(size)
+            }
+        }
+
+        if let selected = ModelSize(rawValue: selectedModelSize),
+           !catalog.contains(selected) {
+            catalog.append(selected)
+        }
+
+        return catalog
+    }
+
+    /// Recreate model UI state from the latest catalog and local cache status.
+    private func rebuildAvailableModels() {
+        availableModels = modelCatalog().map { size in
+            WhisperModelInfo(
+                size: size,
+                filePath: modelManager.modelFolder(for: size),
+                isDownloaded: modelManager.isModelDownloaded(size),
+                isActive: size.rawValue == selectedModelSize,
+                isSupported: modelManager.isModelSupported(size)
+            )
+        }
+    }
+
+    /// Resolve WhisperKit's recommended exact model variant into app metadata.
+    private func recommendedModelSize() -> ModelSize? {
+        guard let recommended = deviceRecommendedModel,
+              let size = modelManager.modelSize(from: recommended),
+              modelManager.isModelSupported(size) else {
+            return nil
+        }
+        return size
+    }
+
+    /// Pick a supported startup model when the stored preference is no longer valid.
+    private func startupFallbackModel(for preferred: ModelSize) -> ModelSize {
+        guard !modelManager.isModelSupported(preferred) else {
+            return preferred
+        }
+
+        if let downloadedSupported = availableModels.last(where: { $0.isSupported && $0.isDownloaded })?.size {
+            return downloadedSupported
+        }
+
+        if let recommended = recommendedModelSize() {
+            return recommended
+        }
+
+        return .tiny
+    }
+
     // MARK: - Permission Handling (delegated to PermissionManager)
 
     func checkPermissions() { permissionManager.checkPermissions() }
@@ -412,6 +457,21 @@ final class AppState: ObservableObject {
     func openMicrophoneSettings() { permissionManager.openMicrophoneSettings() }
     func requestAccessibilityPermission() { permissionManager.requestAccessibilityPermission() }
     func requestInputMonitoringPermission() { permissionManager.requestInputMonitoringPermission() }
+
+    // MARK: - Hotkey Configuration
+
+    /// Apply persisted hotkey settings to the active listener.
+    /// `@AppStorage` updates save preferences immediately, but an already-running
+    /// event tap also needs its in-memory configuration refreshed.
+    func syncHotKeyConfiguration() {
+        hotKeyManager.updateConfiguration(
+            keyCode: hotKeyCode,
+            mode: activationMode,
+            doubleTapThreshold: doubleTapThreshold,
+            safetyTimeout: hotKeySafetyTimeout
+        )
+        VocaLogger.debug(.appState, "Hotkey configuration synced (keyCode=\(hotKeyCode), mode=\(activationMode.rawValue))")
+    }
 
     // MARK: - Force Recovery
 
@@ -478,11 +538,22 @@ final class AppState: ObservableObject {
         // Start recording immediately for instant responsiveness.
         // The start sound is played concurrently — any brief bleed into the
         // mic buffer is negligible and handled well by WhisperKit's noise model.
-        audioEngine.startRecording(
+        let didStartRecording = audioEngine.startRecording(
             silenceThreshold: Float(silenceThreshold),
             silenceDuration: silenceDuration,
-            maxDuration: TimeInterval(maxRecordingDuration)
+            maxDuration: TimeInterval(maxRecordingDuration),
+            preferredInputDeviceID: selectedAudioDeviceID.isEmpty ? nil : selectedAudioDeviceID
         )
+
+        guard didStartRecording else {
+            VocaLogger.warning(.appState, "Audio engine failed to start — resetting recording state")
+            isRecording = false
+            audioLevel = 0.0
+            cursorOverlay.hide()
+            hotKeyManager.resetKeyState()
+            appStatus = .idle
+            return
+        }
 
         // Play start sound after mic is active (fire-and-forget)
         if soundEffectsEnabled {
@@ -562,6 +633,12 @@ final class AppState: ObservableObject {
     // MARK: - Model Management
 
     func loadModel(_ size: ModelSize? = nil) async {
+        let previousLoadedModelName = whisperService.loadedModelName
+        let previousModelSize = currentModel?.size
+            ?? previousLoadedModelName.flatMap { modelManager.modelSize(from: $0) }
+            ?? ModelSize(rawValue: selectedModelSize)
+        let hadLoadedModel = whisperService.isModelLoaded
+
         let modelName: String?
         if let size = size {
             modelName = modelManager.whisperKitModelName(for: size)
@@ -614,8 +691,19 @@ final class AppState: ObservableObject {
                 resolvedSize = targetSize
             } else {
                 let loadedName = (whisperService.loadedModelName ?? "").lowercased()
-                // Check from largest to smallest to avoid "base" matching inside "large-v3"
-                if loadedName.contains("large") {
+                if let loadedSize = modelManager.modelSize(from: whisperService.loadedModelName ?? "") {
+                    resolvedSize = loadedSize
+                } else if loadedName.contains("v20240930_turbo") {
+                    resolvedSize = .largeV3LatestTurbo
+                } else if loadedName.contains("v20240930") {
+                    resolvedSize = .largeV3Latest
+                } else if loadedName.contains("distil") && loadedName.contains("turbo") {
+                    resolvedSize = .distilLargeV3TurboCompact
+                } else if loadedName.contains("distil") {
+                    resolvedSize = .distilLargeV3Compact
+                } else if loadedName.contains("large") && loadedName.contains("turbo") {
+                    resolvedSize = .largeV3Turbo
+                } else if loadedName.contains("large") {
                     resolvedSize = .largeV3
                 } else if loadedName.contains("medium") {
                     resolvedSize = .medium
@@ -652,8 +740,89 @@ final class AppState: ObservableObject {
                 availableModels[i].isLoading = false
                 availableModels[i].loadingStatus = "Loading…"
             }
-            errorMessage = "Failed to load model: \(error.localizedDescription)"
-            VocaLogger.error(.appState, "Failed to load model: \(error.localizedDescription)")
+
+            let modelDisplayName = targetSize?.displayName ?? "model"
+            let failureMessage = "Failed to load \(modelDisplayName): \(error.localizedDescription)"
+            showTemporaryError(failureMessage)
+            VocaLogger.error(.appState, failureMessage)
+
+            await restorePreviousModelIfNeeded(
+                afterFailedLoadFor: targetSize,
+                previousSize: previousModelSize,
+                previousName: previousLoadedModelName,
+                hadLoadedModel: hadLoadedModel,
+                originalFailureMessage: failureMessage
+            )
+        }
+    }
+
+    /// Surface a short-lived error state for settings and menu UI.
+    private func showTemporaryError(_ message: String) {
+        errorMessage = message
+        appStatus = .error
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) { [weak self] in
+            if self?.appStatus == .error, self?.errorMessage == message {
+                self?.appStatus = .idle
+                self?.errorMessage = nil
+            }
+        }
+    }
+
+    /// Restore the model that was active before a failed switch.
+    private func restorePreviousModelIfNeeded(
+        afterFailedLoadFor failedSize: ModelSize?,
+        previousSize: ModelSize?,
+        previousName: String?,
+        hadLoadedModel: Bool,
+        originalFailureMessage: String
+    ) async {
+        guard hadLoadedModel,
+              let previousSize,
+              failedSize != previousSize else {
+            clearActiveModelState()
+            return
+        }
+
+        do {
+            VocaLogger.info(.appState, "Restoring previous model: \(previousSize.displayName)")
+            let folderURL = modelManager.isModelDownloaded(previousSize)
+                ? modelManager.modelFolder(for: previousSize)
+                : nil
+            let restoreName = previousName ?? modelManager.whisperKitModelName(for: previousSize)
+            try await whisperService.loadModel(name: restoreName, folder: folderURL)
+            markModelActive(previousSize)
+            VocaLogger.info(.appState, "Restored previous model: \(previousSize.displayName)")
+        } catch {
+            clearActiveModelState()
+            let restoreFailure = "Previous model could not be restored: \(error.localizedDescription)"
+            errorMessage = "\(originalFailureMessage) \(restoreFailure)"
+            VocaLogger.error(.appState, restoreFailure)
+        }
+    }
+
+    /// Synchronize AppState's model metadata after a successful load.
+    private func markModelActive(_ size: ModelSize) {
+        currentModel = nil
+        for i in availableModels.indices {
+            let matches = availableModels[i].size == size
+            availableModels[i].isActive = matches
+            availableModels[i].isLoading = false
+            availableModels[i].loadingStatus = "Loading…"
+            if matches {
+                availableModels[i].isDownloaded = modelManager.isModelDownloaded(size)
+                currentModel = availableModels[i]
+            }
+        }
+    }
+
+    /// Clear active model metadata when no model is loaded in WhisperService.
+    private func clearActiveModelState() {
+        currentModel = nil
+        for i in availableModels.indices {
+            availableModels[i].isActive = false
+            availableModels[i].isLoading = false
+            availableModels[i].loadingStatus = "Loading…"
         }
     }
 
@@ -739,7 +908,13 @@ final class AppState: ObservableObject {
         // downloaded yet. We download it explicitly so the UI can show real
         // progress, rather than delegating to WhisperKit's opaque auto-select
         // which provides no progress callbacks and may pick a different model.
-        var modelToLoad = ModelSize(rawValue: selectedModelSize) ?? .tiny
+        let preferredModel = ModelSize(rawValue: selectedModelSize) ?? .tiny
+        var modelToLoad = startupFallbackModel(for: preferredModel)
+        if modelToLoad != preferredModel {
+            VocaLogger.warning(.appState, "Preferred model \(preferredModel.displayName) is not supported on this device — falling back to \(modelToLoad.displayName)")
+            selectedModelSize = modelToLoad.rawValue
+            rebuildAvailableModels()
+        }
 
         if !modelManager.isModelDownloaded(modelToLoad) {
             // Try bundled model for the preferred size first
@@ -774,7 +949,7 @@ final class AppState: ObservableObject {
             keyCode: hotKeyCode,
             mode: activationMode,
             doubleTapThreshold: doubleTapThreshold,
-            safetyTimeout: Double(maxRecordingDuration) + 5.0
+            safetyTimeout: hotKeySafetyTimeout
         )
         if hotKeyManager.isListening {
             VocaLogger.info(.appState, "Hotkey listener active (keyCode=\(hotKeyCode), mode=\(activationMode.rawValue))")
@@ -787,6 +962,10 @@ final class AppState: ObservableObject {
         VocaLogger.info(.appState, "Startup complete!")
     }
     func completeOnboarding() {
+        syncHotKeyConfiguration()
+        if !isRecording {
+            hotKeyManager.resetKeyState()
+        }
         hasCompletedOnboarding = true
         VocaLogger.info(.appState, "Onboarding completed")
     }

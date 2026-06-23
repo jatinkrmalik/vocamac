@@ -38,16 +38,68 @@ enum UpdateCheckerError: LocalizedError {
 final class UpdateChecker: ObservableObject {
     @Published var updateState: UpdateState = .idle
 
+    enum HomebrewInstallOverride {
+        case installed(HomebrewInstall)
+        case notInstalled
+    }
+
+    var homebrewInstall: HomebrewInstall? {
+        if let override = overrideHomebrewInstall {
+            switch override {
+            case .installed(let install):
+                return install
+            case .notInstalled:
+                return nil
+            }
+        }
+        return Self.detectHomebrewInstall(bundlePath: Bundle.main.bundlePath)
+    }
+
+    var isHomebrewInstalled: Bool {
+        homebrewInstall != nil
+    }
+
+    var overrideHomebrewInstall: HomebrewInstallOverride?
+
     /// Returns the UpdateInfo if the checker is in any active update flow
     /// (available, downloading, verifying, ready to install, or error after a download attempt).
     /// Used to keep banners and sheets visible during the entire update process.
     var activeUpdateInfo: UpdateInfo? {
         switch updateState {
-        case .updateAvailable(let info):
+        case .updateAvailable(let info), .updateAvailableViaHomebrew(let info, _):
             return info
         default:
             return lastKnownUpdateInfo
         }
+    }
+
+    nonisolated static let supportedHomebrewCaskTokens = ["vocamac", "vocamac-nightly"]
+
+    nonisolated static let defaultHomebrewCaskroomRoots = [
+        URL(fileURLWithPath: "/opt/homebrew/Caskroom", isDirectory: true),
+        URL(fileURLWithPath: "/usr/local/Caskroom", isDirectory: true)
+    ]
+
+    nonisolated static func detectHomebrewInstall(
+        bundlePath: String,
+        caskroomRoots: [URL] = defaultHomebrewCaskroomRoots,
+        fileManager: FileManager = .default
+    ) -> HomebrewInstall? {
+        let normalizedBundlePath = normalizedPath(bundlePath)
+
+        for caskToken in supportedHomebrewCaskTokens {
+            for caskroomRoot in caskroomRoots {
+                let caskRoot = caskroomRoot.appendingPathComponent(caskToken, isDirectory: true)
+                guard hasHomebrewReceipt(in: caskRoot, fileManager: fileManager) else { continue }
+
+                if isPath(normalizedBundlePath, inside: caskRoot.path) ||
+                    caskRootContainsBundlePath(normalizedBundlePath, caskRoot: caskRoot, fileManager: fileManager) {
+                    return HomebrewInstall(caskToken: caskToken)
+                }
+            }
+        }
+
+        return nil
     }
 
     /// Stored when an update is found so views can reference it across state transitions.
@@ -76,11 +128,15 @@ final class UpdateChecker: ObservableObject {
     }
 
     func checkForUpdates() async {
+        await checkForUpdates(releaseProvider: { try await self.fetchLatestRelease() })
+    }
+
+    func checkForUpdates(releaseProvider: () async throws -> GitHubRelease) async {
         guard updateState != .checking else { return }
         updateState = .checking
 
         do {
-            let release = try await fetchLatestRelease()
+            let release = try await releaseProvider()
             UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: lastCheckKey)
 
             let remoteVersion = normalizeVersion(release.tagName)
@@ -96,8 +152,13 @@ final class UpdateChecker: ObservableObject {
                     throw UpdateCheckerError.noDMGAsset
                 }
                 lastKnownUpdateInfo = info
-                updateState = .updateAvailable(info)
-                VocaLogger.info(.updateChecker, "Update available: \(info.tagName)")
+                if let homebrewInstall {
+                    updateState = .updateAvailableViaHomebrew(info: info, install: homebrewInstall)
+                    VocaLogger.info(.updateChecker, "Update available via Homebrew cask \(homebrewInstall.caskToken): \(info.tagName)")
+                } else {
+                    updateState = .updateAvailable(info)
+                    VocaLogger.info(.updateChecker, "Update available: \(info.tagName)")
+                }
             } else {
                 updateState = .upToDate
             }
@@ -242,6 +303,47 @@ final class UpdateChecker: ObservableObject {
             dmgSize: dmgAsset.size,
             sha256: sha256
         )
+    }
+
+    private nonisolated static func hasHomebrewReceipt(in caskRoot: URL, fileManager: FileManager) -> Bool {
+        let receipt = caskRoot
+            .appendingPathComponent(".metadata", isDirectory: true)
+            .appendingPathComponent("INSTALL_RECEIPT.json")
+        return fileManager.fileExists(atPath: receipt.path)
+    }
+
+    private nonisolated static func caskRootContainsBundlePath(
+        _ bundlePath: String,
+        caskRoot: URL,
+        fileManager: FileManager
+    ) -> Bool {
+        let versionDirectories = (try? fileManager.contentsOfDirectory(
+            at: caskRoot,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        )) ?? []
+
+        for versionDirectory in versionDirectories {
+            let stagedApp = versionDirectory.appendingPathComponent("VocaMac.app", isDirectory: true)
+            guard fileManager.fileExists(atPath: stagedApp.path) else { continue }
+
+            let stagedPath = normalizedPath(stagedApp.path)
+            let resolvedPath = normalizedPath(stagedApp.resolvingSymlinksInPath().path)
+            if stagedPath == bundlePath || resolvedPath == bundlePath {
+                return true
+            }
+        }
+
+        return false
+    }
+
+    private nonisolated static func isPath(_ path: String, inside directoryPath: String) -> Bool {
+        let normalizedDirectoryPath = normalizedPath(directoryPath)
+        return path == normalizedDirectoryPath || path.hasPrefix(normalizedDirectoryPath + "/")
+    }
+
+    private nonisolated static func normalizedPath(_ path: String) -> String {
+        URL(fileURLWithPath: path).standardizedFileURL.path
     }
 
     // MARK: - Download with Progress

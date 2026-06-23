@@ -23,8 +23,8 @@ final class SystemInfoTests: XCTestCase {
         XCTAssertEqual(SystemInfo.recommendModel(isAppleSilicon: true, memoryGB: 4), .tiny)
         XCTAssertEqual(SystemInfo.recommendModel(isAppleSilicon: true, memoryGB: 8), .base)
         XCTAssertEqual(SystemInfo.recommendModel(isAppleSilicon: true, memoryGB: 16), .small)
-        XCTAssertEqual(SystemInfo.recommendModel(isAppleSilicon: true, memoryGB: 24), .medium)
-        XCTAssertEqual(SystemInfo.recommendModel(isAppleSilicon: true, memoryGB: 48), .medium)
+        XCTAssertEqual(SystemInfo.recommendModel(isAppleSilicon: true, memoryGB: 24), .largeV3LatestTurboCompact)
+        XCTAssertEqual(SystemInfo.recommendModel(isAppleSilicon: true, memoryGB: 48), .largeV3Latest)
     }
 
     func testModelRecommendationIntel() {
@@ -59,10 +59,9 @@ final class SystemInfoTests: XCTestCase {
 
 final class ModelSizeTests: XCTestCase {
 
-    func testModelSizesAscendingFileSize() {
-        let sizes = ModelSize.allCases.map { $0.fileSizeBytes }
-        for i in 1..<sizes.count {
-            XCTAssertGreaterThan(sizes[i], sizes[i - 1])
+    func testModelSizesHavePositiveFileSizes() {
+        for size in ModelSize.allCases {
+            XCTAssertGreaterThan(size.fileSizeBytes, 0)
         }
     }
 
@@ -78,10 +77,9 @@ final class ModelSizeTests: XCTestCase {
         }
     }
 
-    func testRAMRequirementsIncreasing() {
-        let rams = ModelSize.allCases.map { $0.ramRequiredGB }
-        for i in 1..<rams.count {
-            XCTAssertGreaterThanOrEqual(rams[i], rams[i - 1])
+    func testRAMRequirementsPositive() {
+        for size in ModelSize.allCases {
+            XCTAssertGreaterThan(size.ramRequiredGB, 0)
         }
     }
 
@@ -91,23 +89,34 @@ final class ModelSizeTests: XCTestCase {
         }
     }
 
-    func testRelativeSpeedIncreasing() {
-        let speeds = ModelSize.allCases.map { $0.relativeSpeed }
-        for i in 1..<speeds.count {
-            XCTAssertGreaterThan(speeds[i], speeds[i - 1])
+    func testRelativeSpeedsPositive() {
+        for size in ModelSize.allCases {
+            XCTAssertGreaterThan(size.relativeSpeed, 0)
         }
     }
 
     func testAllCasesCount() {
-        XCTAssertEqual(ModelSize.allCases.count, 5)
+        XCTAssertEqual(ModelSize.allCases.count, 12)
     }
 
     func testRawValues() {
         XCTAssertEqual(ModelSize.tiny.rawValue, "tiny")
         XCTAssertEqual(ModelSize.base.rawValue, "base")
         XCTAssertEqual(ModelSize.small.rawValue, "small")
-        XCTAssertEqual(ModelSize.medium.rawValue, "medium")
+        XCTAssertEqual(ModelSize.largeV3LatestTurboCompact.rawValue, "large-v3-v20240930_turbo_632MB")
+        XCTAssertEqual(ModelSize.distilLargeV3Compact.rawValue, "distil-large-v3_594MB")
+        XCTAssertEqual(ModelSize.distilLargeV3TurboCompact.rawValue, "distil-large-v3_turbo_600MB")
+        XCTAssertEqual(ModelSize.largeV3LatestCompact.rawValue, "large-v3-v20240930_626MB")
+        XCTAssertEqual(ModelSize.largeV3Latest.rawValue, "large-v3-v20240930")
+        XCTAssertEqual(ModelSize.largeV3LatestTurbo.rawValue, "large-v3-v20240930_turbo")
         XCTAssertEqual(ModelSize.largeV3.rawValue, "large-v3")
+        XCTAssertEqual(ModelSize.largeV3Turbo.rawValue, "large-v3_turbo")
+        XCTAssertEqual(ModelSize.medium.rawValue, "medium")
+    }
+
+    func testStandardCatalogExcludesLegacyMedium() {
+        XCTAssertFalse(ModelSize.standardCatalog.contains(.medium))
+        XCTAssertTrue(ModelSize.medium.isLegacy)
     }
 }
 
@@ -120,8 +129,45 @@ final class ModelManagerTests: XCTestCase {
         XCTAssertEqual(manager.whisperKitModelName(for: .tiny), "openai_whisper-tiny")
         XCTAssertEqual(manager.whisperKitModelName(for: .base), "openai_whisper-base")
         XCTAssertEqual(manager.whisperKitModelName(for: .small), "openai_whisper-small")
-        XCTAssertEqual(manager.whisperKitModelName(for: .medium), "openai_whisper-medium")
+        XCTAssertEqual(manager.whisperKitModelName(for: .largeV3LatestTurboCompact), "openai_whisper-large-v3-v20240930_turbo_632MB")
+        XCTAssertEqual(manager.whisperKitModelName(for: .distilLargeV3Compact), "distil-whisper_distil-large-v3_594MB")
+        XCTAssertEqual(manager.whisperKitModelName(for: .distilLargeV3TurboCompact), "distil-whisper_distil-large-v3_turbo_600MB")
+        XCTAssertEqual(manager.whisperKitModelName(for: .largeV3LatestCompact), "openai_whisper-large-v3-v20240930_626MB")
+        XCTAssertEqual(manager.whisperKitModelName(for: .largeV3Latest), "openai_whisper-large-v3-v20240930")
+        XCTAssertEqual(manager.whisperKitModelName(for: .largeV3LatestTurbo), "openai_whisper-large-v3-v20240930_turbo")
         XCTAssertEqual(manager.whisperKitModelName(for: .largeV3), "openai_whisper-large-v3")
+        XCTAssertEqual(manager.whisperKitModelName(for: .largeV3Turbo), "openai_whisper-large-v3_turbo")
+        XCTAssertEqual(manager.whisperKitModelName(for: .medium), "openai_whisper-medium")
+    }
+
+    func testModelSizeFromWhisperKitNameUsesExactVariant() {
+        let manager = ModelManager()
+        XCTAssertEqual(manager.modelSize(from: "openai_whisper-large-v3-v20240930"), .largeV3Latest)
+        XCTAssertEqual(manager.modelSize(from: "openai_whisper-large-v3-v20240930_626MB"), .largeV3LatestCompact)
+        XCTAssertEqual(manager.modelSize(from: "openai_whisper-large-v3"), .largeV3)
+        XCTAssertEqual(manager.modelSize(from: "openai_whisper-large-v3_turbo"), .largeV3Turbo)
+        XCTAssertNil(manager.modelSize(from: "openai_whisper-large-v3-v20240930_extra"))
+    }
+
+    func testUsableCoreMLComponentRequiresWeights() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let component = root.appendingPathComponent("AudioEncoder.mlmodelc", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: component,
+            withIntermediateDirectories: true
+        )
+        try Data("{}".utf8).write(to: component.appendingPathComponent("metadata.json"))
+        try Data("mil".utf8).write(to: component.appendingPathComponent("model.mil"))
+
+        XCTAssertFalse(ModelManager.hasUsableCoreMLComponent(at: component))
+
+        let weights = component.appendingPathComponent("weights", isDirectory: true)
+        try FileManager.default.createDirectory(at: weights, withIntermediateDirectories: true)
+        try Data("weights".utf8).write(to: weights.appendingPathComponent("weight.bin"))
+
+        XCTAssertTrue(ModelManager.hasUsableCoreMLComponent(at: component))
     }
 
     func testDownloadedModelsReturnsArray() {
@@ -274,4 +320,3 @@ final class ActivationModeTests: XCTestCase {
         XCTAssertEqual(ActivationMode.doubleTapToggle.rawValue, "doubleTapToggle")
     }
 }
-

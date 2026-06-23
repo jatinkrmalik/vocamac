@@ -123,6 +123,15 @@ final class AppStateRecordingTests: XCTestCase {
                       "Default language should be 'auto'")
     }
 
+    func testSelectedAudioDeviceDefaultsToSystemDefault() {
+        let (appState, _) = AppState.makeTestState()
+
+        XCTAssertEqual(appState.selectedAudioDeviceID, "",
+                      "Default audio input should follow the system default")
+        XCTAssertEqual(appState.selectedAudioDeviceName, "",
+                      "No device name should be persisted for system default")
+    }
+
     func testActivationModeDefault() {
         let (appState, _) = AppState.makeTestState()
 
@@ -189,6 +198,26 @@ final class AppStateRecordingTests: XCTestCase {
         appState.triggerStartupIfNeeded()
         appState.triggerStartupIfNeeded()
         appState.triggerStartupIfNeeded()
+    }
+
+    func testStartRecordingPassesNilDeviceForSystemDefault() async {
+        let (appState, mocks) = AppState.makeTestState()
+        appState.selectedAudioDeviceID = ""
+
+        await appState.startRecording()
+
+        XCTAssertNil(mocks.audioEngine.lastPreferredInputDeviceID,
+                     "System Default should not pass a preferred input device")
+    }
+
+    func testStartRecordingPassesSelectedAudioDeviceID() async {
+        let (appState, mocks) = AppState.makeTestState()
+        appState.selectedAudioDeviceID = "coreaudio-device-uid"
+
+        await appState.startRecording()
+
+        XCTAssertEqual(mocks.audioEngine.lastPreferredInputDeviceID, "coreaudio-device-uid",
+                       "Selected audio device ID should be forwarded to AudioEngine")
     }
 }
 
@@ -359,6 +388,27 @@ final class AppStateRecordingGuardTests: XCTestCase {
 
         XCTAssertEqual(appState.appStatus, .idle)
         XCTAssertFalse(appState.isRecording)
+    }
+
+    @MainActor
+    func testStartRecordingFailureResetsRecordingState() async {
+        let (appState, mocks) = AppState.makeTestState()
+        mocks.audioEngine.startRecordingResult = false
+
+        await appState.startRecording()
+
+        XCTAssertEqual(appState.appStatus, .idle,
+            "failed audio start should return app state to idle")
+        XCTAssertFalse(appState.isRecording,
+            "failed audio start should clear recording state")
+        XCTAssertEqual(appState.audioLevel, 0.0,
+            "failed audio start should reset audio level")
+        XCTAssertEqual(mocks.cursorOverlay.hideCallCount, 1,
+            "failed audio start should hide the cursor overlay")
+        XCTAssertEqual(mocks.hotKeyManager.resetKeyStateCallCount, 1,
+            "failed audio start should reset hotkey state")
+        XCTAssertEqual(mocks.soundManager.startSoundCallCount, 0,
+            "failed audio start should not play the start sound")
     }
 
     @MainActor

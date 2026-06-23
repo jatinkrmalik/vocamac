@@ -42,10 +42,20 @@ final class TextInjector {
 
     // MARK: - Public API
 
-    /// Inject text at the current cursor position in any application
+    /// Inject text at the current cursor position in any application.
+    ///
+    /// Strategy (in order):
+    /// 1. **Accessibility API** — sets `kAXSelectedTextAttribute` on the
+    ///    focused element. This inserts text directly without going through
+    ///    any paste handler, which makes it compatible with apps like Raycast
+    ///    whose search bar intercepts Cmd+V before it reaches the text field.
+    /// 2. **Clipboard + Cmd+V** — the legacy approach used as a fallback for
+    ///    apps whose text fields are not writable via the Accessibility API.
+    ///
     /// - Parameters:
     ///   - text: The text to inject
     ///   - preserveClipboard: Whether to save and restore the clipboard contents
+    ///                        (only relevant when the clipboard path is taken)
     func inject(text: String, preserveClipboard: Bool = true) {
         guard !text.isEmpty else { return }
 
@@ -61,6 +71,101 @@ final class TextInjector {
             return
         }
 
+        // Strategy 1: Accessibility API direct insertion.
+        // Works with Raycast, Spotlight, and any app whose focused text field
+        // is writable via the AX API. Preferred because it does not touch the
+        // clipboard and does not require dispatching a keyboard shortcut.
+        if injectViaAccessibility(text: text) {
+            VocaLogger.info(.textInjector, "Text injected via Accessibility API")
+            return
+        }
+
+        // Strategy 2: Clipboard + Cmd+V (legacy fallback).
+        VocaLogger.info(.textInjector, "AX injection unavailable — falling back to clipboard + Cmd+V")
+        injectViaClipboard(text: text, preserveClipboard: preserveClipboard)
+    }
+
+    // MARK: - Strategy 1: Accessibility API
+
+    /// Attempt to insert `text` at the cursor position by writing directly to
+    /// the `kAXSelectedTextAttribute` of the currently focused UI element.
+    ///
+    /// This replaces any active selection with `text`, or inserts at the caret
+    /// when no text is selected — identical to what the user would experience
+    /// when typing.
+    ///
+    /// **Scope:** This strategy is intentionally limited to single-line input
+    /// roles (`AXTextField`, `AXSearchField`, `AXComboBox`). Multi-line
+    /// `AXTextArea` elements — which covers terminal emulators (Terminal.app,
+    /// Ghostty, iTerm2) and code editors — accept the AX attribute write and
+    /// return `.success`, but silently discard or mishandle the text because
+    /// those views process input as a stream of key events, not as a direct
+    /// value mutation. Limiting scope to single-line fields makes AX injection
+    /// reliable for apps like Raycast while letting terminal/editor traffic
+    /// fall through to the clipboard+Cmd+V path that has always worked there.
+    ///
+    /// - Returns: `true` if the text was successfully written via the AX API;
+    ///            `false` if the focused element is unreachable, has an
+    ///            unsupported role, or the write was rejected.
+    @discardableResult
+    private func injectViaAccessibility(text: String) -> Bool {
+        let systemWide = AXUIElementCreateSystemWide()
+        var focusedRef: CFTypeRef?
+
+        let fetchResult = AXUIElementCopyAttributeValue(
+            systemWide,
+            kAXFocusedUIElementAttribute as CFString,
+            &focusedRef
+        )
+        guard fetchResult == .success, let focusedRef else {
+            VocaLogger.debug(.textInjector, "AX: no focused element (\(fetchResult.rawValue))")
+            return false
+        }
+
+        // The returned CFTypeRef must be an AXUIElement.
+        guard CFGetTypeID(focusedRef) == AXUIElementGetTypeID() else {
+            VocaLogger.debug(.textInjector, "AX: focused element is not an AXUIElement")
+            return false
+        }
+
+        // swiftlint:disable force_cast
+        let element = focusedRef as! AXUIElement
+        // swiftlint:enable force_cast
+
+        // Gate on element role. Only single-line input fields reliably handle
+        // a direct kAXSelectedTextAttribute write as "insert text at cursor".
+        // AXTextArea (terminals, editors) must use clipboard+Cmd+V instead.
+        var roleRef: CFTypeRef?
+        AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &roleRef)
+        let role = roleRef as? String ?? ""
+
+        let supportedRoles: Set<String> = ["AXTextField", "AXSearchField", "AXComboBox"]
+        guard supportedRoles.contains(role) else {
+            VocaLogger.debug(.textInjector, "AX: skipping role '\(role)' — not a single-line input field")
+            return false
+        }
+
+        let setResult = AXUIElementSetAttributeValue(
+            element,
+            kAXSelectedTextAttribute as CFString,
+            text as CFTypeRef
+        )
+
+        if setResult == .success {
+            VocaLogger.debug(.textInjector, "AX: inserted \(text.count) chars via kAXSelectedTextAttribute (role: \(role))")
+            return true
+        }
+
+        VocaLogger.debug(.textInjector, "AX: kAXSelectedTextAttribute write failed (\(setResult.rawValue)) — element may be read-only")
+        return false
+    }
+
+    // MARK: - Strategy 2: Clipboard + Cmd+V
+
+    /// Inject text via the system clipboard followed by a simulated Cmd+V.
+    /// This is the original injection strategy and acts as a fallback for
+    /// apps whose focused element is not writable via the Accessibility API.
+    private func injectViaClipboard(text: String, preserveClipboard: Bool) {
         let pasteboard = NSPasteboard.general
 
         // Deep-copy current clipboard state before we overwrite it.
