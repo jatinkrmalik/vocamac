@@ -18,14 +18,6 @@ class StatsManager: StatsManaging, ObservableObject {
     private let statsFileURL: URL
     private let calendar: Calendar
 
-    private static let dateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        return formatter
-    }()
-
     init(statsFileURL: URL? = nil, calendar: Calendar = .current) {
         if let statsFileURL {
             self.statsFileURL = statsFileURL
@@ -76,7 +68,7 @@ class StatsManager: StatsManaging, ObservableObject {
             .filter { !$0.isEmpty }
             .count
 
-        let dateKey = Self.dateFormatter.string(from: transcription.timestamp)
+        let dateKey = dayKey(for: transcription.timestamp)
 
         // Update basic counts
         stats.totalWords += words
@@ -100,6 +92,14 @@ class StatsManager: StatsManaging, ObservableObject {
         saveStats()
     }
 
+    private func dayKey(for date: Date) -> String {
+        let components = calendar.dateComponents([.year, .month, .day], from: date)
+        guard let year = components.year, let month = components.month, let day = components.day else {
+            return "unknown"
+        }
+        return String(format: "%04d-%02d-%02d", year, month, day)
+    }
+
     private func updateStreaks(currentDate: Date) {
         guard let lastDate = stats.lastUsageDate else {
             // First time usage
@@ -108,16 +108,19 @@ class StatsManager: StatsManaging, ObservableObject {
             return
         }
 
-        // Check if last usage was yesterday
-        if calendar.isDateInYesterday(lastDate) {
+        let lastDay = calendar.startOfDay(for: lastDate)
+        let currentDay = calendar.startOfDay(for: currentDate)
+        let daysBetween = calendar.dateComponents([.day], from: lastDay, to: currentDay).day
+
+        switch daysBetween {
+        case 0:
+            // Already used on this calendar day, streak remains same
+            break
+        case 1:
             // Continuation of streak
-            if !calendar.isDate(lastDate, inSameDayAs: currentDate) {
-                stats.currentStreak += 1
-            }
-        } else if calendar.isDate(lastDate, inSameDayAs: currentDate) {
-            // Already used today, streak remains same
-        } else {
-            // Streak broken
+            stats.currentStreak += 1
+        default:
+            // Streak broken or older transcription recorded out of order
             stats.currentStreak = 1
         }
 

@@ -129,6 +129,88 @@ final class StatsManagerTests: XCTestCase {
     }
 
     @MainActor
+    func testDailyBucketsUseInjectedCalendarTimeZone() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 2 * 60 * 60)!
+        statsManager = StatsManager(statsFileURL: tempFileURL, calendar: calendar)
+
+        let nearMidnightUTC = Date(timeIntervalSince1970: 1_704_060_000) // 2023-12-31 22:00:00 UTC, 2024-01-01 in GMT+2
+        let transcription = VocaTranscription(
+            text: "local day",
+            duration: 1.0,
+            detectedLanguage: "en",
+            audioLengthSeconds: 1.0,
+            modelUsed: .tiny,
+            timestamp: nearMidnightUTC
+        )
+
+        statsManager.recordTranscription(transcription)
+
+        XCTAssertEqual(statsManager.stats.dailyWordCounts["2024-01-01"], 2)
+        XCTAssertNil(statsManager.stats.dailyWordCounts["2023-12-31"])
+    }
+
+    @MainActor
+    func testStreakUsesTranscriptionDateRatherThanCurrentDate() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        statsManager = StatsManager(statsFileURL: tempFileURL, calendar: calendar)
+
+        let firstDay = Date(timeIntervalSince1970: 946_684_800) // 2000-01-01 00:00:00 UTC
+        let secondDay = Date(timeIntervalSince1970: 946_771_200) // 2000-01-02 00:00:00 UTC
+
+        statsManager.recordTranscription(VocaTranscription(
+            text: "first day",
+            duration: 1.0,
+            detectedLanguage: "en",
+            audioLengthSeconds: 1.0,
+            modelUsed: .tiny,
+            timestamp: firstDay
+        ))
+        statsManager.recordTranscription(VocaTranscription(
+            text: "second day",
+            duration: 1.0,
+            detectedLanguage: "en",
+            audioLengthSeconds: 1.0,
+            modelUsed: .tiny,
+            timestamp: secondDay
+        ))
+
+        XCTAssertEqual(statsManager.stats.currentStreak, 2)
+        XCTAssertEqual(statsManager.stats.bestStreak, 2)
+    }
+
+    @MainActor
+    func testSameDayTranscriptionsDoNotIncrementStreak() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        statsManager = StatsManager(statsFileURL: tempFileURL, calendar: calendar)
+
+        let first = Date(timeIntervalSince1970: 946_684_800) // 2000-01-01 00:00:00 UTC
+        let second = Date(timeIntervalSince1970: 946_728_000) // 2000-01-01 12:00:00 UTC
+
+        statsManager.recordTranscription(VocaTranscription(
+            text: "morning words",
+            duration: 1.0,
+            detectedLanguage: "en",
+            audioLengthSeconds: 1.0,
+            modelUsed: .tiny,
+            timestamp: first
+        ))
+        statsManager.recordTranscription(VocaTranscription(
+            text: "afternoon words",
+            duration: 1.0,
+            detectedLanguage: "en",
+            audioLengthSeconds: 1.0,
+            modelUsed: .tiny,
+            timestamp: second
+        ))
+
+        XCTAssertEqual(statsManager.stats.currentStreak, 1)
+        XCTAssertEqual(statsManager.stats.bestStreak, 1)
+    }
+
+    @MainActor
     func testResetStats() {
         let transcription = VocaTranscription(text: "Test", duration: 1.0, detectedLanguage: "en", audioLengthSeconds: 1.0, modelUsed: .tiny)
         statsManager.recordTranscription(transcription)
