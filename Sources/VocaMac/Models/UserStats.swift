@@ -28,14 +28,30 @@ struct UserStats: Codable {
     /// Key is date string in "yyyy-MM-dd" format
     var dailyWordCounts: [String: Int] = [:]
 
-    /// Daily duration to calculate WPM history
-    var dailyDurationSeconds: [String: Double] = [:]
-
     /// Calculated average Words Per Minute (WPM).
     /// Note: This is "words-per-minute-of-audio", dividing total words by total audio duration.
     var averageWPM: Double {
         guard totalAudioDurationSeconds > 0 else { return 0 }
         let minutes = totalAudioDurationSeconds / 60.0
         return Double(totalWords) / minutes
+    }
+}
+
+extension UserStats {
+    /// Decode leniently so evolving the schema never wipes a user's saved stats:
+    /// any key missing from an older `stats.json` falls back to its default.
+    /// (Synthesized `Codable` requires every non-optional key, so adding a field
+    /// later would otherwise fail decoding and silently reset all history.)
+    /// Declared in an extension to keep the memberwise `UserStats()` initializer.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init()
+        totalWords = try container.decodeIfPresent(Int.self, forKey: .totalWords) ?? totalWords
+        totalTranscriptions = try container.decodeIfPresent(Int.self, forKey: .totalTranscriptions) ?? totalTranscriptions
+        totalAudioDurationSeconds = try container.decodeIfPresent(Double.self, forKey: .totalAudioDurationSeconds) ?? totalAudioDurationSeconds
+        lastUsageDate = try container.decodeIfPresent(Date.self, forKey: .lastUsageDate)
+        currentStreak = try container.decodeIfPresent(Int.self, forKey: .currentStreak) ?? currentStreak
+        bestStreak = try container.decodeIfPresent(Int.self, forKey: .bestStreak) ?? bestStreak
+        dailyWordCounts = try container.decodeIfPresent([String: Int].self, forKey: .dailyWordCounts) ?? dailyWordCounts
     }
 }

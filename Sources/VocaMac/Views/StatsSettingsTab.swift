@@ -7,6 +7,7 @@ import SwiftUI
 
 struct StatsSettingsTab: View {
     @EnvironmentObject var appState: AppState
+    @State private var showingResetConfirmation = false
 
     private static let durationFormatter: DateComponentsFormatter = {
         let formatter = DateComponentsFormatter()
@@ -19,6 +20,9 @@ struct StatsSettingsTab: View {
     private static let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
+        // Fixed locale so the "yyyy-MM-dd" keys (written with a Gregorian calendar)
+        // parse back correctly regardless of the user's default calendar/locale.
+        formatter.locale = Locale(identifier: "en_US_POSIX")
         return formatter
     }()
 
@@ -74,7 +78,7 @@ struct StatsSettingsTab: View {
                                 .font(.system(size: 32, weight: .bold, design: .rounded))
                             + Text(" WPM").font(.headline).foregroundColor(.secondary)
 
-                            Text("Words Per Minute")
+                            Text("Speaking Speed")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -139,7 +143,7 @@ struct StatsSettingsTab: View {
 
                 // Reset Button
                 Button(role: .destructive) {
-                    appState.statsManager.resetStats()
+                    showingResetConfirmation = true
                 } label: {
                     Label("Reset All Statistics", systemImage: "trash")
                 }
@@ -148,6 +152,14 @@ struct StatsSettingsTab: View {
                 .padding(.top, 20)
             }
             .padding()
+        }
+        .alert("Reset All Statistics?", isPresented: $showingResetConfirmation) {
+            Button("Reset", role: .destructive) {
+                appState.statsManager.resetStats()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This permanently deletes all your usage statistics. This action cannot be undone.")
         }
     }
 

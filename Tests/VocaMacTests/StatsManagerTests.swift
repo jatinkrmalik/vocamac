@@ -220,4 +220,37 @@ final class StatsManagerTests: XCTestCase {
         XCTAssertEqual(statsManager.stats.totalTranscriptions, 0)
         XCTAssertEqual(statsManager.stats.totalWords, 0)
     }
+
+    @MainActor
+    func testWordCountHandlesSpacelessScripts() {
+        // Japanese has no word separators; a naive whitespace split counts it as 1.
+        let transcription = VocaTranscription(
+            text: "これはテストです",
+            duration: 1.0,
+            detectedLanguage: "ja",
+            audioLengthSeconds: 1.0,
+            modelUsed: .tiny
+        )
+
+        statsManager.recordTranscription(transcription)
+
+        XCTAssertGreaterThan(statsManager.stats.totalWords, 1, "Space-less scripts should be tokenized into multiple words")
+    }
+
+    func testStatsDecodeToleratesMissingAndUnknownKeys() throws {
+        // Simulates an older/newer stats.json: only one known key present, plus a
+        // now-removed legacy key. Decoding must not throw or wipe — missing keys
+        // fall back to defaults and unknown keys are ignored.
+        let json = Data("""
+        {"totalWords": 42, "dailyDurationSeconds": {"2024-01-01": 5.0}}
+        """.utf8)
+
+        let decoded = try JSONDecoder().decode(UserStats.self, from: json)
+
+        XCTAssertEqual(decoded.totalWords, 42)
+        XCTAssertEqual(decoded.totalTranscriptions, 0)
+        XCTAssertEqual(decoded.currentStreak, 0)
+        XCTAssertNil(decoded.lastUsageDate)
+        XCTAssertTrue(decoded.dailyWordCounts.isEmpty)
+    }
 }

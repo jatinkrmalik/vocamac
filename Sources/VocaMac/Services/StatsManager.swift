@@ -18,11 +18,15 @@ class StatsManager: StatsManaging, ObservableObject {
     private let statsFileURL: URL
     private let calendar: Calendar
 
+    /// Serial queue for off-main disk writes so recording never blocks the UI.
+    private let saveQueue = DispatchQueue(label: "com.vocamac.stats.save", qos: .utility)
+
     init(statsFileURL: URL? = nil, calendar: Calendar = .current) {
         if let statsFileURL {
             self.statsFileURL = statsFileURL
         } else {
-            let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+            let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+                ?? FileManager.default.temporaryDirectory
             let vMacDir = appSupport.appendingPathComponent("VocaMac", isDirectory: true)
 
             // Ensure directory exists
@@ -50,12 +54,23 @@ class StatsManager: StatsManaging, ObservableObject {
     }
 
     private func saveStats() {
+        // Encode on the main actor (cheap, tiny payload), then write off-main so a
+        // busy disk can't hitch the UI. The serial queue preserves write ordering.
+        let data: Data
         do {
-            let data = try JSONEncoder().encode(stats)
-            try data.write(to: statsFileURL, options: .atomic)
-            VocaLogger.debug(.general, "User stats saved to disk")
+            data = try JSONEncoder().encode(stats)
         } catch {
-            VocaLogger.error(.general, "Failed to save stats: \(error.localizedDescription)")
+            VocaLogger.error(.general, "Failed to encode stats: \(error.localizedDescription)")
+            return
+        }
+        let url = statsFileURL
+        saveQueue.async {
+            do {
+                try data.write(to: url, options: .atomic)
+                VocaLogger.debug(.general, "User stats saved to disk")
+            } catch {
+                VocaLogger.error(.general, "Failed to save stats: \(error.localizedDescription)")
+            }
         }
     }
 
@@ -63,10 +78,12 @@ class StatsManager: StatsManaging, ObservableObject {
         let text = transcription.text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
 
-        // Estimate word count
-        let words = text.components(separatedBy: .whitespacesAndNewlines)
-            .filter { !$0.isEmpty }
-            .count
+        // Count words using the system tokenizer so space-less scripts
+        // (Chinese, Japanese, Thai, …) aren't undercounted as a single word.
+        var words = 0
+        text.enumerateSubstrings(in: text.startIndex..<text.endIndex, options: .byWords) { _, _, _, _ in
+            words += 1
+        }
 
         let dateKey = dayKey(for: transcription.timestamp)
 
@@ -77,7 +94,6 @@ class StatsManager: StatsManaging, ObservableObject {
 
         // Update daily stats
         stats.dailyWordCounts[dateKey, default: 0] += words
-        stats.dailyDurationSeconds[dateKey, default: 0] += transcription.audioLengthSeconds
 
         // Update streaks
         updateStreaks(currentDate: transcription.timestamp)
