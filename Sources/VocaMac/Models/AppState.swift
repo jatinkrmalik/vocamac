@@ -108,6 +108,7 @@ final class AppState: ObservableObject {
     @AppStorage("vocamac.soundEffectsEnabled") var soundEffectsEnabled: Bool = true
     @AppStorage("vocamac.showCursorIndicator") var showCursorIndicator: Bool = true
     @AppStorage("vocamac.translationEnabled") var translationEnabled: Bool = false
+    @AppStorage("vocamac.customVocabulary") var customVocabulary: String = ""
     @AppStorage("vocamac.logLevel") var logLevel: String = "info"
 
     private var hotKeySafetyTimeout: Double {
@@ -593,7 +594,8 @@ final class AppState: ObservableObject {
             let result = try await whisperService.transcribe(
                 audioData: audioData,
                 language: language,
-                translate: translationEnabled
+                translate: translationEnabled,
+                vocabulary: customVocabulary
             )
 
             lastTranscription = result

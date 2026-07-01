@@ -129,7 +129,7 @@ extension ModelManaging {
 protocol SpeechTranscribing: AnyObject {
     var loadedModelName: String? { get }
     var isModelLoaded: Bool { get }
-    func transcribe(audioData: [Float], language: String?, translate: Bool) async throws -> VocaTranscription
+    func transcribe(audioData: [Float], language: String?, translate: Bool, vocabulary: String) async throws -> VocaTranscription
     func _loadModel(name: String?, folder: URL?, onPhaseChange: ((String) -> Void)?) async throws
 }
 

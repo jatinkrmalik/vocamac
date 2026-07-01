@@ -136,11 +136,14 @@ final class WhisperService: @unchecked Sendable {
     ///   - audioData: Array of Float32 PCM samples at 16kHz mono
     ///   - language: ISO 639-1 language code (e.g., "en"), or nil for auto-detection
     ///   - translate: Whether to translate to English (if true) or transcribe as-is (if false)
+    ///   - vocabulary: Custom terms (newline/comma separated) to bias transcription toward,
+    ///     e.g. proper nouns and jargon like names. Empty string disables it.
     /// - Returns: VocaTranscription with the transcribed text and metadata
     func transcribe(
         audioData: [Float],
         language: String? = nil,
-        translate: Bool = false
+        translate: Bool = false,
+        vocabulary: String = ""
     ) async throws -> VocaTranscription {
         guard let kit = whisperKit else {
             throw WhisperError.modelNotLoaded
@@ -155,15 +158,23 @@ final class WhisperService: @unchecked Sendable {
 
         let startTime = CFAbsoluteTimeGetCurrent()
 
+        // Encode the user's custom vocabulary into conditioning tokens so the
+        // model biases toward their proper nouns / jargon (e.g. names like
+        // "Namrata"). WhisperKit only applies promptTokens when usePrefillPrompt
+        // is true, so we force it on whenever vocabulary is present — otherwise
+        // the terms would be silently ignored in auto-detect mode.
+        let promptTokens = Self.promptTokens(for: vocabulary, tokenizer: kit.tokenizer)
+
         // Configure decoding options — optimized for low latency dictation
         let options = DecodingOptions(
             task: translate ? .translate : .transcribe,
             language: language,
             temperature: 0.0,
             temperatureFallbackCount: 0,  // No fallback for speed
-            usePrefillPrompt: language != nil,
+            usePrefillPrompt: language != nil || promptTokens != nil,
             detectLanguage: language == nil,
             wordTimestamps: false,
+            promptTokens: promptTokens,
             chunkingStrategy: nil  // No chunking for short dictation clips
         )
 
@@ -250,6 +261,30 @@ final class WhisperService: @unchecked Sendable {
         // Collapse multiple spaces left behind by removed tokens
         cleaned = cleaned.replacingOccurrences(of: "  +", with: " ", options: .regularExpression)
         return cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    // MARK: - Custom Vocabulary
+
+    /// Parse a raw vocabulary string into individual terms. Terms are separated
+    /// by newlines or commas; surrounding whitespace and blank entries are dropped.
+    static func vocabularyTerms(from vocabulary: String) -> [String] {
+        vocabulary
+            .split(whereSeparator: { $0 == "\n" || $0 == "," })
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+    }
+
+    /// Encode custom vocabulary into WhisperKit conditioning tokens.
+    /// Returns nil when there are no terms or the tokenizer isn't ready yet.
+    /// Framed as a "Glossary:" prompt, which nudges Whisper to treat the terms
+    /// as domain vocabulary without confusing it about the audio. WhisperKit
+    /// trims to its own token budget and strips special tokens internally.
+    private static func promptTokens(for vocabulary: String, tokenizer: WhisperTokenizer?) -> [Int]? {
+        guard let tokenizer else { return nil }
+        let terms = vocabularyTerms(from: vocabulary)
+        guard !terms.isEmpty else { return nil }
+        let tokens = tokenizer.encode(text: "Glossary: " + terms.joined(separator: ", "))
+        return tokens.isEmpty ? nil : tokens
     }
 
     /// Map a model name string to our ModelSize enum

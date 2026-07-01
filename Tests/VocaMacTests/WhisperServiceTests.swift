@@ -66,3 +66,26 @@ final class WhisperServiceHallucinationTests: XCTestCase {
         XCTAssertEqual(result, "", "Should return empty after filtering and trimming")
     }
 }
+
+// MARK: - WhisperService Custom Vocabulary Tests
+
+final class WhisperServiceVocabularyTests: XCTestCase {
+
+    func testEmptyStringYieldsNoTerms() {
+        XCTAssertEqual(WhisperService.vocabularyTerms(from: ""), [])
+        XCTAssertEqual(WhisperService.vocabularyTerms(from: "   \n  \n"), [])
+    }
+
+    func testSplitsOnNewlinesAndCommas() {
+        let input = "Namrata\nKubernetes, kubectl\n  etcd  "
+        XCTAssertEqual(
+            WhisperService.vocabularyTerms(from: input),
+            ["Namrata", "Kubernetes", "kubectl", "etcd"]
+        )
+    }
+
+    func testDropsBlankEntries() {
+        let input = "Namrata,,\n\n, ,VocaMac"
+        XCTAssertEqual(WhisperService.vocabularyTerms(from: input), ["Namrata", "VocaMac"])
+    }
+}
