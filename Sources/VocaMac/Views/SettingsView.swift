@@ -157,7 +157,7 @@ struct GeneralSettingsTab: View {
                     .frame(minHeight: 90)
                     .overlay(alignment: .topLeading) {
                         if appState.customVocabulary.isEmpty {
-                            Text("Namrata\nKubernetes\nVocaMac")
+                            Text("kubectl, PostgreSQL, nginx, Grafana")
                                 .foregroundStyle(.tertiary)
                                 .padding(.top, 8)
                                 .padding(.leading, 5)
