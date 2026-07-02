@@ -38,7 +38,7 @@
     <meta name="theme-color" content="#FFFFFF">
 
     <!-- Open Graph -->
-    <meta property="og:type" content="website">
+    <meta property="og:type" content="{{ if .IsHome }}website{{ else }}article{{ end }}">
     <meta property="og:url" content="{{ .Permalink }}">
     <meta property="og:title" content="{{ if .IsHome }}VocaMac - 100% Local Voice-to-Text for macOS{{ else }}{{ .Title }} | VocaMac{{ end }}">
     <meta property="og:description" content="{{ with .Params.description }}{{ . }}{{ else }}{{ .Site.Params.description }}{{ end }}">
