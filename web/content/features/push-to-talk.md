@@ -38,8 +38,11 @@ VocaMac supports a wide range of hotkeys for Push-to-Talk activation:
 - **Left Option (⌥)** - if you prefer the left side
 - **Right Command (⌘)** - for Command-key enthusiasts
 - **Right Shift (⇧)** - another good ergonomic choice
+- **Right Control (⌃)** - a comfortable reach for many keyboards
 - **Function keys (F5-F12)** - if you prefer dedicated keys
 - **Fn key** - the function key itself
+
+Want a key that isn't in the list? Click **Record** next to the preset picker and press any key — VocaMac captures it and shows it as your "Custom" key (press Escape to cancel). While VocaMac is running, that key is reserved for activation.
 
 You can change your hotkey anytime in **Settings → General → Activation Key**.
 

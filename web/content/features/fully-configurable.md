@@ -16,9 +16,9 @@ Every major aspect of VocaMac can be customized. Hotkeys, audio behavior, transc
 
 ## Hotkey Configuration
 
-Your hotkey is how you activate VocaMac. The app respects your preference for how you work and lets you choose exactly which key combination suits your workflow best.
+Your hotkey is how you activate VocaMac. The app respects how you work and lets you pick the single activation key that suits you best.
 
-Maybe you prefer Control-Space. Perhaps Command-Shift-L feels more natural. You might want something completely different. The settings window presents a simple, elegant hotkey selector. Click, press the keys you want to use, and you're done.
+Start from a preset — Right Option, Left Option, Right Command, Right Shift, Right Control, Fn, or a function key (F5–F12). Prefer something else? Click **Record**, press any key, and VocaMac captures it (press Escape to cancel). Your choice shows up as a "Custom" key, and while VocaMac is running that key is reserved for activation.
 
 The hotkey works from anywhere on your Mac. Launch VocaMac from Mail, from Slack, from a web browser, or from any application. As long as VocaMac is running, your hotkey is active and ready.
 
@@ -40,7 +40,7 @@ Set the silence detection threshold to match your environment. In a quiet office
 
 Configure the maximum recording duration. If you prefer shorter bursts of dictation, set a reasonable limit. The app will automatically stop recording when you reach it, preventing accidental marathon recording sessions.
 
-Choose your audio input device. If you use an external microphone, a USB headset, or an AirPods Pro, select it directly from the settings. VocaMac remembers your choice and uses it every time.
+Choose your audio input device. Leave it on **System Default** to follow macOS, or pin VocaMac to a specific microphone — an external mic, a USB headset, or AirPods Pro. Pinning is non-invasive: VocaMac uses your chosen device without changing the system-wide default for other apps. If that device disconnects, VocaMac falls back to System Default automatically and resumes using it when the device reconnects. Plugged something in? Hit **Refresh Devices** to update the list.
 
 ## Language and Transcription Settings
 
