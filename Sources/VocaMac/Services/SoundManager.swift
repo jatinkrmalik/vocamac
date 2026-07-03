@@ -22,6 +22,9 @@ final class SoundManager: NSObject, NSSoundDelegate, @unchecked Sendable {
     /// Volume for sound effects (0.0 to 1.0)
     var volume: Float = 0.5
 
+    /// Queue used because NSSound can block while Core Audio wakes or fails.
+    private let soundQueue = DispatchQueue(label: "com.vocamac.sound-playback", qos: .utility)
+
     /// Lock for thread-safe access to continuation
     private let continuationLock = NSLock()
 
@@ -58,13 +61,20 @@ final class SoundManager: NSObject, NSSoundDelegate, @unchecked Sendable {
 
     /// Play a macOS system sound by name (fire-and-forget)
     private func playSystemSound(_ name: String) {
-        let soundPath = "/System/Library/Sounds/\(name).aiff"
-        guard let sound = NSSound(contentsOfFile: soundPath, byReference: true) else {
-            VocaLogger.warning(.soundManager, "Could not load system sound: \(name)")
-            return
+        let volume = self.volume
+
+        soundQueue.async {
+            let soundPath = "/System/Library/Sounds/\(name).aiff"
+            guard let sound = NSSound(contentsOfFile: soundPath, byReference: true) else {
+                VocaLogger.warning(.soundManager, "Could not load system sound: \(name)")
+                return
+            }
+
+            sound.volume = volume
+            if !sound.play() {
+                VocaLogger.warning(.soundManager, "Could not play system sound: \(name)")
+            }
         }
-        sound.volume = volume
-        sound.play()
     }
 
     /// Play a system sound and wait for completion using async/await

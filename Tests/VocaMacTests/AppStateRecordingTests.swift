@@ -34,6 +34,43 @@ final class AppStateRecordingTests: XCTestCase {
                      "Error message should mention microphone")
     }
 
+    func testStartRecordingDoesNotBlockMainActorDuringAudioStart() async throws {
+        let (appState, mocks) = AppState.makeTestState()
+        mocks.audioEngine.startRecordingDelay = 0.3
+
+        let start = Date()
+        let task = Task {
+            await appState.startRecording()
+        }
+
+        await Task.yield()
+        try await Task.sleep(nanoseconds: 50_000_000)
+
+        XCTAssertLessThan(Date().timeIntervalSince(start), 0.2,
+                          "Core Audio startup should not block the main actor")
+
+        await task.value
+        XCTAssertEqual(appState.appStatus, .recording)
+    }
+
+    func testStartSoundIsNotPlayedIfRecordingStopsDuringAudioStart() async throws {
+        let (appState, mocks) = AppState.makeTestState()
+        mocks.audioEngine.startRecordingDelay = 0.3
+
+        let task = Task {
+            await appState.startRecording()
+        }
+
+        await Task.yield()
+        try await Task.sleep(nanoseconds: 50_000_000)
+        await appState.stopRecordingAndTranscribe()
+        await task.value
+
+        XCTAssertEqual(mocks.soundManager.startSoundCallCount, 0)
+        XCTAssertEqual(mocks.soundManager.stopSoundCallCount, 1)
+        XCTAssertEqual(appState.appStatus, .idle)
+    }
+
     func testStartRecordingInProcessingStateForceRecovers() async {
         let (appState, _) = AppState.makeTestState()
         appState.appStatus = .processing

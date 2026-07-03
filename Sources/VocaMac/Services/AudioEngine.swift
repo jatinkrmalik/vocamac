@@ -211,54 +211,67 @@ final class AudioEngine {
             self.maxDuration = maxDuration
 
             resetRecordingState()
-            _isCurrentlyRecording = true
 
-            let engine = acquireEngine()
-            let inputNode = engine.inputNode
-            configurePreferredInputDevice(preferredInputDeviceID, on: inputNode)
-            let inputFormat = inputNode.outputFormat(forBus: 0)
+            for attempt in 1...2 {
+                let engine = acquireEngine()
+                let inputNode = engine.inputNode
+                configurePreferredInputDevice(preferredInputDeviceID, on: inputNode)
+                let inputFormat = inputNode.outputFormat(forBus: 0)
 
-            guard isValidInputFormat(inputFormat) else {
-                VocaLogger.error(
-                    .audioEngine,
-                    "Invalid input format before recording start: sampleRate=\(inputFormat.sampleRate), channels=\(inputFormat.channelCount)"
-                )
-                recoverFromStartFailure(notifyAppState: true)
-                return false
-            }
-
-            // A previous failed start can leave a tap installed even when our
-            // recording flag is false. Remove any stale tap before installing a
-            // fresh one; otherwise AVAudioEngine raises an uncaught NSException.
-            removeInputTap(reason: "pre-start cleanup")
-
-            var startError: Error?
-            let exception = VocaObjCExceptionCatcher.catchException { [weak self] in
-                guard let self = self else { return }
-
-                inputNode.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { [weak self] buffer, _ in
-                    self?.processAudioBuffer(buffer, inputFormat: inputFormat)
+                guard isValidInputFormat(inputFormat) else {
+                    VocaLogger.error(
+                        .audioEngine,
+                        "Invalid input format before recording start: sampleRate=\(inputFormat.sampleRate), channels=\(inputFormat.channelCount)"
+                    )
+                    recoverFromStartFailure(notifyAppState: false)
+                    return false
                 }
 
-                do {
-                    try engine.start()
-                } catch {
-                    startError = error
+                // A previous failed start can leave a tap installed even when our
+                // recording flag is false. Remove any stale tap before installing a
+                // fresh one; otherwise AVAudioEngine raises an uncaught NSException.
+                removeInputTap(reason: "pre-start cleanup")
+
+                var startError: Error?
+                let exception = VocaObjCExceptionCatcher.catchException { [weak self] in
+                    guard let self = self else { return }
+
+                    inputNode.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { [weak self] buffer, _ in
+                        self?.processAudioBuffer(buffer, inputFormat: inputFormat)
+                    }
+
+                    do {
+                        try engine.start()
+                    } catch {
+                        startError = error
+                    }
                 }
+
+                if let exception {
+                    VocaLogger.error(.audioEngine, "AVAudioEngine exception while starting recording: \(exception.localizedDescription)")
+                    recoverFromStartFailure(notifyAppState: false)
+                    return false
+                }
+
+                if let startError {
+                    VocaLogger.error(
+                        .audioEngine,
+                        "Failed to start audio engine (attempt \(attempt)): \(Self.describeCoreAudioError(startError))"
+                    )
+                    recoverFromStartFailure(notifyAppState: false)
+
+                    if Self.shouldRetryStart(after: startError, attempt: attempt) {
+                        VocaLogger.warning(.audioEngine, "Retrying audio engine start after hardware-not-running error")
+                        continue
+                    }
+                    return false
+                }
+
+                _isCurrentlyRecording = true
+                return true
             }
 
-            if let exception {
-                VocaLogger.error(.audioEngine, "AVAudioEngine exception while starting recording: \(exception.localizedDescription)")
-                recoverFromStartFailure(notifyAppState: true)
-                return false
-            }
-
-            if let startError {
-                VocaLogger.error(.audioEngine, "Failed to start audio engine: \(startError.localizedDescription)")
-                recoverFromStartFailure(notifyAppState: true)
-                return false
-            }
-            return true
+            return false
         }
     }
 
@@ -385,6 +398,38 @@ final class AudioEngine {
     ) -> Bool {
         elapsedSinceRecordingStart >= 0
             && elapsedSinceRecordingStart <= recoveryWindow
+    }
+
+    static func shouldRetryStart(after error: Error, attempt: Int) -> Bool {
+        guard attempt == 1 else { return false }
+        return OSStatus(truncatingIfNeeded: (error as NSError).code) == kAudioHardwareNotRunningError
+    }
+
+    static func describeCoreAudioError(_ error: Error) -> String {
+        let nsError = error as NSError
+        var parts = [nsError.localizedDescription, "domain=\(nsError.domain)", "code=\(nsError.code)"]
+
+        if let fourCC = fourCharacterCode(forOSStatusCode: nsError.code) {
+            parts.append("'\(fourCC)'")
+        }
+
+        return parts.joined(separator: " ")
+    }
+
+    static func fourCharacterCode(forOSStatusCode code: Int) -> String? {
+        let value = UInt32(bitPattern: Int32(truncatingIfNeeded: code))
+        let bytes = [
+            UInt8((value >> 24) & 0xff),
+            UInt8((value >> 16) & 0xff),
+            UInt8((value >> 8) & 0xff),
+            UInt8(value & 0xff),
+        ]
+
+        guard bytes.allSatisfy({ $0 >= 32 && $0 <= 126 }) else {
+            return nil
+        }
+
+        return String(bytes: bytes, encoding: .ascii)
     }
 
     // MARK: - Audio Processing

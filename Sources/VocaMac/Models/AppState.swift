@@ -133,6 +133,30 @@ final class AppState: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private var hasStarted = false
 
+    /// AudioEngine serializes its own lifecycle internally; this wrapper makes
+    /// the intentional background handoff explicit for Dispatch's @Sendable API.
+    private struct AudioEngineWorker: @unchecked Sendable {
+        let audioEngine: AudioRecording
+
+        func startRecording(
+            silenceThreshold: Float,
+            silenceDuration: Double,
+            maxDuration: TimeInterval,
+            preferredInputDeviceID: String?
+        ) -> Bool {
+            audioEngine.startRecording(
+                silenceThreshold: silenceThreshold,
+                silenceDuration: silenceDuration,
+                maxDuration: maxDuration,
+                preferredInputDeviceID: preferredInputDeviceID
+            )
+        }
+
+        func stopRecording() -> [Float] {
+            audioEngine.stopRecording()
+        }
+    }
+
     /// Process-level flag that prevents performStartup from running more than
     /// once even when SwiftUI instantiates multiple AppState objects (which it
     /// does during MenuBarExtra scene setup). Instance-level `hasStarted` guards
@@ -539,7 +563,7 @@ final class AppState: ObservableObject {
         // Start recording immediately for instant responsiveness.
         // The start sound is played concurrently — any brief bleed into the
         // mic buffer is negligible and handled well by WhisperKit's noise model.
-        let didStartRecording = audioEngine.startRecording(
+        let didStartRecording = await startAudioEngine(
             silenceThreshold: Float(silenceThreshold),
             silenceDuration: silenceDuration,
             maxDuration: TimeInterval(maxRecordingDuration),
@@ -557,7 +581,7 @@ final class AppState: ObservableObject {
         }
 
         // Play start sound after mic is active (fire-and-forget)
-        if soundEffectsEnabled {
+        if soundEffectsEnabled && isRecording && appStatus == .recording {
             soundManager.playStartSound()
         }
     }
@@ -568,7 +592,7 @@ final class AppState: ObservableObject {
         // isRecording and appStatus may be out of sync).
         guard isRecording || appStatus == .recording else { return }
 
-        let audioData = audioEngine.stopRecording()
+        let audioData = await stopAudioEngine()
         isRecording = false
         audioLevel = 0.0
 
@@ -628,6 +652,35 @@ final class AppState: ObservableObject {
                     self?.appStatus = .idle
                     self?.errorMessage = nil
                 }
+            }
+        }
+    }
+
+    private func startAudioEngine(
+        silenceThreshold: Float,
+        silenceDuration: Double,
+        maxDuration: TimeInterval,
+        preferredInputDeviceID: String?
+    ) async -> Bool {
+        let worker = AudioEngineWorker(audioEngine: audioEngine)
+        return await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                let didStart = worker.startRecording(
+                    silenceThreshold: silenceThreshold,
+                    silenceDuration: silenceDuration,
+                    maxDuration: maxDuration,
+                    preferredInputDeviceID: preferredInputDeviceID
+                )
+                continuation.resume(returning: didStart)
+            }
+        }
+    }
+
+    private func stopAudioEngine() async -> [Float] {
+        let worker = AudioEngineWorker(audioEngine: audioEngine)
+        return await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                continuation.resume(returning: worker.stopRecording())
             }
         }
     }

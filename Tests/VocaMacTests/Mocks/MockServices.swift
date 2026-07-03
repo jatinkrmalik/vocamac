@@ -24,6 +24,7 @@ final class MockAudioEngine: AudioRecording {
     var stopRecordingResult: [Float] = []
     var forceResetCallCount = 0
     var startRecordingResult = true
+    var startRecordingDelay: TimeInterval = 0
 
     private var permissionStatus: PermissionStatus = .granted
 
@@ -34,6 +35,9 @@ final class MockAudioEngine: AudioRecording {
         maxDuration: TimeInterval,
         preferredInputDeviceID: String?
     ) -> Bool {
+        if startRecordingDelay > 0 {
+            Thread.sleep(forTimeInterval: startRecordingDelay)
+        }
         isCurrentlyRecording = startRecordingResult
         lastSilenceThreshold = silenceThreshold
         lastSilenceDuration = silenceDuration

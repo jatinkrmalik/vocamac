@@ -485,6 +485,30 @@ final class AudioEngineTests: XCTestCase {
     }
 }
 
+final class AudioEngineStartFailureTests: XCTestCase {
+
+    func testFourCharacterCodeDecodesHardwareNotRunningError() {
+        XCTAssertEqual(AudioEngine.fourCharacterCode(forOSStatusCode: 1937010544), "stop")
+    }
+
+    func testStartRetryOnlyAppliesToFirstHardwareNotRunningFailure() {
+        let hardwareNotRunning = NSError(domain: "com.apple.coreaudio.avfaudio", code: 1937010544)
+        let otherError = NSError(domain: "com.apple.coreaudio.avfaudio", code: -1)
+
+        XCTAssertTrue(AudioEngine.shouldRetryStart(after: hardwareNotRunning, attempt: 1))
+        XCTAssertFalse(AudioEngine.shouldRetryStart(after: hardwareNotRunning, attempt: 2))
+        XCTAssertFalse(AudioEngine.shouldRetryStart(after: otherError, attempt: 1))
+    }
+
+    func testCoreAudioErrorDescriptionIncludesFourCharacterCode() {
+        let error = NSError(domain: "com.apple.coreaudio.avfaudio", code: 1937010544)
+        let description = AudioEngine.describeCoreAudioError(error)
+
+        XCTAssertTrue(description.contains("code=1937010544"))
+        XCTAssertTrue(description.contains("'stop'"))
+    }
+}
+
 
 // MARK: - AudioEngine Force Reset Tests
 
@@ -568,17 +592,19 @@ final class AudioEngineForceResetTests: XCTestCase {
             "Engine should be idle after multiple force resets")
     }
 
-    func testIsCurrentlyRecordingReflectsState() {
+    func testIsCurrentlyRecordingReflectsState() throws {
         let engine = AudioEngine()
 
         XCTAssertFalse(engine.isCurrentlyRecording,
             "Engine should not be recording initially")
 
-        engine.startRecording(
+        let didStart = engine.startRecording(
             silenceThreshold: 0.01,
             silenceDuration: 999.0,
             maxDuration: 60.0
         )
+
+        try XCTSkipIf(!didStart, "No microphone available or Core Audio input could not start")
 
         // Allow engine to start
         let startExpectation = XCTestExpectation(description: "Recording started")
