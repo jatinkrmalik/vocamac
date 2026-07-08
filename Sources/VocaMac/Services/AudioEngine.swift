@@ -24,6 +24,13 @@ final class AudioEngine {
     private var _isCurrentlyRecording = false
     private let bufferQueue = DispatchQueue(label: "com.vocamac.audio-buffer", qos: .userInteractive)
     private let lifecycleQueue = DispatchQueue(label: "com.vocamac.audio-engine.lifecycle", qos: .userInitiated)
+    private var activeRecordingConfiguration: RecordingConfiguration?
+    private var recordingSessionID = 0
+    private var startupConfigurationChangeRecoveryAttempts = 0
+
+    static let startupConfigurationChangeRecoveryWindow: TimeInterval = 1.0
+    static let startupConfigurationChangeRestartDelay: TimeInterval = 0.2
+    static let maxStartupConfigurationChangeRecoveryAttempts = 2
 
     var isCurrentlyRecording: Bool {
         lifecycleQueue.sync { _isCurrentlyRecording }
@@ -63,6 +70,13 @@ final class AudioEngine {
     /// The engine is automatically stopped and reset when this happens.
     /// AppState should use this to recover from a stuck recording state.
     var onAudioDeviceChanged: (() -> Void)?
+
+    private struct RecordingConfiguration {
+        let silenceThreshold: Float
+        let silenceDuration: Double
+        let maxDuration: TimeInterval
+        let preferredInputDeviceID: String?
+    }
 
     // MARK: - Initialization
 
@@ -129,27 +143,27 @@ final class AudioEngine {
 
             let wasRecording = self._isCurrentlyRecording
 
+            if wasRecording, self.shouldTreatAsStartupConfigurationChange() {
+                if self.engine?.isRunning == true {
+                    VocaLogger.info(.audioEngine, "Ignoring startup audio configuration change because the engine is still running")
+                    return
+                }
+
+                if self.restartAfterStartupConfigurationChangeIfPossible() {
+                    return
+                }
+            }
+
             if wasRecording {
                 VocaLogger.warning(.audioEngine, "Configuration changed while recording — forcing stop and reset")
-                // Tear down the stale recording state
-                self._isCurrentlyRecording = false
-                self.silenceCallbackFired = false
-                self.maxDurationCallbackFired = false
-                self.removeInputTap(reason: "audio configuration change")
-                self.engine?.stop()
+                self.stopAfterConfigurationChange()
+                return
             }
 
             // Drop the engine entirely so the next recording starts from a
             // clean instance bound to the new default device.
             self.releaseEngine()
             VocaLogger.info(.audioEngine, "Audio engine released after configuration change")
-
-            if wasRecording {
-                // Notify AppState on the main queue so it can handle the interrupted recording
-                DispatchQueue.main.async { [weak self] in
-                    self?.onAudioDeviceChanged?()
-                }
-            }
         }
     }
 
@@ -196,55 +210,23 @@ final class AudioEngine {
         lifecycleQueue.sync {
             guard !self._isCurrentlyRecording else { return true }
 
-            self.silenceThreshold = silenceThreshold
-            self.silenceDuration = silenceDuration
-            self.maxDuration = maxDuration
+            let configuration = RecordingConfiguration(
+                silenceThreshold: silenceThreshold,
+                silenceDuration: silenceDuration,
+                maxDuration: maxDuration,
+                preferredInputDeviceID: preferredInputDeviceID
+            )
+            self.silenceThreshold = configuration.silenceThreshold
+            self.silenceDuration = configuration.silenceDuration
+            self.maxDuration = configuration.maxDuration
 
             resetRecordingState()
+            activeRecordingConfiguration = configuration
+            startupConfigurationChangeRecoveryAttempts = 0
+            recordingSessionID &+= 1
             _isCurrentlyRecording = true
 
-            let engine = acquireEngine()
-            let inputNode = engine.inputNode
-            configurePreferredInputDevice(preferredInputDeviceID, on: inputNode)
-            let inputFormat = inputNode.outputFormat(forBus: 0)
-
-            guard isValidInputFormat(inputFormat) else {
-                VocaLogger.error(
-                    .audioEngine,
-                    "Invalid input format before recording start: sampleRate=\(inputFormat.sampleRate), channels=\(inputFormat.channelCount)"
-                )
-                recoverFromStartFailure(notifyAppState: true)
-                return false
-            }
-
-            // A previous failed start can leave a tap installed even when our
-            // recording flag is false. Remove any stale tap before installing a
-            // fresh one; otherwise AVAudioEngine raises an uncaught NSException.
-            removeInputTap(reason: "pre-start cleanup")
-
-            var startError: Error?
-            let exception = VocaObjCExceptionCatcher.catchException { [weak self] in
-                guard let self = self else { return }
-
-                inputNode.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { [weak self] buffer, _ in
-                    self?.processAudioBuffer(buffer, inputFormat: inputFormat)
-                }
-
-                do {
-                    try engine.start()
-                } catch {
-                    startError = error
-                }
-            }
-
-            if let exception {
-                VocaLogger.error(.audioEngine, "AVAudioEngine exception while starting recording: \(exception.localizedDescription)")
-                recoverFromStartFailure(notifyAppState: true)
-                return false
-            }
-
-            if let startError {
-                VocaLogger.error(.audioEngine, "Failed to start audio engine: \(startError.localizedDescription)")
+            guard startEngineCapture(using: configuration) else {
                 recoverFromStartFailure(notifyAppState: true)
                 return false
             }
@@ -259,6 +241,9 @@ final class AudioEngine {
             guard _isCurrentlyRecording else { return [] }
 
             _isCurrentlyRecording = false
+            activeRecordingConfiguration = nil
+            startupConfigurationChangeRecoveryAttempts = 0
+            recordingSessionID &+= 1
             removeInputTap(reason: "stop recording")
             engine?.stop()
 
@@ -283,6 +268,9 @@ final class AudioEngine {
             _isCurrentlyRecording = false
             silenceCallbackFired = false
             maxDurationCallbackFired = false
+            activeRecordingConfiguration = nil
+            startupConfigurationChangeRecoveryAttempts = 0
+            recordingSessionID &+= 1
 
             removeInputTap(reason: "force reset")
             engine?.stop()
@@ -330,6 +318,55 @@ final class AudioEngine {
         format.sampleRate.isFinite && format.sampleRate > 0 && format.channelCount > 0
     }
 
+    /// Starts the AVAudioEngine for an already-created logical recording session.
+    /// Must be called on `lifecycleQueue`.
+    private func startEngineCapture(using configuration: RecordingConfiguration) -> Bool {
+        let engine = acquireEngine()
+        let inputNode = engine.inputNode
+        configurePreferredInputDevice(configuration.preferredInputDeviceID, on: inputNode)
+        let inputFormat = inputNode.outputFormat(forBus: 0)
+
+        guard isValidInputFormat(inputFormat) else {
+            VocaLogger.error(
+                .audioEngine,
+                "Invalid input format before recording start: sampleRate=\(inputFormat.sampleRate), channels=\(inputFormat.channelCount)"
+            )
+            return false
+        }
+
+        // A previous failed start can leave a tap installed even when our
+        // recording flag is false. Remove any stale tap before installing a
+        // fresh one; otherwise AVAudioEngine raises an uncaught NSException.
+        removeInputTap(reason: "pre-start cleanup")
+
+        var startError: Error?
+        let exception = VocaObjCExceptionCatcher.catchException { [weak self] in
+            guard let self = self else { return }
+
+            inputNode.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { [weak self] buffer, _ in
+                self?.processAudioBuffer(buffer, inputFormat: inputFormat)
+            }
+
+            do {
+                try engine.start()
+            } catch {
+                startError = error
+            }
+        }
+
+        if let exception {
+            VocaLogger.error(.audioEngine, "AVAudioEngine exception while starting recording: \(exception.localizedDescription)")
+            return false
+        }
+
+        if let startError {
+            VocaLogger.error(.audioEngine, "Failed to start audio engine: \(startError.localizedDescription)")
+            return false
+        }
+
+        return true
+    }
+
     /// Removes the current input tap while converting AVFoundation NSExceptions
     /// into log messages instead of process aborts. No-op if the engine has
     /// already been released.
@@ -349,6 +386,9 @@ final class AudioEngine {
         _isCurrentlyRecording = false
         silenceCallbackFired = false
         maxDurationCallbackFired = false
+        activeRecordingConfiguration = nil
+        startupConfigurationChangeRecoveryAttempts = 0
+        recordingSessionID &+= 1
         removeInputTap(reason: "start failure")
         engine?.stop()
         engine?.reset()
@@ -363,6 +403,90 @@ final class AudioEngine {
             DispatchQueue.main.async { [weak self] in
                 self?.onAudioDeviceChanged?()
             }
+        }
+    }
+
+    /// Returns whether a configuration notification is close enough to recording
+    /// startup to be treated as device/profile setup churn instead of a live
+    /// device interruption.
+    static func shouldTreatAsStartupConfigurationChange(
+        elapsedSinceRecordingStart: TimeInterval,
+        recoveryWindow: TimeInterval = startupConfigurationChangeRecoveryWindow
+    ) -> Bool {
+        elapsedSinceRecordingStart >= 0
+            && elapsedSinceRecordingStart <= recoveryWindow
+    }
+
+    /// Bluetooth input devices often post a configuration change while the input
+    /// unit is switching into headset capture mode. Handle that locally so
+    /// AppState keeps the active recording instead of treating normal startup
+    /// as an unplug.
+    private func shouldTreatAsStartupConfigurationChange() -> Bool {
+        guard activeRecordingConfiguration != nil else { return false }
+
+        return Self.shouldTreatAsStartupConfigurationChange(
+            elapsedSinceRecordingStart: Date().timeIntervalSince(recordingStartTime)
+        )
+    }
+
+    /// Restarts the underlying AVAudioEngine without ending the logical recording.
+    /// Must be called on `lifecycleQueue`.
+    private func restartAfterStartupConfigurationChangeIfPossible() -> Bool {
+        guard let configuration = activeRecordingConfiguration,
+              startupConfigurationChangeRecoveryAttempts < Self.maxStartupConfigurationChangeRecoveryAttempts else {
+            return false
+        }
+
+        startupConfigurationChangeRecoveryAttempts += 1
+        let attempt = startupConfigurationChangeRecoveryAttempts
+        let sessionID = recordingSessionID
+
+        VocaLogger.warning(
+            .audioEngine,
+            "Configuration changed during recording startup — restarting audio engine without ending recording (attempt \(attempt))"
+        )
+
+        removeInputTap(reason: "startup audio configuration change")
+        engine?.stop()
+        engine?.reset()
+        releaseEngine()
+
+        lifecycleQueue.asyncAfter(deadline: .now() + Self.startupConfigurationChangeRestartDelay) { [weak self] in
+            guard let self = self else { return }
+            guard self._isCurrentlyRecording, self.recordingSessionID == sessionID else { return }
+
+            guard self.startEngineCapture(using: configuration) else {
+                VocaLogger.error(.audioEngine, "Failed to restart audio engine after startup configuration change")
+                self.recoverFromStartFailure(notifyAppState: true)
+                return
+            }
+
+            VocaLogger.info(.audioEngine, "Audio engine restarted after startup configuration change")
+        }
+
+        return true
+    }
+
+    /// Stops the logical recording after a non-startup configuration change and
+    /// notifies AppState so it can reset UI and hotkey state.
+    /// Must be called on `lifecycleQueue`.
+    private func stopAfterConfigurationChange() {
+        _isCurrentlyRecording = false
+        silenceCallbackFired = false
+        maxDurationCallbackFired = false
+        activeRecordingConfiguration = nil
+        startupConfigurationChangeRecoveryAttempts = 0
+        recordingSessionID &+= 1
+        removeInputTap(reason: "audio configuration change")
+        engine?.stop()
+
+        // Drop the engine entirely so the next recording starts from a
+        // clean instance bound to the new default device.
+        releaseEngine()
+        VocaLogger.info(.audioEngine, "Audio engine released after configuration change")
+
+        DispatchQueue.main.async { [weak self] in
+            self?.onAudioDeviceChanged?()
         }
     }
 
