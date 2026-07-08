@@ -601,27 +601,19 @@ final class AudioEngineForceResetTests: XCTestCase {
 
 final class AudioEngineDeviceChangeTests: XCTestCase {
 
-    func testStartupConfigurationChangeWindowIncludesEarlyElapsed() {
-        XCTAssertTrue(
-            AudioEngine.shouldTreatAsStartupConfigurationChange(elapsedSinceRecordingStart: 0.10),
-            "A configuration notification immediately after start should be treated as startup churn"
-        )
-    }
+    func testStartupConfigurationChangeWindow() {
+        let cases: [(elapsed: TimeInterval, expected: Bool)] = [
+            (0.10, true),
+            (AudioEngine.startupConfigurationChangeRecoveryWindow + 0.01, false),
+            (-0.01, false)
+        ]
 
-    func testStartupConfigurationChangeWindowRejectsLateElapsed() {
-        XCTAssertFalse(
-            AudioEngine.shouldTreatAsStartupConfigurationChange(
-                elapsedSinceRecordingStart: AudioEngine.startupConfigurationChangeRecoveryWindow + 0.01
-            ),
-            "Configuration changes after the startup window should use normal device-change recovery"
-        )
-    }
-
-    func testStartupConfigurationChangeWindowRejectsNegativeElapsed() {
-        XCTAssertFalse(
-            AudioEngine.shouldTreatAsStartupConfigurationChange(elapsedSinceRecordingStart: -0.01),
-            "Negative elapsed values are invalid and should not be treated as startup changes"
-        )
+        for testCase in cases {
+            XCTAssertEqual(
+                AudioEngine.shouldTreatAsStartupConfigurationChange(elapsedSinceRecordingStart: testCase.elapsed),
+                testCase.expected
+            )
+        }
     }
 
     func testOnAudioDeviceChangedCallbackExists() {
