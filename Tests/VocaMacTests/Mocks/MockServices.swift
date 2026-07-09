@@ -404,11 +404,22 @@ final class MockTextInjector: TextInjecting {
 // MARK: - MockTextPostProcessor
 
 final class MockTextPostProcessor: TextPostProcessing {
+    var prepareCallCount = 0
     var improveCallCount = 0
+    var lastPrepareConfiguration: TextPostProcessingConfiguration?
     var lastText: String?
     var lastConfiguration: TextPostProcessingConfiguration?
     var result = "processed text"
     var error: Error?
+    var prepareError: Error?
+
+    func prepare(configuration: TextPostProcessingConfiguration) async throws {
+        prepareCallCount += 1
+        lastPrepareConfiguration = configuration
+        if let prepareError {
+            throw prepareError
+        }
+    }
 
     func improve(_ text: String, configuration: TextPostProcessingConfiguration) async throws -> String {
         improveCallCount += 1
@@ -456,6 +467,7 @@ extension AppState {
         UserDefaults.standard.removeObject(forKey: "vocamac.selectedAudioDeviceName")
         UserDefaults.standard.removeObject(forKey: "vocamac.postProcessingEnabled")
         UserDefaults.standard.removeObject(forKey: "vocamac.postProcessingRunnerPath")
+        UserDefaults.standard.removeObject(forKey: "vocamac.postProcessingModelID")
         UserDefaults.standard.removeObject(forKey: "vocamac.postProcessingModelPath")
         UserDefaults.standard.removeObject(forKey: "vocamac.postProcessingInstructions")
 

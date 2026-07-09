@@ -5,12 +5,48 @@
 
 import Foundation
 
+struct LocalLLMModel: Identifiable, Equatable {
+    static let recommendedID = "qwen3-1.7b-q8"
+    static let customID = "custom-gguf"
+
+    let id: String
+    let displayName: String
+    let detail: String
+    let reference: String?
+
+    static let catalog: [LocalLLMModel] = [
+        LocalLLMModel(
+            id: recommendedID,
+            displayName: "Qwen3 1.7B",
+            detail: "Best quality, 1.83 GB",
+            reference: "Qwen/Qwen3-1.7B-GGUF:Q8_0"
+        ),
+        LocalLLMModel(
+            id: "gemma-3-1b-q4",
+            displayName: "Gemma 3 1B",
+            detail: "Fast setup, 806 MB",
+            reference: "ggml-org/gemma-3-1b-it-GGUF:Q4_K_M"
+        ),
+        LocalLLMModel(
+            id: customID,
+            displayName: "Custom GGUF",
+            detail: "Use a local model file",
+            reference: nil
+        ),
+    ]
+
+    static func model(for id: String) -> LocalLLMModel {
+        catalog.first { $0.id == id } ?? catalog[0]
+    }
+}
+
 enum TextPostProcessingError: LocalizedError {
     case missingRunnerPath
     case missingModelPath
     case runnerNotExecutable(String)
     case modelNotFound(String)
-    case processFailed(Int32)
+    case homebrewNotFound
+    case processFailed(Int32, String)
     case timedOut
     case emptyOutput
 
@@ -24,8 +60,10 @@ enum TextPostProcessingError: LocalizedError {
             return "LLM runner is not executable: \(path)"
         case .modelNotFound(let path):
             return "LLM model was not found: \(path)"
-        case .processFailed(let code):
-            return "Local LLM exited with code \(code)."
+        case .homebrewNotFound:
+            return "Homebrew was not found. Install llama.cpp manually."
+        case .processFailed(let code, let details):
+            return details.isEmpty ? "Local LLM exited with code \(code)." : "Local LLM exited with code \(code): \(details)"
         case .timedOut:
             return "Local LLM timed out."
         case .emptyOutput:
@@ -35,19 +73,77 @@ enum TextPostProcessingError: LocalizedError {
 }
 
 final class LocalLLMPostProcessor: TextPostProcessing {
-    static let defaultRunnerPath = "/opt/homebrew/bin/llama-cli"
+    static let defaultRunnerPath = detectedRunnerPath() ?? "/opt/homebrew/bin/llama-cli"
     static let defaultInstructions = "Clean up dictation into polished text while preserving my meaning. Remove filler words, false starts, duplicate phrases, and obvious speech disfluencies. Fix punctuation and capitalization. Keep my tone concise and natural. Return only the final text."
+    static let installURL = URL(string: "https://github.com/ggml-org/llama.cpp")!
+
+    private static let runnerCandidates = [
+        "/opt/homebrew/bin/llama",
+        "/opt/homebrew/bin/llama-cli",
+        "/usr/local/bin/llama",
+        "/usr/local/bin/llama-cli",
+    ]
+
+    private static let brewCandidates = [
+        "/opt/homebrew/bin/brew",
+        "/usr/local/bin/brew",
+    ]
 
     private let timeout: TimeInterval
+    private let prepareTimeout: TimeInterval
 
-    init(timeout: TimeInterval = 60) {
+    init(timeout: TimeInterval = 60, prepareTimeout: TimeInterval = 600) {
         self.timeout = timeout
+        self.prepareTimeout = prepareTimeout
+    }
+
+    func prepare(configuration: TextPostProcessingConfiguration) async throws {
+        let timeout = prepareTimeout
+        _ = try await Task.detached(priority: .userInitiated) {
+            try Self.run(
+                "Reply with OK.",
+                configuration: configuration,
+                timeout: timeout,
+                maxTokens: 4
+            )
+        }.value
     }
 
     func improve(_ text: String, configuration: TextPostProcessingConfiguration) async throws -> String {
         let timeout = timeout
         return try await Task.detached(priority: .userInitiated) {
-            try Self.run(text, configuration: configuration, timeout: timeout)
+            try Self.run(
+                text,
+                configuration: configuration,
+                timeout: timeout,
+                maxTokens: 256
+            )
+        }.value
+    }
+
+    static func detectedRunnerPath() -> String? {
+        detectedRunnerPath(in: runnerCandidates)
+    }
+
+    static func detectedRunnerPath(in candidates: [String]) -> String? {
+        candidates.first { runnerExists(at: $0) }
+    }
+
+    static func detectedBrewPath() -> String? {
+        brewCandidates.first { FileManager.default.isExecutableFile(atPath: $0) }
+    }
+
+    static func runnerExists(at path: String) -> Bool {
+        FileManager.default.isExecutableFile(atPath: expandedPath(path))
+    }
+
+    static func installLlamaCpp() async throws -> String {
+        guard let brewPath = detectedBrewPath() else {
+            throw TextPostProcessingError.homebrewNotFound
+        }
+
+        return try await Task.detached(priority: .userInitiated) {
+            try installLlamaCpp(using: brewPath)
         }.value
     }
 
@@ -90,18 +186,14 @@ final class LocalLLMPostProcessor: TextPostProcessing {
     private static func run(
         _ text: String,
         configuration: TextPostProcessingConfiguration,
-        timeout: TimeInterval
+        timeout: TimeInterval,
+        maxTokens: Int
     ) throws -> String {
         let runnerPath = expandedPath(configuration.runnerPath)
-        let modelPath = expandedPath(configuration.modelPath)
 
         guard !runnerPath.isEmpty else { throw TextPostProcessingError.missingRunnerPath }
-        guard !modelPath.isEmpty else { throw TextPostProcessingError.missingModelPath }
         guard FileManager.default.isExecutableFile(atPath: runnerPath) else {
             throw TextPostProcessingError.runnerNotExecutable(runnerPath)
-        }
-        guard FileManager.default.fileExists(atPath: modelPath) else {
-            throw TextPostProcessingError.modelNotFound(modelPath)
         }
 
         let prompt = prompt(for: text, instructions: configuration.instructions)
@@ -110,11 +202,14 @@ final class LocalLLMPostProcessor: TextPostProcessing {
         let finished = DispatchSemaphore(value: 0)
 
         task.executableURL = URL(fileURLWithPath: runnerPath)
-        task.arguments = [
-            "-m", modelPath,
+        task.arguments = runnerCommandPrefix(for: runnerPath) + (try modelArguments(for: configuration)) + [
             "-p", prompt,
-            "-n", "256",
-            "--temp", "0.2",
+            "-n", "\(maxTokens)",
+            "-c", "2048",
+            "--temp", "0.3",
+            "--top-k", "20",
+            "--top-p", "0.8",
+            "--presence-penalty", "1.1",
             "--no-display-prompt",
         ]
         task.standardOutput = stdout
@@ -130,7 +225,7 @@ final class LocalLLMPostProcessor: TextPostProcessing {
 
         let data = stdout.fileHandleForReading.readDataToEndOfFile()
         guard task.terminationStatus == 0 else {
-            throw TextPostProcessingError.processFailed(task.terminationStatus)
+            throw TextPostProcessingError.processFailed(task.terminationStatus, "")
         }
 
         let output = String(data: data, encoding: .utf8) ?? ""
@@ -139,8 +234,52 @@ final class LocalLLMPostProcessor: TextPostProcessing {
         return cleaned
     }
 
-    private static func expandedPath(_ path: String) -> String {
+    static func modelArguments(for configuration: TextPostProcessingConfiguration) throws -> [String] {
+        let model = LocalLLMModel.model(for: configuration.modelID)
+        if let reference = model.reference {
+            return ["-hf", reference, "--jinja"]
+        }
+
+        let modelPath = expandedPath(configuration.customModelPath)
+        guard !modelPath.isEmpty else { throw TextPostProcessingError.missingModelPath }
+        guard FileManager.default.fileExists(atPath: modelPath) else {
+            throw TextPostProcessingError.modelNotFound(modelPath)
+        }
+        return ["-m", modelPath]
+    }
+
+    static func expandedPath(_ path: String) -> String {
         path.trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: #"^~(?=/|$)"#, with: NSHomeDirectory(), options: .regularExpression)
     }
+
+    private static func installLlamaCpp(using brewPath: String) throws -> String {
+        let task = Process()
+        let finished = DispatchSemaphore(value: 0)
+
+        task.executableURL = URL(fileURLWithPath: brewPath)
+        task.arguments = ["install", "llama.cpp"]
+        task.standardOutput = FileHandle.nullDevice
+        task.standardError = FileHandle.nullDevice
+        task.terminationHandler = { _ in finished.signal() }
+
+        try task.run()
+        guard finished.wait(timeout: .now() + 600) == .success else {
+            task.terminate()
+            throw TextPostProcessingError.timedOut
+        }
+
+        guard task.terminationStatus == 0 else {
+            throw TextPostProcessingError.processFailed(task.terminationStatus, "")
+        }
+        guard let runner = detectedRunnerPath() else {
+            throw TextPostProcessingError.runnerNotExecutable("llama.cpp installed, but no llama runner was found.")
+        }
+        return runner
+    }
+
+    private static func runnerCommandPrefix(for runnerPath: String) -> [String] {
+        URL(fileURLWithPath: runnerPath).lastPathComponent == "llama" ? ["cli"] : []
+    }
+
 }

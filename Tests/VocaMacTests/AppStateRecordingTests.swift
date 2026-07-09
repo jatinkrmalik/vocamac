@@ -297,7 +297,7 @@ final class AppStateRecordingTests: XCTestCase {
         )
         appState.postProcessingEnabled = true
         appState.postProcessingRunnerPath = "/mock/llama-cli"
-        appState.postProcessingModelPath = "/mock/qwen.gguf"
+        appState.postProcessingModelID = "gemma-3-1b-q4"
         appState.postProcessingInstructions = "Keep it concise."
         appState.isRecording = true
         appState.appStatus = .recording
@@ -308,10 +308,27 @@ final class AppStateRecordingTests: XCTestCase {
         XCTAssertEqual(postProcessor.improveCallCount, 1)
         XCTAssertEqual(postProcessor.lastText, "um email nam rata about the launch")
         XCTAssertEqual(postProcessor.lastConfiguration?.runnerPath, "/mock/llama-cli")
-        XCTAssertEqual(postProcessor.lastConfiguration?.modelPath, "/mock/qwen.gguf")
+        XCTAssertEqual(postProcessor.lastConfiguration?.modelID, "gemma-3-1b-q4")
         XCTAssertEqual(postProcessor.lastConfiguration?.instructions, "Keep it concise.")
         XCTAssertEqual(mocks.textInjector.lastInjectedText, "Email Namrata about the launch.")
         XCTAssertEqual(appState.lastTranscription?.text, "Email Namrata about the launch.")
+    }
+
+    func testPreparePostProcessingModelEnablesRewrite() async {
+        let postProcessor = MockTextPostProcessor()
+        let (appState, _) = AppState.makeTestState(textPostProcessor: postProcessor)
+        appState.postProcessingRunnerPath = "/bin/echo"
+        appState.postProcessingModelID = "gemma-3-1b-q4"
+        appState.postProcessingInstructions = "Keep it tidy."
+
+        await appState.preparePostProcessingModel()
+
+        XCTAssertEqual(postProcessor.prepareCallCount, 1)
+        XCTAssertEqual(postProcessor.lastPrepareConfiguration?.runnerPath, "/bin/echo")
+        XCTAssertEqual(postProcessor.lastPrepareConfiguration?.modelID, "gemma-3-1b-q4")
+        XCTAssertEqual(postProcessor.lastPrepareConfiguration?.instructions, "Keep it tidy.")
+        XCTAssertTrue(appState.postProcessingEnabled)
+        XCTAssertEqual(appState.postProcessingSetupMessage, "Gemma 3 1B ready.")
     }
 
     func testPostProcessingFailureInjectsRawText() async {

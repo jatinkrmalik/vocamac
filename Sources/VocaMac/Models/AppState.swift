@@ -90,6 +90,11 @@ final class AppState: ObservableObject {
     /// WhisperKit's recommended model for this device
     @Published var deviceRecommendedModel: String?
 
+    /// Local LLM setup status for the Text settings tab.
+    @Published var isInstallingLlamaCpp: Bool = false
+    @Published var isPreparingPostProcessingModel: Bool = false
+    @Published var postProcessingSetupMessage: String?
+
     // MARK: - User Settings (persisted via UserDefaults)
 
     @AppStorage("vocamac.hasCompletedOnboarding") var hasCompletedOnboarding: Bool = false
@@ -111,6 +116,7 @@ final class AppState: ObservableObject {
     @AppStorage("vocamac.customVocabulary") var customVocabulary: String = ""
     @AppStorage("vocamac.postProcessingEnabled") var postProcessingEnabled: Bool = false
     @AppStorage("vocamac.postProcessingRunnerPath") var postProcessingRunnerPath: String = LocalLLMPostProcessor.defaultRunnerPath
+    @AppStorage("vocamac.postProcessingModelID") var postProcessingModelID: String = LocalLLMModel.recommendedID
     @AppStorage("vocamac.postProcessingModelPath") var postProcessingModelPath: String = ""
     @AppStorage("vocamac.postProcessingInstructions") var postProcessingInstructions: String = LocalLLMPostProcessor.defaultInstructions
     @AppStorage("vocamac.logLevel") var logLevel: String = "info"
@@ -416,6 +422,8 @@ final class AppState: ObservableObject {
 
         // Check permissions
         checkPermissions()
+
+        refreshPostProcessingRunner()
     }
 
     /// Build the model list shown in Settings and onboarding.
@@ -647,7 +655,8 @@ final class AppState: ObservableObject {
                         finalText,
                         configuration: TextPostProcessingConfiguration(
                             runnerPath: postProcessingRunnerPath,
-                            modelPath: postProcessingModelPath,
+                            modelID: postProcessingModelID,
+                            customModelPath: postProcessingModelPath,
                             instructions: postProcessingInstructions
                         )
                     )
@@ -730,6 +739,59 @@ final class AppState: ObservableObject {
             DispatchQueue.global(qos: .userInitiated).async {
                 continuation.resume(returning: worker.stopRecording())
             }
+        }
+    }
+
+    // MARK: - Local AI Post-processing
+
+    func refreshPostProcessingRunner() {
+        guard !LocalLLMPostProcessor.runnerExists(at: postProcessingRunnerPath),
+              let detected = LocalLLMPostProcessor.detectedRunnerPath() else {
+            return
+        }
+
+        postProcessingRunnerPath = detected
+    }
+
+    func installLlamaCpp() async {
+        guard !isInstallingLlamaCpp else { return }
+
+        isInstallingLlamaCpp = true
+        postProcessingSetupMessage = "Installing llama.cpp…"
+        defer { isInstallingLlamaCpp = false }
+
+        do {
+            let runner = try await LocalLLMPostProcessor.installLlamaCpp()
+            postProcessingRunnerPath = runner
+            postProcessingSetupMessage = "llama.cpp ready."
+        } catch {
+            postProcessingSetupMessage = "Install failed: \(error.localizedDescription)"
+            VocaLogger.error(.textPostProcessor, postProcessingSetupMessage ?? "llama.cpp install failed")
+        }
+    }
+
+    func preparePostProcessingModel() async {
+        guard !isPreparingPostProcessingModel else { return }
+
+        refreshPostProcessingRunner()
+        isPreparingPostProcessingModel = true
+        postProcessingSetupMessage = "Preparing \(LocalLLMModel.model(for: postProcessingModelID).displayName)…"
+        defer { isPreparingPostProcessingModel = false }
+
+        do {
+            try await textPostProcessor.prepare(
+                configuration: TextPostProcessingConfiguration(
+                    runnerPath: postProcessingRunnerPath,
+                    modelID: postProcessingModelID,
+                    customModelPath: postProcessingModelPath,
+                    instructions: postProcessingInstructions
+                )
+            )
+            postProcessingEnabled = true
+            postProcessingSetupMessage = "\(LocalLLMModel.model(for: postProcessingModelID).displayName) ready."
+        } catch {
+            postProcessingSetupMessage = "Model setup failed: \(error.localizedDescription)"
+            VocaLogger.error(.textPostProcessor, postProcessingSetupMessage ?? "Model setup failed")
         }
     }
 

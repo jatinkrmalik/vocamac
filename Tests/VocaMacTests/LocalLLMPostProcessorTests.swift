@@ -30,4 +30,36 @@ final class LocalLLMPostProcessorTests: XCTestCase {
             "Email Namrata about the launch."
         )
     }
+
+    func testModelArgumentsUseHuggingFaceReferenceForCatalogModel() throws {
+        let config = TextPostProcessingConfiguration(
+            runnerPath: "/usr/bin/false",
+            modelID: "gemma-3-1b-q4",
+            customModelPath: "",
+            instructions: ""
+        )
+
+        XCTAssertEqual(
+            try LocalLLMPostProcessor.modelArguments(for: config),
+            ["-hf", "ggml-org/gemma-3-1b-it-GGUF:Q4_K_M", "--jinja"]
+        )
+    }
+
+    func testModelArgumentsValidateCustomModelPath() {
+        let config = TextPostProcessingConfiguration(
+            runnerPath: "/usr/bin/false",
+            modelID: LocalLLMModel.customID,
+            customModelPath: "/definitely/not/a/model.gguf",
+            instructions: ""
+        )
+
+        XCTAssertThrowsError(try LocalLLMPostProcessor.modelArguments(for: config))
+    }
+
+    func testDetectedRunnerPathUsesFirstExecutableCandidate() {
+        XCTAssertEqual(
+            LocalLLMPostProcessor.detectedRunnerPath(in: ["/definitely/missing", "/bin/echo"]),
+            "/bin/echo"
+        )
+    }
 }
