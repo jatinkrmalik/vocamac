@@ -1,11 +1,19 @@
-name: "Pull Request Labeler"
+name: "Issue and Pull Request Labeler"
 
 on:
+  issues:
+    types: [opened]
   pull_request_target:
-    types: [opened, synchronized, reopened]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
 
 jobs:
   labeler:
+    if: github.event_name == 'pull_request_target'
     permissions:
       contents: read
       pull-requests: write
@@ -16,3 +24,60 @@ jobs:
         with:
           repo-token: "${{ secrets.GITHUB_TOKEN }}"
           sync-labels: true
+
+  classify:
+    if: github.event.action == 'opened'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Classify issue or pull request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.issue.number || github.event.pull_request.number }}
+          TITLE: ${{ github.event.issue.title || github.event.pull_request.title }}
+          BODY: ${{ github.event.issue.body || github.event.pull_request.body }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          text="$(printf '%s\n%s' "$TITLE" "$BODY" | tr '[:upper:]' '[:lower:]')"
+          labels=()
+
+          matches() {
+            [[ "$text" =~ $1 ]]
+          }
+
+          if matches '(^|[^[:alnum:]])(bug|broken|crash|error|fail|failure|regression)([^[:alnum:]]|$)'; then
+            labels+=("bug")
+          elif matches '(^|[^[:alnum:]])(question|how do|how to|why)([^[:alnum:]]|$)'; then
+            labels+=("question")
+          elif matches '(^|[^[:alnum:]])(docs|documentation|readme)([^[:alnum:]]|$)'; then
+            labels+=("documentation")
+          elif matches '(^|[^[:alnum:]])(add|feature|enhancement|improve|support)([^[:alnum:]]|$)'; then
+            labels+=("enhancement")
+          fi
+
+          if matches '(^|[^[:alnum:]])(app|audio|dictation|hotkey|menu bar|microphone|swift|transcription|whisper)([^[:alnum:]]|$)'; then
+            labels+=("app")
+          fi
+          if matches '(^|[^[:alnum:]])(homepage|site|vocamac.com|web|website)([^[:alnum:]]|$)'; then
+            labels+=("web")
+          fi
+          if matches '(^|[^[:alnum:]])(docs|documentation|readme|release notes)([^[:alnum:]]|$)'; then
+            labels+=("docs")
+          fi
+          if matches '(^|[^[:alnum:]])(action|build|ci|release|test|workflow)([^[:alnum:]]|$)'; then
+            labels+=("ci")
+          fi
+
+          if [ "${#labels[@]}" -eq 0 ]; then
+            exit 0
+          fi
+
+          mapfile -t labels < <(printf '%s\n' "${labels[@]}" | sort -u)
+          fields=()
+          for label in "${labels[@]}"; do
+            fields+=(-f "labels[]=$label")
+          done
+
+          gh api "repos/$REPO/issues/$NUMBER/labels" --method POST "${fields[@]}"
