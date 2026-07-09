@@ -200,6 +200,8 @@ final class LocalLLMPostProcessor: TextPostProcessing {
         let task = Process()
         let stdout = Pipe()
         let finished = DispatchSemaphore(value: 0)
+        let outputRead = DispatchSemaphore(value: 0)
+        var outputData = Data()
 
         task.executableURL = URL(fileURLWithPath: runnerPath)
         task.arguments = runnerCommandPrefix(for: runnerPath) + (try modelArguments(for: configuration)) + [
@@ -212,23 +214,29 @@ final class LocalLLMPostProcessor: TextPostProcessing {
             "--presence-penalty", "1.1",
             "--no-display-prompt",
         ]
+        task.standardInput = FileHandle.nullDevice
         task.standardOutput = stdout
         task.standardError = FileHandle.nullDevice
         task.terminationHandler = { _ in finished.signal() }
 
         try task.run()
 
+        DispatchQueue.global(qos: .utility).async {
+            outputData = stdout.fileHandleForReading.readDataToEndOfFile()
+            outputRead.signal()
+        }
+
         guard finished.wait(timeout: .now() + timeout) == .success else {
             task.terminate()
             throw TextPostProcessingError.timedOut
         }
 
-        let data = stdout.fileHandleForReading.readDataToEndOfFile()
+        outputRead.wait()
         guard task.terminationStatus == 0 else {
             throw TextPostProcessingError.processFailed(task.terminationStatus, "")
         }
 
-        let output = String(data: data, encoding: .utf8) ?? ""
+        let output = String(data: outputData, encoding: .utf8) ?? ""
         let cleaned = cleanedOutput(output, prompt: prompt)
         guard !cleaned.isEmpty else { throw TextPostProcessingError.emptyOutput }
         return cleaned

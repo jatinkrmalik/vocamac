@@ -62,4 +62,31 @@ final class LocalLLMPostProcessorTests: XCTestCase {
             "/bin/echo"
         )
     }
+
+    func testPrepareDrainsChattyRunnerOutput() async throws {
+        let scriptURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("vocamac-chatty-runner-\(UUID().uuidString).sh")
+        defer { try? FileManager.default.removeItem(at: scriptURL) }
+        let script = """
+        #!/bin/sh
+        i=0
+        while [ "$i" -lt 5000 ]; do
+          printf 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\\n'
+          i=$((i + 1))
+        done
+        printf 'OK\\n'
+        """
+        try script.write(to: scriptURL, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: scriptURL.path)
+
+        let processor = LocalLLMPostProcessor(prepareTimeout: 2)
+        try await processor.prepare(
+            configuration: TextPostProcessingConfiguration(
+                runnerPath: scriptURL.path,
+                modelID: "gemma-3-1b-q4",
+                customModelPath: "",
+                instructions: ""
+            )
+        )
+    }
 }

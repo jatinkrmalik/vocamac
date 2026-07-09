@@ -774,21 +774,22 @@ final class AppState: ObservableObject {
         guard !isPreparingPostProcessingModel else { return }
 
         refreshPostProcessingRunner()
+        let model = LocalLLMModel.model(for: postProcessingModelID)
         isPreparingPostProcessingModel = true
-        postProcessingSetupMessage = "Preparing \(LocalLLMModel.model(for: postProcessingModelID).displayName)…"
+        postProcessingSetupMessage = "Preparing \(model.displayName). First setup can take a few minutes…"
         defer { isPreparingPostProcessingModel = false }
 
         do {
             try await textPostProcessor.prepare(
                 configuration: TextPostProcessingConfiguration(
                     runnerPath: postProcessingRunnerPath,
-                    modelID: postProcessingModelID,
+                    modelID: model.id,
                     customModelPath: postProcessingModelPath,
                     instructions: postProcessingInstructions
                 )
             )
             postProcessingEnabled = true
-            postProcessingSetupMessage = "\(LocalLLMModel.model(for: postProcessingModelID).displayName) ready."
+            postProcessingSetupMessage = "\(model.displayName) ready."
         } catch {
             postProcessingSetupMessage = "Model setup failed: \(error.localizedDescription)"
             VocaLogger.error(.textPostProcessor, postProcessingSetupMessage ?? "Model setup failed")

@@ -141,10 +141,13 @@ struct TextSettingsTab: View {
         LocalLLMPostProcessor.detectedBrewPath() != nil
     }
 
+    private var isPostProcessingSetupBusy: Bool {
+        appState.isPreparingPostProcessingModel || appState.isInstallingLlamaCpp
+    }
+
     private var canPrepareModel: Bool {
         runnerReady &&
-        !appState.isPreparingPostProcessingModel &&
-        !appState.isInstallingLlamaCpp &&
+        !isPostProcessingSetupBusy &&
         (selectedModel.reference != nil || !appState.postProcessingModelPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
     }
 
@@ -211,27 +214,32 @@ struct TextSettingsTab: View {
                         Text("\(model.displayName) - \(model.detail)").tag(model.id)
                     }
                 }
+                .disabled(isPostProcessingSetupBusy)
 
                 if selectedModel.id == LocalLLMModel.customID {
                     HStack {
                         TextField("GGUF model path", text: $appState.postProcessingModelPath)
                             .textFieldStyle(.roundedBorder)
+                            .disabled(isPostProcessingSetupBusy)
                         Button {
                             chooseFile { appState.postProcessingModelPath = $0 }
                         } label: {
                             Label("Choose", systemImage: "folder")
                         }
+                        .disabled(isPostProcessingSetupBusy)
                     }
                 }
 
                 HStack {
                     TextField("llama runner path", text: $appState.postProcessingRunnerPath)
                         .textFieldStyle(.roundedBorder)
+                        .disabled(isPostProcessingSetupBusy)
                     Button {
                         chooseFile { appState.postProcessingRunnerPath = $0 }
                     } label: {
                         Label("Choose", systemImage: "folder")
                     }
+                    .disabled(isPostProcessingSetupBusy)
                 }
 
                 HStack {
@@ -264,7 +272,7 @@ struct TextSettingsTab: View {
                     }
                     .disabled(!canPrepareModel)
 
-                    if appState.isPreparingPostProcessingModel || appState.isInstallingLlamaCpp {
+                    if isPostProcessingSetupBusy {
                         ProgressView()
                             .controlSize(.small)
                     }
