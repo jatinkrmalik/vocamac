@@ -177,6 +177,50 @@ struct GeneralSettingsTab: View {
                     .foregroundStyle(.secondary)
             }
 
+            Section("Local AI Post-processing") {
+                Toggle("Rewrite text before pasting", isOn: $appState.postProcessingEnabled)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        TextField("llama-cli path", text: $appState.postProcessingRunnerPath)
+                            .textFieldStyle(.roundedBorder)
+                        Button {
+                            chooseFile { appState.postProcessingRunnerPath = $0 }
+                        } label: {
+                            Label("Choose", systemImage: "folder")
+                        }
+                    }
+
+                    HStack {
+                        TextField("GGUF model path", text: $appState.postProcessingModelPath)
+                            .textFieldStyle(.roundedBorder)
+                        Button {
+                            chooseFile { appState.postProcessingModelPath = $0 }
+                        } label: {
+                            Label("Choose", systemImage: "folder")
+                        }
+                    }
+
+                    TextEditor(text: $appState.postProcessingInstructions)
+                        .font(.body)
+                        .frame(minHeight: 90)
+                        .overlay(alignment: .topLeading) {
+                            if appState.postProcessingInstructions.isEmpty {
+                                Text("Keep my tone concise, warm, and direct.")
+                                    .foregroundStyle(.tertiary)
+                                    .padding(.top, 8)
+                                    .padding(.leading, 5)
+                                    .allowsHitTesting(false)
+                            }
+                        }
+                }
+                .disabled(!appState.postProcessingEnabled)
+
+                Text("Runs a local llama.cpp-compatible model after Whisper and before insertion. Try Qwen3-1.7B or Gemma 3 1B GGUF on M-series Macs; use a larger Q4 model if the delay is acceptable.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("Behavior") {
                 Toggle("Launch at Login", isOn: Binding(
                     get: { appState.launchAtLogin },
@@ -194,6 +238,16 @@ struct GeneralSettingsTab: View {
 
         }
         .formStyle(.grouped)
+    }
+
+    private func chooseFile(_ update: (String) -> Void) {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        if panel.runModal() == .OK, let url = panel.url {
+            update(url.path)
+        }
     }
 }
 
@@ -335,7 +389,7 @@ struct ModelSettingsTab: View {
                     }
                 }
 
-                if appState.appStatus == .error, let errorMessage = appState.errorMessage {
+                if let errorMessage = appState.errorMessage {
                     GroupBox {
                         HStack(alignment: .top, spacing: 8) {
                             Image(systemName: "exclamationmark.triangle.fill")

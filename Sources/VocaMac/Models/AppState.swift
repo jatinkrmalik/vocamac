@@ -109,6 +109,10 @@ final class AppState: ObservableObject {
     @AppStorage("vocamac.showCursorIndicator") var showCursorIndicator: Bool = true
     @AppStorage("vocamac.translationEnabled") var translationEnabled: Bool = false
     @AppStorage("vocamac.customVocabulary") var customVocabulary: String = ""
+    @AppStorage("vocamac.postProcessingEnabled") var postProcessingEnabled: Bool = false
+    @AppStorage("vocamac.postProcessingRunnerPath") var postProcessingRunnerPath: String = LocalLLMPostProcessor.defaultRunnerPath
+    @AppStorage("vocamac.postProcessingModelPath") var postProcessingModelPath: String = ""
+    @AppStorage("vocamac.postProcessingInstructions") var postProcessingInstructions: String = LocalLLMPostProcessor.defaultInstructions
     @AppStorage("vocamac.logLevel") var logLevel: String = "info"
 
     private var hotKeySafetyTimeout: Double {
@@ -120,6 +124,7 @@ final class AppState: ObservableObject {
     let audioEngine: AudioRecording
     let whisperService: SpeechTranscribing
     let textInjector: TextInjecting
+    let textPostProcessor: TextPostProcessing
     let hotKeyManager: HotKeyMonitoring
     let modelManager: ModelManaging
     let soundManager: SoundPlaying
@@ -175,6 +180,7 @@ final class AppState: ObservableObject {
         audioEngine: AudioRecording = AudioEngine(),
         whisperService: SpeechTranscribing = WhisperService(),
         textInjector: TextInjecting = TextInjector(),
+        textPostProcessor: TextPostProcessing = LocalLLMPostProcessor(),
         hotKeyManager: HotKeyMonitoring = HotKeyManager(),
         modelManager: ModelManaging = ModelManager(),
         soundManager: SoundPlaying = SoundManager(),
@@ -186,6 +192,7 @@ final class AppState: ObservableObject {
         self.audioEngine = audioEngine
         self.whisperService = whisperService
         self.textInjector = textInjector
+        self.textPostProcessor = textPostProcessor
         self.hotKeyManager = hotKeyManager
         self.modelManager = modelManager
         self.soundManager = soundManager
@@ -632,14 +639,40 @@ final class AppState: ObservableObject {
                 vocabulary: customVocabulary
             )
 
-            lastTranscription = result
+            var finalText = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            var postProcessingError: String?
+            if postProcessingEnabled, !finalText.isEmpty {
+                do {
+                    finalText = try await textPostProcessor.improve(
+                        finalText,
+                        configuration: TextPostProcessingConfiguration(
+                            runnerPath: postProcessingRunnerPath,
+                            modelPath: postProcessingModelPath,
+                            instructions: postProcessingInstructions
+                        )
+                    )
+                } catch {
+                    postProcessingError = "Post-processing failed: \(error.localizedDescription)"
+                    VocaLogger.error(.textPostProcessor, postProcessingError ?? "Post-processing failed")
+                }
+            }
+
+            let finalResult = VocaTranscription(
+                text: finalText,
+                duration: result.duration,
+                detectedLanguage: result.detectedLanguage,
+                audioLengthSeconds: result.audioLengthSeconds,
+                modelUsed: result.modelUsed,
+                timestamp: result.timestamp
+            )
+            lastTranscription = finalResult
 
             // Update stats
-            statsManager.recordTranscription(result)
+            statsManager.recordTranscription(finalResult)
 
             // Inject text at cursor position
             // by WhisperService to remove hallucination tokens like [BLANK_AUDIO])
-            let trimmedText = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            let trimmedText = finalResult.text.trimmingCharacters(in: .whitespacesAndNewlines)
             if !trimmedText.isEmpty {
                 textInjector.inject(
                     text: trimmedText,
@@ -650,7 +683,12 @@ final class AppState: ObservableObject {
             }
 
             cursorOverlay.hide()
-            appStatus = .idle
+            if let postProcessingError {
+                appStatus = .idle
+                showTemporaryWarning(postProcessingError)
+            } else {
+                appStatus = .idle
+            }
         } catch {
             cursorOverlay.hide()
             errorMessage = "Transcription failed: \(error.localizedDescription)"
@@ -829,6 +867,17 @@ final class AppState: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) { [weak self] in
             if self?.appStatus == .error, self?.errorMessage == message {
                 self?.appStatus = .idle
+                self?.errorMessage = nil
+            }
+        }
+    }
+
+    /// Surface a non-blocking warning while keeping dictation ready.
+    private func showTemporaryWarning(_ message: String) {
+        errorMessage = message
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) { [weak self] in
+            if self?.appStatus == .idle, self?.errorMessage == message {
                 self?.errorMessage = nil
             }
         }

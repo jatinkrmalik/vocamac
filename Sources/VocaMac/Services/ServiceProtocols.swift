@@ -145,6 +145,18 @@ protocol TextInjecting: AnyObject {
     func inject(text: String, preserveClipboard: Bool)
 }
 
+// MARK: - TextPostProcessing
+
+struct TextPostProcessingConfiguration {
+    let runnerPath: String
+    let modelPath: String
+    let instructions: String
+}
+
+protocol TextPostProcessing: AnyObject {
+    func improve(_ text: String, configuration: TextPostProcessingConfiguration) async throws -> String
+}
+
 // MARK: - StatsManaging
 
 @MainActor
