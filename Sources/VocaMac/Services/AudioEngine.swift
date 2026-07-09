@@ -14,21 +14,27 @@ final class AudioEngine {
 
     // MARK: - Properties
 
-    /// AVAudioEngine is created lazily when recording starts and torn down when
-    /// recording stops. Keeping it alive while idle holds an input route on the
-    /// system mic, which on Bluetooth devices like AirPods forces the headset
-    /// (HFP/SCO) profile and breaks remote media controls (e.g. tap-to-pause)
-    /// for any other app playing audio.
+    /// AVAudioEngine is created lazily when recording starts and torn down soon
+    /// after recording stops. Keeping it alive indefinitely while idle holds an
+    /// input route on the system mic, which on Bluetooth devices like AirPods
+    /// forces the headset (HFP/SCO) profile and breaks remote media controls
+    /// (e.g. tap-to-pause) for any other app playing audio.
     private var engine: AVAudioEngine?
+    private var pendingEngineRelease: DispatchWorkItem?
     private var audioBuffer: [Float] = []
     private var _isCurrentlyRecording = false
     private let bufferQueue = DispatchQueue(label: "com.vocamac.audio-buffer", qos: .userInteractive)
     private let lifecycleQueue = DispatchQueue(label: "com.vocamac.audio-engine.lifecycle", qos: .userInitiated)
 
     static let startupConfigurationChangeRecoveryWindow: TimeInterval = 1.0
+    static let idleEngineReleaseDelay: TimeInterval = 3.0
 
     var isCurrentlyRecording: Bool {
         lifecycleQueue.sync { _isCurrentlyRecording }
+    }
+
+    var isEngineAllocatedForTesting: Bool {
+        lifecycleQueue.sync { engine != nil }
     }
 
     // Silence detection
@@ -74,10 +80,11 @@ final class AudioEngine {
         // engine's input node to materialise and claim the system input route,
         // which on Bluetooth headsets forces the HFP profile. The observer is
         // attached as part of `acquireEngine()` instead, and torn down by
-        // `releaseEngine()` when recording stops.
+        // `releaseEngine()` once the stopped engine has been idle briefly.
     }
 
     deinit {
+        pendingEngineRelease?.cancel()
         // Make sure any active engine and its observer are released. This is a
         // safety net — under normal flows `stopRecording`/`forceReset` will
         // already have torn things down.
@@ -91,6 +98,9 @@ final class AudioEngine {
     /// Lazily create the AVAudioEngine and start observing configuration changes.
     /// Must be called on `lifecycleQueue`.
     private func acquireEngine() -> AVAudioEngine {
+        pendingEngineRelease?.cancel()
+        pendingEngineRelease = nil
+
         if let engine { return engine }
         let newEngine = AVAudioEngine()
         engine = newEngine
@@ -109,10 +119,29 @@ final class AudioEngine {
     /// aren't affected while we're idle.
     /// Must be called on `lifecycleQueue`.
     private func releaseEngine() {
+        pendingEngineRelease?.cancel()
+        pendingEngineRelease = nil
+
         guard let engine else { return }
         NotificationCenter.default.removeObserver(self, name: .AVAudioEngineConfigurationChange, object: engine)
         self.engine = nil
         VocaLogger.debug(.audioEngine, "AVAudioEngine instance released")
+    }
+
+    /// Release the engine after a short idle window so rapid push-to-talk
+    /// recordings can reuse a warm input route.
+    /// Must be called on `lifecycleQueue`.
+    private func scheduleEngineRelease() {
+        pendingEngineRelease?.cancel()
+
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self, !self._isCurrentlyRecording else { return }
+            self.releaseEngine()
+        }
+        pendingEngineRelease = workItem
+
+        lifecycleQueue.asyncAfter(deadline: .now() + Self.idleEngineReleaseDelay, execute: workItem)
+        VocaLogger.debug(.audioEngine, "AVAudioEngine instance scheduled for idle release")
     }
 
     // MARK: - Audio Configuration Change
@@ -240,6 +269,8 @@ final class AudioEngine {
                         self?.processAudioBuffer(buffer, inputFormat: inputFormat)
                     }
 
+                    engine.prepare()
+
                     do {
                         try engine.start()
                     } catch {
@@ -287,9 +318,10 @@ final class AudioEngine {
 
             let samples = capturedSamplesAndResetBuffer()
 
-            // Release the engine so we don't keep holding the system input
-            // route (and forcing AirPods into HFP) while idle.
-            releaseEngine()
+            // Keep the stopped engine briefly so rapid push-to-talk recordings
+            // don't cold-reacquire a silent input route, then release it so we
+            // don't keep forcing Bluetooth headsets into HFP while idle.
+            scheduleEngineRelease()
 
             return samples
         }
