@@ -166,7 +166,7 @@ final class WhisperService: @unchecked Sendable {
         let promptTokens = Self.promptTokens(for: vocabulary, tokenizer: kit.tokenizer)
 
         // Configure decoding options — optimized for low latency dictation
-        let options = DecodingOptions(
+        var options = DecodingOptions(
             task: translate ? .translate : .transcribe,
             language: language,
             temperature: 0.0,
@@ -179,19 +179,31 @@ final class WhisperService: @unchecked Sendable {
         )
 
         do {
-            let results = try await kit.transcribe(
+            var results = try await kit.transcribe(
                 audioArray: audioData,
                 decodeOptions: options
             )
 
-            let elapsed = CFAbsoluteTimeGetCurrent() - startTime
-
             // Concatenate all segment texts
-            let rawText = results.map { $0.text }.joined(separator: " ")
+            var rawText = results.map { $0.text }.joined(separator: " ")
 
             // Filter out WhisperKit hallucination tokens that should not be
             // exposed to the user (e.g. "[BLANK_AUDIO]", "(blank audio)", etc.)
-            let fullText = Self.filterHallucinationTokens(rawText)
+            var fullText = Self.filterHallucinationTokens(rawText)
+
+            // WhisperKit can exit during prompt prefill and return no text for
+            // some models. Preserve vocabulary bias normally, but recover the
+            // dictation by retrying once without custom prompt tokens.
+            if Self.shouldRetryWithoutVocabulary(text: fullText, promptTokens: promptTokens) {
+                VocaLogger.warning(.whisperService, "Prompted transcription was empty; retrying without custom vocabulary")
+                options.promptTokens = nil
+                options.usePrefillPrompt = language != nil
+                results = try await kit.transcribe(audioArray: audioData, decodeOptions: options)
+                rawText = results.map { $0.text }.joined(separator: " ")
+                fullText = Self.filterHallucinationTokens(rawText)
+            }
+
+            let elapsed = CFAbsoluteTimeGetCurrent() - startTime
 
             // Get detected language from first result
             let detectedLanguage = results.first?.language ?? language ?? "en"
@@ -272,6 +284,10 @@ final class WhisperService: @unchecked Sendable {
             .split(whereSeparator: { $0 == "\n" || $0 == "," })
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
+    }
+
+    static func shouldRetryWithoutVocabulary(text: String, promptTokens: [Int]?) -> Bool {
+        text.isEmpty && promptTokens != nil
     }
 
     /// Encode custom vocabulary into WhisperKit conditioning tokens.

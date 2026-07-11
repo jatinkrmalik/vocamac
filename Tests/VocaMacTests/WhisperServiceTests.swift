@@ -88,4 +88,10 @@ final class WhisperServiceVocabularyTests: XCTestCase {
         let input = "Namrata,,\n\n, ,VocaMac"
         XCTAssertEqual(WhisperService.vocabularyTerms(from: input), ["Namrata", "VocaMac"])
     }
+
+    func testRetriesOnlyEmptyPromptedTranscriptions() {
+        XCTAssertTrue(WhisperService.shouldRetryWithoutVocabulary(text: "", promptTokens: [1]))
+        XCTAssertFalse(WhisperService.shouldRetryWithoutVocabulary(text: "transcribed", promptTokens: [1]))
+        XCTAssertFalse(WhisperService.shouldRetryWithoutVocabulary(text: "", promptTokens: nil))
+    }
 }
