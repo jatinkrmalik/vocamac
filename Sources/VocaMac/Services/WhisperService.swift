@@ -194,8 +194,11 @@ final class WhisperService: @unchecked Sendable {
             // WhisperKit can exit during prompt prefill and return no text for
             // some models. Preserve vocabulary bias normally, but recover the
             // dictation by retrying once without custom prompt tokens.
-            if Self.shouldRetryWithoutVocabulary(text: fullText, promptTokens: promptTokens) {
-                VocaLogger.warning(.whisperService, "Prompted transcription was empty; retrying without custom vocabulary")
+            if Self.shouldRetryWithoutVocabulary(rawText: rawText, promptTokens: promptTokens) {
+                VocaLogger.warning(
+                    .whisperService,
+                    "Prompted transcription was empty for \(loadedModelName ?? "unknown model"); retrying without custom vocabulary"
+                )
                 options.promptTokens = nil
                 options.usePrefillPrompt = language != nil
                 results = try await kit.transcribe(audioArray: audioData, decodeOptions: options)
@@ -286,8 +289,8 @@ final class WhisperService: @unchecked Sendable {
             .filter { !$0.isEmpty }
     }
 
-    static func shouldRetryWithoutVocabulary(text: String, promptTokens: [Int]?) -> Bool {
-        text.isEmpty && promptTokens != nil
+    static func shouldRetryWithoutVocabulary(rawText: String, promptTokens: [Int]?) -> Bool {
+        promptTokens != nil && rawText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     /// Encode custom vocabulary into WhisperKit conditioning tokens.

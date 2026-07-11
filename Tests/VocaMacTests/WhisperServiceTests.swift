@@ -90,8 +90,9 @@ final class WhisperServiceVocabularyTests: XCTestCase {
     }
 
     func testRetriesOnlyEmptyPromptedTranscriptions() {
-        XCTAssertTrue(WhisperService.shouldRetryWithoutVocabulary(text: "", promptTokens: [1]))
-        XCTAssertFalse(WhisperService.shouldRetryWithoutVocabulary(text: "transcribed", promptTokens: [1]))
-        XCTAssertFalse(WhisperService.shouldRetryWithoutVocabulary(text: "", promptTokens: nil))
+        XCTAssertTrue(WhisperService.shouldRetryWithoutVocabulary(rawText: "  \n", promptTokens: [1]))
+        XCTAssertFalse(WhisperService.shouldRetryWithoutVocabulary(rawText: "transcribed", promptTokens: [1]))
+        XCTAssertFalse(WhisperService.shouldRetryWithoutVocabulary(rawText: "[BLANK_AUDIO]", promptTokens: [1]))
+        XCTAssertFalse(WhisperService.shouldRetryWithoutVocabulary(rawText: "", promptTokens: nil))
     }
 }
