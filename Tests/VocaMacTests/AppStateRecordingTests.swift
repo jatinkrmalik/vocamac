@@ -118,6 +118,20 @@ final class AppStateRecordingTests: XCTestCase {
                       "Should return to idle when audio data is empty")
     }
 
+    func testStopRecordingWithSilentAudioShowsInputError() async {
+        let (appState, mocks) = AppState.makeTestState()
+        mocks.audioEngine.stopRecordingResult = Array(repeating: 0, count: 16_000)
+        appState.isRecording = true
+        appState.appStatus = .recording
+
+        await appState.stopRecordingAndTranscribe()
+
+        XCTAssertEqual(appState.appStatus, .error)
+        XCTAssertTrue(appState.errorMessage?.contains("external microphone") == true)
+        XCTAssertNil(mocks.whisperService.lastTranscribedAudioData)
+        XCTAssertEqual(mocks.textInjector.injectCallCount, 0)
+    }
+
     func testSelectedModelSizeDefault() {
         let (appState, _) = AppState.makeTestState()
 
