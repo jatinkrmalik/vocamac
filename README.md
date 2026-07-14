@@ -479,9 +479,9 @@ AGPL-3.0 License - see [LICENSE](LICENSE) for details.
 
 <a href="https://www.star-history.com/?repos=jatinkrmalik%2Fvocamac&type=date&legend=top-left">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=jatinkrmalik/vocamac&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=jatinkrmalik/vocamac&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=jatinkrmalik/vocamac&type=date&legend=top-left" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=jatinkrmalik/vocamac&type=date&theme=dark&legend=top-left&sealed_token=otfG_PjqVtfSDqjuVxBihRMsoeuZwc0ZnUdPqNX9TypLSfyjI0QHWwkE-IVtel80QH3TtIRZzDSNYISJ_tYCHQjqN5fWBUY028tmOiUPvH_MIJroI3Kidg" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=jatinkrmalik/vocamac&type=date&legend=top-left&sealed_token=otfG_PjqVtfSDqjuVxBihRMsoeuZwc0ZnUdPqNX9TypLSfyjI0QHWwkE-IVtel80QH3TtIRZzDSNYISJ_tYCHQjqN5fWBUY028tmOiUPvH_MIJroI3Kidg" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=jatinkrmalik/vocamac&type=date&legend=top-left&sealed_token=otfG_PjqVtfSDqjuVxBihRMsoeuZwc0ZnUdPqNX9TypLSfyjI0QHWwkE-IVtel80QH3TtIRZzDSNYISJ_tYCHQjqN5fWBUY028tmOiUPvH_MIJroI3Kidg" />
  </picture>
 </a>
 
