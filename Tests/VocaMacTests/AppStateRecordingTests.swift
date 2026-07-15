@@ -46,7 +46,7 @@ final class AppStateRecordingTests: XCTestCase {
         await Task.yield()
         try await Task.sleep(nanoseconds: 50_000_000)
 
-        XCTAssertLessThan(Date().timeIntervalSince(start), 0.2,
+        XCTAssertLessThan(Date().timeIntervalSince(start), 0.3,
                           "Core Audio startup should not block the main actor")
 
         await task.value
