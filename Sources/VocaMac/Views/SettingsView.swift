@@ -652,7 +652,7 @@ struct AudioSettingsTab: View {
                         Text("\(selectedAudioDeviceDisplayName) (Unavailable)").tag(appState.selectedAudioDeviceID)
                     }
                     ForEach(audioDevices) { device in
-                        Text(audioDeviceLabel(for: device)).tag(device.id)
+                        Text(device.name).tag(device.id)
                     }
                 }
                 .onChange(of: appState.selectedAudioDeviceID) { _ in
@@ -719,10 +719,6 @@ struct AudioSettingsTab: View {
             return "VocaMac will follow macOS' system default input: \(defaultDevice.name)."
         }
         return "VocaMac will follow macOS' system default input."
-    }
-
-    private func audioDeviceLabel(for device: AudioDevice) -> String {
-        device.isDefault ? "\(device.name) (System Default)" : device.name
     }
 
     private func refreshAudioDevices() {
