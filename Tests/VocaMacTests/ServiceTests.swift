@@ -417,6 +417,38 @@ final class AudioEngineTests: XCTestCase {
             "Audio buffer should contain samples after recording")
     }
 
+    func testStopKeepsEngineWarmUntilIdleRelease() throws {
+        let engine = AudioEngine()
+
+        let didStart = engine.startRecording(
+            silenceThreshold: 0.01,
+            silenceDuration: 999.0,
+            maxDuration: 60.0
+        )
+
+        try XCTSkipIf(!didStart, "No microphone available or Core Audio input could not start")
+        XCTAssertTrue(engine.isEngineAllocatedForTesting)
+
+        _ = engine.stopRecording()
+
+        XCTAssertFalse(engine.isCurrentlyRecording)
+        XCTAssertTrue(
+            engine.isEngineAllocatedForTesting,
+            "Stopped engine should stay warm briefly for rapid push-to-talk restarts"
+        )
+
+        let expectation = XCTestExpectation(description: "Idle engine release")
+        DispatchQueue.main.asyncAfter(deadline: .now() + AudioEngine.idleEngineReleaseDelay + 0.5) {
+            expectation.fulfill()
+        }
+        wait(for: [expectation], timeout: AudioEngine.idleEngineReleaseDelay + 2.0)
+
+        XCTAssertFalse(
+            engine.isEngineAllocatedForTesting,
+            "Engine should release after the idle window so the input route is not held indefinitely"
+        )
+    }
+
     func testAudioBufferPreservedWhenSilenceDetected() {
         // The key bug fix: audio should be buffered BEFORE silence detection fires,
         // so we don't lose the audio frames that triggered the silence condition
