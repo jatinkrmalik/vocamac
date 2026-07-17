@@ -613,6 +613,8 @@ final class AppState: ObservableObject {
 
         guard audioData.contains(where: { abs($0) >= 0.0001 }) else {
             cursorOverlay.hide()
+            // Don't keep a capture route that only produced silence warm.
+            audioEngine.forceReset()
             let message = "No microphone audio detected. If your MacBook lid is closed, select an external microphone in Settings → Audio."
             VocaLogger.warning(.appState, message)
             showTemporaryError(message)

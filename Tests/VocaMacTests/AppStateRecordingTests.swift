@@ -130,6 +130,8 @@ final class AppStateRecordingTests: XCTestCase {
         XCTAssertTrue(appState.errorMessage?.contains("external microphone") == true)
         XCTAssertNil(mocks.whisperService.lastTranscribedAudioData)
         XCTAssertEqual(mocks.textInjector.injectCallCount, 0)
+        XCTAssertEqual(mocks.audioEngine.forceResetCallCount, 1,
+                       "Silent capture should force-reset the engine so a dead route is not kept warm")
     }
 
     func testSelectedModelSizeDefault() {
