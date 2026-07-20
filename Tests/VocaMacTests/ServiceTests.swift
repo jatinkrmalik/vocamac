@@ -659,19 +659,19 @@ final class AudioEngineForceResetTests: XCTestCase {
 
 final class AudioEngineDeviceChangeTests: XCTestCase {
 
-    func testStartupConfigurationChangeWindow() {
-        let cases: [(elapsed: TimeInterval, expected: Bool)] = [
-            (0.10, true),
-            (AudioEngine.startupConfigurationChangeRecoveryWindow + 0.01, false),
-            (-0.01, false)
-        ]
-
-        for testCase in cases {
-            XCTAssertEqual(
-                AudioEngine.shouldTreatAsStartupConfigurationChange(elapsedSinceRecordingStart: testCase.elapsed),
-                testCase.expected
-            )
-        }
+    func testInputRouteReconfigurationDecision() {
+        XCTAssertFalse(
+            AudioEngine.shouldReconfigureInputDevice(currentDeviceID: 42, targetDeviceID: 42),
+            "An AudioUnit already bound to the target device should not rebuild its graph"
+        )
+        XCTAssertTrue(
+            AudioEngine.shouldReconfigureInputDevice(currentDeviceID: 41, targetDeviceID: 42),
+            "Switching devices must rebuild the graph"
+        )
+        XCTAssertTrue(
+            AudioEngine.shouldReconfigureInputDevice(currentDeviceID: nil, targetDeviceID: 42),
+            "An unreadable current route must be treated as needing configuration"
+        )
     }
 
     func testOnAudioDeviceChangedCallbackExists() {

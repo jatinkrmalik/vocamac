@@ -68,7 +68,8 @@ final class AppStateRecordingTests: XCTestCase {
 
         XCTAssertEqual(mocks.soundManager.startSoundCallCount, 0)
         XCTAssertEqual(mocks.soundManager.stopSoundCallCount, 1)
-        XCTAssertEqual(appState.appStatus, .idle)
+        XCTAssertEqual(appState.appStatus, .error)
+        XCTAssertEqual(mocks.audioEngine.forceResetCallCount, 1)
     }
 
     func testStartRecordingInProcessingStateForceRecovers() async {
@@ -107,15 +108,19 @@ final class AppStateRecordingTests: XCTestCase {
                       "Stop sound should be played once")
     }
 
-    func testStopRecordingWithEmptyAudioReturnsToIdle() async {
-        let (appState, _) = AppState.makeTestState()
+    func testStopRecordingWithEmptyAudioShowsInputErrorAndResetsRoute() async {
+        let (appState, mocks) = AppState.makeTestState()
         appState.isRecording = true
         appState.appStatus = .recording
 
         await appState.stopRecordingAndTranscribe()
 
-        XCTAssertEqual(appState.appStatus, .idle,
-                      "Should return to idle when audio data is empty")
+        XCTAssertEqual(appState.appStatus, .error)
+        XCTAssertTrue(appState.errorMessage?.contains("selected microphone") == true)
+        XCTAssertNil(mocks.whisperService.lastTranscribedAudioData)
+        XCTAssertEqual(mocks.textInjector.injectCallCount, 0)
+        XCTAssertEqual(mocks.audioEngine.forceResetCallCount, 1,
+                       "Empty capture should force-reset the engine so a dead route is not kept warm")
     }
 
     func testStopRecordingWithSilentAudioShowsInputError() async {
@@ -127,7 +132,7 @@ final class AppStateRecordingTests: XCTestCase {
         await appState.stopRecordingAndTranscribe()
 
         XCTAssertEqual(appState.appStatus, .error)
-        XCTAssertTrue(appState.errorMessage?.contains("external microphone") == true)
+        XCTAssertTrue(appState.errorMessage?.contains("selected microphone") == true)
         XCTAssertNil(mocks.whisperService.lastTranscribedAudioData)
         XCTAssertEqual(mocks.textInjector.injectCallCount, 0)
         XCTAssertEqual(mocks.audioEngine.forceResetCallCount, 1,
