@@ -12,30 +12,36 @@ final class LocalLLMPostProcessorTests: XCTestCase {
         )
     }
 
-    func testCleanedOutputExtractsAssistantReplyFromChatTranscript() {
-        let userPrompt = "um let's email Namrata about the launch"
-        let output = """
-        Loading model...
-
-        available commands:
-          /exit or Ctrl+C     stop or exit
-
-        > um let's email Namrata about the launch
-
-        <think>
-        hidden reasoning
-        </think>
-        Email Namrata about the launch.
-
-        [ Prompt: 99.6 t/s | Generation: 214.6 t/s ]
-
-        Exiting...
+    func testResponseTextDecodesStructuredAssistantReply() throws {
+        let response = """
+        {
+          "choices": [
+            {
+              "message": {
+                "role": "assistant",
+                "content": "Email Namrata about the launch."
+              }
+            }
+          ]
+        }
         """
 
         XCTAssertEqual(
-            LocalLLMPostProcessor.cleanedOutput(output, userPrompt: userPrompt),
+            try LocalLLMPostProcessor.responseText(from: Data(response.utf8)),
             "Email Namrata about the launch."
         )
+    }
+
+    func testResponseTextRejectsMissingAssistantReply() {
+        let response = #"{"choices":[]}"#
+
+        XCTAssertThrowsError(
+            try LocalLLMPostProcessor.responseText(from: Data(response.utf8))
+        ) { error in
+            guard case TextPostProcessingError.emptyOutput = error else {
+                return XCTFail("Expected emptyOutput, got \(error)")
+            }
+        }
     }
 
     func testModelArgumentsUseHuggingFaceReferenceForCatalogModel() throws {
@@ -63,40 +69,57 @@ final class LocalLLMPostProcessorTests: XCTestCase {
         XCTAssertThrowsError(try LocalLLMPostProcessor.modelArguments(for: config))
     }
 
-    func testDetectedRunnerPathUsesFirstExecutableCandidate() {
+    func testDetectedRunnerPathUsesFirstExecutableServerCandidate() throws {
+        let directoryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("vocamac-llama-tools-\(UUID().uuidString)")
+        let serverURL = directoryURL.appendingPathComponent("llama-server")
+        defer { try? FileManager.default.removeItem(at: directoryURL) }
+        try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        try "#!/bin/sh\n".write(to: serverURL, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: serverURL.path)
+
         XCTAssertEqual(
-            LocalLLMPostProcessor.detectedRunnerPath(in: ["/definitely/missing", "/bin/echo"]),
-            "/bin/echo"
+            LocalLLMPostProcessor.detectedRunnerPath(in: ["/definitely/missing", serverURL.path]),
+            serverURL.path
         )
     }
 
-    func testPrepareDrainsChattyRunnerOutput() async throws {
-        let scriptURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("vocamac-chatty-runner-\(UUID().uuidString).sh")
-        defer { try? FileManager.default.removeItem(at: scriptURL) }
-        let script = """
-        #!/bin/sh
-        i=0
-        while [ "$i" -lt 5000 ]; do
-          printf 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\\n'
-          i=$((i + 1))
-        done
-        printf '> ping\\n\\n'
-        printf 'OK\\n\\n'
-        printf '[ Prompt: 1.0 t/s | Generation: 1.0 t/s ]\\n\\n'
-        printf 'Exiting...\\n'
-        """
-        try script.write(to: scriptURL, atomically: true, encoding: .utf8)
-        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: scriptURL.path)
+    func testRunnerExistsResolvesServerNextToLegacyCLIPath() throws {
+        let directoryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("vocamac-llama-tools-\(UUID().uuidString)")
+        let serverURL = directoryURL.appendingPathComponent("llama-server")
+        defer { try? FileManager.default.removeItem(at: directoryURL) }
+        try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        try "#!/bin/sh\n".write(to: serverURL, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: serverURL.path)
 
-        let processor = LocalLLMPostProcessor(prepareTimeout: 2)
-        try await processor.prepare(
+        XCTAssertTrue(
+            LocalLLMPostProcessor.runnerExists(
+                at: directoryURL.appendingPathComponent("llama-cli").path
+            )
+        )
+    }
+
+    func testLocalLlamaServerIntegrationWhenEnabled() async throws {
+        guard ProcessInfo.processInfo.environment["VOCAMAC_RUN_LOCAL_LLM_TEST"] == "1" else {
+            throw XCTSkip("Set VOCAMAC_RUN_LOCAL_LLM_TEST=1 to run the local model integration test.")
+        }
+        guard LocalLLMPostProcessor.runnerExists(at: LocalLLMPostProcessor.defaultRunnerPath) else {
+            throw XCTSkip("llama-server is not installed.")
+        }
+
+        let result = try await LocalLLMPostProcessor().improve(
+            "um the launch moved to friday",
             configuration: TextPostProcessingConfiguration(
-                runnerPath: scriptURL.path,
-                modelID: "gemma-3-1b-q4",
+                runnerPath: LocalLLMPostProcessor.defaultRunnerPath,
+                modelID: LocalLLMModel.recommendedID,
                 customModelPath: "",
                 instructions: ""
             )
         )
+
+        XCTAssertTrue(result.localizedCaseInsensitiveContains("Friday"))
+        XCTAssertFalse(result.contains("\"choices\""))
+        XCTAssertFalse(result.contains("Loading model"))
     }
 }

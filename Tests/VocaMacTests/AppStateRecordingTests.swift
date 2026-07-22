@@ -317,14 +317,17 @@ final class AppStateRecordingTests: XCTestCase {
     func testPreparePostProcessingModelEnablesRewrite() async {
         let postProcessor = MockTextPostProcessor()
         let (appState, _) = AppState.makeTestState(textPostProcessor: postProcessor)
-        appState.postProcessingRunnerPath = "/bin/echo"
+        appState.postProcessingRunnerPath = LocalLLMPostProcessor.defaultRunnerPath
         appState.postProcessingModelID = "gemma-3-1b-q4"
         appState.postProcessingInstructions = "Keep it tidy."
 
         await appState.preparePostProcessingModel()
 
         XCTAssertEqual(postProcessor.prepareCallCount, 1)
-        XCTAssertEqual(postProcessor.lastPrepareConfiguration?.runnerPath, "/bin/echo")
+        XCTAssertEqual(
+            postProcessor.lastPrepareConfiguration?.runnerPath,
+            LocalLLMPostProcessor.defaultRunnerPath
+        )
         XCTAssertEqual(postProcessor.lastPrepareConfiguration?.modelID, "gemma-3-1b-q4")
         XCTAssertEqual(postProcessor.lastPrepareConfiguration?.instructions, "Keep it tidy.")
         XCTAssertTrue(appState.postProcessingEnabled)

@@ -231,7 +231,7 @@ struct TextSettingsTab: View {
                 }
 
                 HStack {
-                    TextField("llama runner path", text: $appState.postProcessingRunnerPath)
+                    TextField("llama-server path", text: $appState.postProcessingRunnerPath)
                         .textFieldStyle(.roundedBorder)
                         .disabled(isPostProcessingSetupBusy)
                     Button {
@@ -243,7 +243,7 @@ struct TextSettingsTab: View {
                 }
 
                 HStack {
-                    Label(runnerReady ? "llama.cpp ready" : "llama.cpp not found", systemImage: runnerReady ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                    Label(runnerReady ? "llama-server ready" : "llama-server not found", systemImage: runnerReady ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
                         .foregroundStyle(runnerReady ? .green : .orange)
 
                     Spacer()

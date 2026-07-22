@@ -49,6 +49,7 @@ enum TextPostProcessingError: LocalizedError {
     case processFailed(Int32, String)
     case timedOut
     case emptyOutput
+    case invalidResponse(String)
     case unexpectedResponse(String)
 
     var errorDescription: String? {
@@ -69,6 +70,10 @@ enum TextPostProcessingError: LocalizedError {
             return "Local LLM timed out."
         case .emptyOutput:
             return "Local LLM returned no text."
+        case .invalidResponse(let details):
+            return details.isEmpty
+                ? "Local LLM returned an invalid response."
+                : "Local LLM returned an invalid response: \(details)"
         case .unexpectedResponse(let response):
             return response.isEmpty
                 ? "Local LLM returned an unexpected response."
@@ -78,15 +83,13 @@ enum TextPostProcessingError: LocalizedError {
 }
 
 final class LocalLLMPostProcessor: TextPostProcessing {
-    static let defaultRunnerPath = detectedRunnerPath() ?? "/opt/homebrew/bin/llama-cli"
+    static let defaultRunnerPath = detectedRunnerPath() ?? "/opt/homebrew/bin/llama-server"
     static let defaultInstructions = "You are a transcription cleanup engine. Rewrite the user's dictated transcript as clean final text for immediate pasting. Keep the original meaning and intent. Remove filler words and false starts. Fix punctuation and capitalization. Make only conservative wording changes. Do not summarize, answer, invent subject lines, or add commentary. Return only the final rewritten text."
     static let installURL = URL(string: "https://github.com/ggml-org/llama.cpp")!
 
     private static let runnerCandidates = [
-        "/opt/homebrew/bin/llama",
-        "/opt/homebrew/bin/llama-cli",
-        "/usr/local/bin/llama",
-        "/usr/local/bin/llama-cli",
+        "/opt/homebrew/bin/llama-server",
+        "/usr/local/bin/llama-server",
     ]
 
     private static let brewCandidates = [
@@ -131,7 +134,7 @@ final class LocalLLMPostProcessor: TextPostProcessing {
                 userPrompt: text.trimmingCharacters(in: .whitespacesAndNewlines),
                 configuration: configuration,
                 timeout: timeout,
-                maxTokens: 64
+                maxTokens: 256
             )
         }.value
     }
@@ -149,7 +152,7 @@ final class LocalLLMPostProcessor: TextPostProcessing {
     }
 
     static func runnerExists(at path: String) -> Bool {
-        FileManager.default.isExecutableFile(atPath: expandedPath(path))
+        serverExecutable(for: path) != nil
     }
 
     static func installLlamaCpp() async throws -> String {
@@ -167,38 +170,6 @@ final class LocalLLMPostProcessor: TextPostProcessing {
         return style.isEmpty ? defaultInstructions : style
     }
 
-    static func cleanedOutput(_ output: String, userPrompt: String) -> String {
-        var text = output.replacingOccurrences(
-            of: "\u{001B}\\[[0-9;]*[A-Za-z]",
-            with: "",
-            options: .regularExpression
-        )
-        text = text.replacingOccurrences(of: "\r\n", with: "\n")
-        text = text.replacingOccurrences(of: "\r", with: "\n")
-
-        let promptMarker = "> \(userPrompt)"
-        if let range = text.range(of: promptMarker) {
-            text = String(text[range.upperBound...])
-        }
-
-        text = text.replacingOccurrences(
-            of: #"(?s)<think>.*?</think>"#,
-            with: "",
-            options: .regularExpression
-        )
-        text = text.replacingOccurrences(
-            of: #"(?m)^\[ Prompt:.*$"#,
-            with: "",
-            options: .regularExpression
-        )
-        text = text.replacingOccurrences(
-            of: #"(?m)^Exiting\.\.\.$"#,
-            with: "",
-            options: .regularExpression
-        )
-        return text.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
     private static func run(
         systemPrompt: String,
         userPrompt: String,
@@ -206,62 +177,174 @@ final class LocalLLMPostProcessor: TextPostProcessing {
         timeout: TimeInterval,
         maxTokens: Int
     ) throws -> String {
-        let runnerPath = expandedPath(configuration.runnerPath)
-
-        guard !runnerPath.isEmpty else { throw TextPostProcessingError.missingRunnerPath }
-        guard FileManager.default.isExecutableFile(atPath: runnerPath) else {
-            throw TextPostProcessingError.runnerNotExecutable(runnerPath)
+        let configuredPath = expandedPath(configuration.runnerPath)
+        guard !configuredPath.isEmpty else { throw TextPostProcessingError.missingRunnerPath }
+        guard let runnerPath = serverExecutable(for: configuredPath) else {
+            throw TextPostProcessingError.runnerNotExecutable(configuredPath)
         }
 
+        let socketURL = URL(fileURLWithPath: "/tmp")
+            .appendingPathComponent("vocamac-\(UUID().uuidString).sock")
+        let server = Process()
+        let serverOutput = Pipe()
+        let serverFinished = DispatchSemaphore(value: 0)
+        let serverOutputRead = DispatchSemaphore(value: 0)
+        var serverOutputData = Data()
+
+        server.executableURL = URL(fileURLWithPath: runnerPath)
+        server.arguments = (try modelArguments(for: configuration)) + [
+            "--host", socketURL.path,
+            "-c", "2048",
+            "--reasoning", "off",
+        ]
+        server.standardInput = FileHandle.nullDevice
+        server.standardOutput = serverOutput
+        server.standardError = serverOutput
+        server.terminationHandler = { _ in serverFinished.signal() }
+
+        try server.run()
+
+        DispatchQueue.global(qos: .utility).async {
+            serverOutputData = serverOutput.fileHandleForReading.readDataToEndOfFile()
+            serverOutputRead.signal()
+        }
+
+        defer {
+            if server.isRunning {
+                server.terminate()
+            }
+            _ = serverFinished.wait(timeout: .now() + 5)
+            try? FileManager.default.removeItem(at: socketURL)
+        }
+
+        let deadline = Date().addingTimeInterval(timeout)
+        try waitUntilReady(
+            server: server,
+            socketURL: socketURL,
+            deadline: deadline,
+            outputRead: serverOutputRead,
+            outputData: { serverOutputData }
+        )
+
+        let request = ChatCompletionRequest(
+            messages: [
+                ChatMessage(role: "system", content: systemPrompt),
+                ChatMessage(role: "user", content: userPrompt),
+            ],
+            maxTokens: maxTokens,
+            temperature: 0.1,
+            topP: 0.8,
+            stream: false
+        )
+        let requestData = try JSONEncoder().encode(request)
+        let remaining = deadline.timeIntervalSinceNow
+        guard remaining > 0 else { throw TextPostProcessingError.timedOut }
+
+        let responseData = try runCurl(
+            arguments: [
+                "--silent",
+                "--show-error",
+                "--fail-with-body",
+                "--max-time", "\(Int(ceil(remaining)))",
+                "--unix-socket", socketURL.path,
+                "--header", "Content-Type: application/json",
+                "--data-binary", "@-",
+                "http://localhost/v1/chat/completions",
+            ],
+            input: requestData,
+            timeout: remaining
+        )
+        return try responseText(from: responseData)
+    }
+
+    static func responseText(from data: Data) throws -> String {
+        do {
+            let response = try JSONDecoder().decode(ChatCompletionResponse.self, from: data)
+            let text = response.choices.first?.message.content
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            guard !text.isEmpty else { throw TextPostProcessingError.emptyOutput }
+            return text
+        } catch let error as TextPostProcessingError {
+            throw error
+        } catch {
+            throw TextPostProcessingError.invalidResponse(error.localizedDescription)
+        }
+    }
+
+    private static func waitUntilReady(
+        server: Process,
+        socketURL: URL,
+        deadline: Date,
+        outputRead: DispatchSemaphore,
+        outputData: () -> Data
+    ) throws {
+        while Date() < deadline {
+            guard server.isRunning else {
+                _ = outputRead.wait(timeout: .now() + 1)
+                let details = String(data: outputData(), encoding: .utf8)?
+                    .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                throw TextPostProcessingError.processFailed(server.terminationStatus, details)
+            }
+
+            if FileManager.default.fileExists(atPath: socketURL.path),
+               (try? runCurl(
+                   arguments: [
+                       "--silent",
+                       "--fail",
+                       "--max-time", "1",
+                       "--unix-socket", socketURL.path,
+                       "http://localhost/health",
+                   ],
+                   timeout: 2
+               )) != nil {
+                return
+            }
+            Thread.sleep(forTimeInterval: 0.1)
+        }
+        throw TextPostProcessingError.timedOut
+    }
+
+    private static func runCurl(
+        arguments: [String],
+        input: Data? = nil,
+        timeout: TimeInterval
+    ) throws -> Data {
         let task = Process()
-        let outputPipe = Pipe()
+        let output = Pipe()
+        let inputPipe = input.map { _ in Pipe() }
         let finished = DispatchSemaphore(value: 0)
         let outputRead = DispatchSemaphore(value: 0)
         var outputData = Data()
 
-        task.executableURL = URL(fileURLWithPath: runnerPath)
-        task.arguments = runnerCommandPrefix(for: runnerPath) + (try modelArguments(for: configuration)) + [
-            "-sys", systemPrompt,
-            "-p", userPrompt,
-            "-n", "\(maxTokens)",
-            "-c", "2048",
-            "--temp", "0.1",
-            "--top-k", "20",
-            "--top-p", "0.8",
-            "--simple-io",
-            "--no-display-prompt",
-            "-st",
-            "--reasoning", "off",
-        ]
-        task.standardInput = FileHandle.nullDevice
-        task.standardOutput = outputPipe
-        task.standardError = outputPipe
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/curl")
+        task.arguments = arguments
+        task.standardInput = inputPipe ?? FileHandle.nullDevice
+        task.standardOutput = output
+        task.standardError = output
         task.terminationHandler = { _ in finished.signal() }
 
         try task.run()
-
         DispatchQueue.global(qos: .utility).async {
-            outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
+            outputData = output.fileHandleForReading.readDataToEndOfFile()
             outputRead.signal()
+        }
+        if let input, let inputPipe {
+            inputPipe.fileHandleForWriting.write(input)
+            inputPipe.fileHandleForWriting.closeFile()
         }
 
         guard finished.wait(timeout: .now() + timeout) == .success else {
             task.terminate()
             throw TextPostProcessingError.timedOut
         }
-
         outputRead.wait()
-        let output = String(data: outputData, encoding: .utf8) ?? ""
-        guard task.terminationStatus == 0 else {
-            throw TextPostProcessingError.processFailed(
-                task.terminationStatus,
-                output.trimmingCharacters(in: .whitespacesAndNewlines)
-            )
-        }
 
-        let cleaned = cleanedOutput(output, userPrompt: userPrompt)
-        guard !cleaned.isEmpty else { throw TextPostProcessingError.emptyOutput }
-        return cleaned
+        guard task.terminationStatus == 0 else {
+            let details = String(data: outputData, encoding: .utf8)?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            throw TextPostProcessingError.processFailed(task.terminationStatus, details)
+        }
+        return outputData
     }
 
     static func modelArguments(for configuration: TextPostProcessingConfiguration) throws -> [String] {
@@ -281,6 +364,22 @@ final class LocalLLMPostProcessor: TextPostProcessing {
     static func expandedPath(_ path: String) -> String {
         path.trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: #"^~(?=/|$)"#, with: NSHomeDirectory(), options: .regularExpression)
+    }
+
+    private static func serverExecutable(for configuredPath: String) -> String? {
+        let path = expandedPath(configuredPath)
+        guard !path.isEmpty else { return nil }
+
+        if URL(fileURLWithPath: path).lastPathComponent == "llama-server",
+           FileManager.default.isExecutableFile(atPath: path) {
+            return path
+        }
+
+        let sibling = URL(fileURLWithPath: path)
+            .deletingLastPathComponent()
+            .appendingPathComponent("llama-server")
+            .path
+        return FileManager.default.isExecutableFile(atPath: sibling) ? sibling : nil
     }
 
     private static func installLlamaCpp(using brewPath: String) throws -> String {
@@ -303,13 +402,37 @@ final class LocalLLMPostProcessor: TextPostProcessing {
             throw TextPostProcessingError.processFailed(task.terminationStatus, "")
         }
         guard let runner = detectedRunnerPath() else {
-            throw TextPostProcessingError.runnerNotExecutable("llama.cpp installed, but no llama runner was found.")
+            throw TextPostProcessingError.runnerNotExecutable("llama.cpp installed, but llama-server was not found.")
         }
         return runner
     }
 
-    private static func runnerCommandPrefix(for runnerPath: String) -> [String] {
-        URL(fileURLWithPath: runnerPath).lastPathComponent == "llama" ? ["cli"] : []
+    private struct ChatCompletionRequest: Encodable {
+        let messages: [ChatMessage]
+        let maxTokens: Int
+        let temperature: Double
+        let topP: Double
+        let stream: Bool
+
+        enum CodingKeys: String, CodingKey {
+            case messages
+            case maxTokens = "max_tokens"
+            case temperature
+            case topP = "top_p"
+            case stream
+        }
     }
 
+    private struct ChatMessage: Codable {
+        let role: String
+        let content: String
+    }
+
+    private struct ChatCompletionResponse: Decodable {
+        let choices: [Choice]
+
+        struct Choice: Decodable {
+            let message: ChatMessage
+        }
+    }
 }
