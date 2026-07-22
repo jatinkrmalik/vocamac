@@ -5,28 +5,35 @@ import XCTest
 @testable import VocaMac
 
 final class LocalLLMPostProcessorTests: XCTestCase {
-    func testPromptIncludesTranscriptAndInstructions() {
-        let prompt = LocalLLMPostProcessor.prompt(
-            for: "um let's email Namrata about the launch",
-            instructions: "Keep it concise."
+    func testRewriteSystemPromptUsesCustomInstructions() {
+        XCTAssertEqual(
+            LocalLLMPostProcessor.rewriteSystemPrompt(instructions: "Keep it concise."),
+            "Keep it concise."
         )
-
-        XCTAssertTrue(prompt.contains("Keep it concise."))
-        XCTAssertTrue(prompt.contains("um let's email Namrata about the launch"))
-        XCTAssertTrue(prompt.contains("Return only the rewritten text."))
     }
 
-    func testCleanedOutputRemovesPromptAndThinkingBlock() {
-        let prompt = "Prompt:"
+    func testCleanedOutputExtractsAssistantReplyFromChatTranscript() {
+        let userPrompt = "um let's email Namrata about the launch"
         let output = """
-        \u{001B}[32mPrompt:<think>
+        Loading model...
+
+        available commands:
+          /exit or Ctrl+C     stop or exit
+
+        > um let's email Namrata about the launch
+
+        <think>
         hidden reasoning
         </think>
         Email Namrata about the launch.
+
+        [ Prompt: 99.6 t/s | Generation: 214.6 t/s ]
+
+        Exiting...
         """
 
         XCTAssertEqual(
-            LocalLLMPostProcessor.cleanedOutput(output, prompt: prompt),
+            LocalLLMPostProcessor.cleanedOutput(output, userPrompt: userPrompt),
             "Email Namrata about the launch."
         )
     }
@@ -41,7 +48,7 @@ final class LocalLLMPostProcessorTests: XCTestCase {
 
         XCTAssertEqual(
             try LocalLLMPostProcessor.modelArguments(for: config),
-            ["-hf", "ggml-org/gemma-3-1b-it-GGUF:Q4_K_M", "--jinja"]
+            ["-hf", "ggml-org/gemma-3-1b-it-GGUF:Q4_K_M"]
         )
     }
 
@@ -74,7 +81,10 @@ final class LocalLLMPostProcessorTests: XCTestCase {
           printf 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\\n'
           i=$((i + 1))
         done
-        printf 'OK\\n'
+        printf '> ping\\n\\n'
+        printf 'OK\\n\\n'
+        printf '[ Prompt: 1.0 t/s | Generation: 1.0 t/s ]\\n\\n'
+        printf 'Exiting...\\n'
         """
         try script.write(to: scriptURL, atomically: true, encoding: .utf8)
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: scriptURL.path)

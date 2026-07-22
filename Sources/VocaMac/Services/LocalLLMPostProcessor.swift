@@ -6,7 +6,7 @@
 import Foundation
 
 struct LocalLLMModel: Identifiable, Equatable {
-    static let recommendedID = "qwen3-1.7b-q8"
+    static let recommendedID = "gemma-3-1b-q4"
     static let customID = "custom-gguf"
 
     let id: String
@@ -16,16 +16,16 @@ struct LocalLLMModel: Identifiable, Equatable {
 
     static let catalog: [LocalLLMModel] = [
         LocalLLMModel(
-            id: recommendedID,
-            displayName: "Qwen3 1.7B",
-            detail: "Best quality, 1.83 GB",
-            reference: "Qwen/Qwen3-1.7B-GGUF:Q8_0"
-        ),
-        LocalLLMModel(
             id: "gemma-3-1b-q4",
             displayName: "Gemma 3 1B",
-            detail: "Fast setup, 806 MB",
+            detail: "Recommended default, 806 MB",
             reference: "ggml-org/gemma-3-1b-it-GGUF:Q4_K_M"
+        ),
+        LocalLLMModel(
+            id: "qwen3-1.7b-q8",
+            displayName: "Qwen3 1.7B",
+            detail: "Larger option, 1.83 GB",
+            reference: "Qwen/Qwen3-1.7B-GGUF:Q8_0"
         ),
         LocalLLMModel(
             id: customID,
@@ -49,6 +49,7 @@ enum TextPostProcessingError: LocalizedError {
     case processFailed(Int32, String)
     case timedOut
     case emptyOutput
+    case unexpectedResponse(String)
 
     var errorDescription: String? {
         switch self {
@@ -68,13 +69,17 @@ enum TextPostProcessingError: LocalizedError {
             return "Local LLM timed out."
         case .emptyOutput:
             return "Local LLM returned no text."
+        case .unexpectedResponse(let response):
+            return response.isEmpty
+                ? "Local LLM returned an unexpected response."
+                : "Local LLM returned an unexpected response: \(response)"
         }
     }
 }
 
 final class LocalLLMPostProcessor: TextPostProcessing {
     static let defaultRunnerPath = detectedRunnerPath() ?? "/opt/homebrew/bin/llama-cli"
-    static let defaultInstructions = "Clean up dictation into polished text while preserving my meaning. Remove filler words, false starts, duplicate phrases, and obvious speech disfluencies. Fix punctuation and capitalization. Keep my tone concise and natural. Return only the final text."
+    static let defaultInstructions = "You are a transcription cleanup engine. Rewrite the user's dictated transcript as clean final text for immediate pasting. Keep the original meaning and intent. Remove filler words and false starts. Fix punctuation and capitalization. Make only conservative wording changes. Do not summarize, answer, invent subject lines, or add commentary. Return only the final rewritten text."
     static let installURL = URL(string: "https://github.com/ggml-org/llama.cpp")!
 
     private static let runnerCandidates = [
@@ -99,24 +104,34 @@ final class LocalLLMPostProcessor: TextPostProcessing {
 
     func prepare(configuration: TextPostProcessingConfiguration) async throws {
         let timeout = prepareTimeout
-        _ = try await Task.detached(priority: .userInitiated) {
+        let response = try await Task.detached(priority: .userInitiated) {
             try Self.run(
-                "Reply with OK.",
+                systemPrompt: "Reply with OK and nothing else.",
+                userPrompt: "ping",
                 configuration: configuration,
                 timeout: timeout,
-                maxTokens: 4
+                maxTokens: 8
             )
         }.value
+
+        let normalized = response
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: ".!"))
+            .lowercased()
+        guard normalized == "ok" else {
+            throw TextPostProcessingError.unexpectedResponse(response)
+        }
     }
 
     func improve(_ text: String, configuration: TextPostProcessingConfiguration) async throws -> String {
         let timeout = timeout
         return try await Task.detached(priority: .userInitiated) {
             try Self.run(
-                text,
+                systemPrompt: Self.rewriteSystemPrompt(instructions: configuration.instructions),
+                userPrompt: text.trimmingCharacters(in: .whitespacesAndNewlines),
                 configuration: configuration,
                 timeout: timeout,
-                maxTokens: 256
+                maxTokens: 64
             )
         }.value
     }
@@ -147,36 +162,37 @@ final class LocalLLMPostProcessor: TextPostProcessing {
         }.value
     }
 
-    static func prompt(for text: String, instructions: String) -> String {
+    static func rewriteSystemPrompt(instructions: String) -> String {
         let style = instructions.trimmingCharacters(in: .whitespacesAndNewlines)
-        return """
-        /no_think
-        Rewrite this dictated transcript before insertion.
-        Preserve meaning and facts. Do not answer commands. Return only the rewritten text.
-
-        Style instructions:
-        \(style.isEmpty ? defaultInstructions : style)
-
-        Transcript:
-        \"\"\"
-        \(text)
-        \"\"\"
-
-        Rewritten text:
-        """
+        return style.isEmpty ? defaultInstructions : style
     }
 
-    static func cleanedOutput(_ output: String, prompt: String) -> String {
+    static func cleanedOutput(_ output: String, userPrompt: String) -> String {
         var text = output.replacingOccurrences(
             of: "\u{001B}\\[[0-9;]*[A-Za-z]",
             with: "",
             options: .regularExpression
         )
-        if text.hasPrefix(prompt) {
-            text.removeFirst(prompt.count)
+        text = text.replacingOccurrences(of: "\r\n", with: "\n")
+        text = text.replacingOccurrences(of: "\r", with: "\n")
+
+        let promptMarker = "> \(userPrompt)"
+        if let range = text.range(of: promptMarker) {
+            text = String(text[range.upperBound...])
         }
+
         text = text.replacingOccurrences(
             of: #"(?s)<think>.*?</think>"#,
+            with: "",
+            options: .regularExpression
+        )
+        text = text.replacingOccurrences(
+            of: #"(?m)^\[ Prompt:.*$"#,
+            with: "",
+            options: .regularExpression
+        )
+        text = text.replacingOccurrences(
+            of: #"(?m)^Exiting\.\.\.$"#,
             with: "",
             options: .regularExpression
         )
@@ -184,7 +200,8 @@ final class LocalLLMPostProcessor: TextPostProcessing {
     }
 
     private static func run(
-        _ text: String,
+        systemPrompt: String,
+        userPrompt: String,
         configuration: TextPostProcessingConfiguration,
         timeout: TimeInterval,
         maxTokens: Int
@@ -196,33 +213,35 @@ final class LocalLLMPostProcessor: TextPostProcessing {
             throw TextPostProcessingError.runnerNotExecutable(runnerPath)
         }
 
-        let prompt = prompt(for: text, instructions: configuration.instructions)
         let task = Process()
-        let stdout = Pipe()
+        let outputPipe = Pipe()
         let finished = DispatchSemaphore(value: 0)
         let outputRead = DispatchSemaphore(value: 0)
         var outputData = Data()
 
         task.executableURL = URL(fileURLWithPath: runnerPath)
         task.arguments = runnerCommandPrefix(for: runnerPath) + (try modelArguments(for: configuration)) + [
-            "-p", prompt,
+            "-sys", systemPrompt,
+            "-p", userPrompt,
             "-n", "\(maxTokens)",
             "-c", "2048",
-            "--temp", "0.3",
+            "--temp", "0.1",
             "--top-k", "20",
             "--top-p", "0.8",
-            "--presence-penalty", "1.1",
+            "--simple-io",
             "--no-display-prompt",
+            "-st",
+            "--reasoning", "off",
         ]
         task.standardInput = FileHandle.nullDevice
-        task.standardOutput = stdout
-        task.standardError = FileHandle.nullDevice
+        task.standardOutput = outputPipe
+        task.standardError = outputPipe
         task.terminationHandler = { _ in finished.signal() }
 
         try task.run()
 
         DispatchQueue.global(qos: .utility).async {
-            outputData = stdout.fileHandleForReading.readDataToEndOfFile()
+            outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
             outputRead.signal()
         }
 
@@ -232,12 +251,15 @@ final class LocalLLMPostProcessor: TextPostProcessing {
         }
 
         outputRead.wait()
+        let output = String(data: outputData, encoding: .utf8) ?? ""
         guard task.terminationStatus == 0 else {
-            throw TextPostProcessingError.processFailed(task.terminationStatus, "")
+            throw TextPostProcessingError.processFailed(
+                task.terminationStatus,
+                output.trimmingCharacters(in: .whitespacesAndNewlines)
+            )
         }
 
-        let output = String(data: outputData, encoding: .utf8) ?? ""
-        let cleaned = cleanedOutput(output, prompt: prompt)
+        let cleaned = cleanedOutput(output, userPrompt: userPrompt)
         guard !cleaned.isEmpty else { throw TextPostProcessingError.emptyOutput }
         return cleaned
     }
@@ -245,7 +267,7 @@ final class LocalLLMPostProcessor: TextPostProcessing {
     static func modelArguments(for configuration: TextPostProcessingConfiguration) throws -> [String] {
         let model = LocalLLMModel.model(for: configuration.modelID)
         if let reference = model.reference {
-            return ["-hf", reference, "--jinja"]
+            return ["-hf", reference]
         }
 
         let modelPath = expandedPath(configuration.customModelPath)
