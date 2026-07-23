@@ -605,10 +605,15 @@ final class AppState: ObservableObject {
         // Keeps the overlay visible so the user knows text is on its way
         cursorOverlay.transitionToProcessing()
 
-        guard !audioData.isEmpty,
-              audioData.contains(where: { abs($0) >= 0.0001 }) else {
+        guard !audioData.isEmpty else {
             cursorOverlay.hide()
-            // Don't keep a route warm when it produced no buffers or only silence.
+            appStatus = .idle
+            return
+        }
+
+        guard audioData.contains(where: { abs($0) >= 0.0001 }) else {
+            cursorOverlay.hide()
+            // Don't keep a route warm when it produced only silence.
             audioEngine.forceReset()
             let message = "No microphone audio detected. Check that the selected microphone is connected and available in Settings → Audio."
             VocaLogger.warning(.appState, message)

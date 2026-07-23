@@ -68,8 +68,8 @@ final class AppStateRecordingTests: XCTestCase {
 
         XCTAssertEqual(mocks.soundManager.startSoundCallCount, 0)
         XCTAssertEqual(mocks.soundManager.stopSoundCallCount, 1)
-        XCTAssertEqual(appState.appStatus, .error)
-        XCTAssertEqual(mocks.audioEngine.forceResetCallCount, 1)
+        XCTAssertEqual(appState.appStatus, .idle)
+        XCTAssertEqual(mocks.audioEngine.forceResetCallCount, 0)
     }
 
     func testStartRecordingInProcessingStateForceRecovers() async {
@@ -108,19 +108,19 @@ final class AppStateRecordingTests: XCTestCase {
                       "Stop sound should be played once")
     }
 
-    func testStopRecordingWithEmptyAudioShowsInputErrorAndResetsRoute() async {
+    func testStopRecordingWithEmptyAudioReturnsToIdle() async {
         let (appState, mocks) = AppState.makeTestState()
         appState.isRecording = true
         appState.appStatus = .recording
 
         await appState.stopRecordingAndTranscribe()
 
-        XCTAssertEqual(appState.appStatus, .error)
-        XCTAssertTrue(appState.errorMessage?.contains("selected microphone") == true)
+        XCTAssertEqual(appState.appStatus, .idle)
+        XCTAssertNil(appState.errorMessage)
         XCTAssertNil(mocks.whisperService.lastTranscribedAudioData)
         XCTAssertEqual(mocks.textInjector.injectCallCount, 0)
-        XCTAssertEqual(mocks.audioEngine.forceResetCallCount, 1,
-                       "Empty capture should force-reset the engine so a dead route is not kept warm")
+        XCTAssertEqual(mocks.audioEngine.forceResetCallCount, 0,
+                       "Cancelling before the first buffer should not be reported as a broken route")
     }
 
     func testStopRecordingWithSilentAudioShowsInputError() async {

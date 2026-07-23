@@ -674,6 +674,65 @@ final class AudioEngineDeviceChangeTests: XCTestCase {
         )
     }
 
+    func testExplicitInputRouteMustBeVerified() {
+        XCTAssertTrue(
+            AudioEngine.shouldAcceptConfiguredInputRoute(
+                requestedDeviceID: 42,
+                targetDeviceID: 42,
+                deviceIDImmediatelyAfterSet: 42,
+                deviceIDAfterReset: 42
+            )
+        )
+        XCTAssertFalse(
+            AudioEngine.shouldAcceptConfiguredInputRoute(
+                requestedDeviceID: 42,
+                targetDeviceID: 42,
+                deviceIDImmediatelyAfterSet: 41,
+                deviceIDAfterReset: 41
+            ),
+            "An explicit selection must not silently record from a fallback device"
+        )
+        XCTAssertTrue(
+            AudioEngine.shouldAcceptConfiguredInputRoute(
+                requestedDeviceID: nil,
+                targetDeviceID: 42,
+                deviceIDImmediatelyAfterSet: 41,
+                deviceIDAfterReset: 41
+            ),
+            "System Default may continue on Core Audio's active fallback route"
+        )
+    }
+
+    func testDelayedHealthyStartupConfigurationChangeIsIgnored() {
+        XCTAssertTrue(
+            AudioEngine.shouldIgnoreConfigurationChange(
+                occurredDuringRecordingPreparation: false,
+                isRecording: true,
+                engineIsRunning: true,
+                elapsedSinceRecordingStart: 0.5
+            ),
+            "A delayed startup notification must not tear down a healthy recording"
+        )
+        XCTAssertFalse(
+            AudioEngine.shouldIgnoreConfigurationChange(
+                occurredDuringRecordingPreparation: false,
+                isRecording: true,
+                engineIsRunning: false,
+                elapsedSinceRecordingStart: 0.5
+            ),
+            "A stopped engine still requires route-change recovery"
+        )
+        XCTAssertFalse(
+            AudioEngine.shouldIgnoreConfigurationChange(
+                occurredDuringRecordingPreparation: false,
+                isRecording: true,
+                engineIsRunning: true,
+                elapsedSinceRecordingStart: 1.01
+            ),
+            "Live route changes after startup must still interrupt recording"
+        )
+    }
+
     func testOnAudioDeviceChangedCallbackExists() {
         // Verify the callback property can be set
         let engine = AudioEngine()

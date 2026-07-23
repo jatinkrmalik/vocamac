@@ -29,6 +29,7 @@ final class AudioEngine {
     private var _isPreparingRecording = false
 
     static let inputRouteConfigurationTimeout: TimeInterval = 0.25
+    static let startupConfigurationChangeRecoveryWindow: TimeInterval = 1.0
     static let idleEngineReleaseDelay: TimeInterval = 3.0
 
     var isCurrentlyRecording: Bool {
@@ -171,12 +172,17 @@ final class AudioEngine {
             guard let self = self else { return }
             VocaLogger.info(.audioEngine, "Audio configuration changed (device plug/unplug or route change)")
 
-            if occurredDuringRecordingPreparation {
+            let wasRecording = self._isCurrentlyRecording
+            let elapsedSinceRecordingStart = Date().timeIntervalSince(self.recordingStartTime)
+            if Self.shouldIgnoreConfigurationChange(
+                occurredDuringRecordingPreparation: occurredDuringRecordingPreparation,
+                isRecording: wasRecording,
+                engineIsRunning: self.engine?.isRunning == true,
+                elapsedSinceRecordingStart: elapsedSinceRecordingStart
+            ) {
                 VocaLogger.info(.audioEngine, "Configuration change was part of recording route preparation")
                 return
             }
-
-            let wasRecording = self._isCurrentlyRecording
 
             if wasRecording {
                 VocaLogger.warning(.audioEngine, "Configuration changed while recording — forcing stop and reset")
@@ -257,11 +263,14 @@ final class AudioEngine {
             for attempt in 1...2 {
                 let engine = acquireEngine()
                 let inputNode = engine.inputNode
-                configureInputRoute(
+                guard configureInputRoute(
                     preferredInputDeviceID: preferredInputDeviceID,
                     engine: engine,
                     inputNode: inputNode
-                )
+                ) else {
+                    recoverFromStartFailure(notifyAppState: false)
+                    return false
+                }
                 let inputFormat = inputNode.outputFormat(forBus: 0)
 
                 guard isValidInputFormat(inputFormat) else {
@@ -458,6 +467,20 @@ final class AudioEngine {
         return OSStatus(truncatingIfNeeded: (error as NSError).code) == kAudioHardwareNotRunningError
     }
 
+    static func shouldIgnoreConfigurationChange(
+        occurredDuringRecordingPreparation: Bool,
+        isRecording: Bool,
+        engineIsRunning: Bool,
+        elapsedSinceRecordingStart: TimeInterval,
+        recoveryWindow: TimeInterval = startupConfigurationChangeRecoveryWindow
+    ) -> Bool {
+        occurredDuringRecordingPreparation
+            || (isRecording
+                && engineIsRunning
+                && elapsedSinceRecordingStart >= 0
+                && elapsedSinceRecordingStart <= recoveryWindow)
+    }
+
     static func describeCoreAudioError(_ error: Error) -> String {
         let nsError = error as NSError
         var parts = [nsError.localizedDescription, "domain=\(nsError.domain)", "code=\(nsError.code)"]
@@ -645,7 +668,7 @@ final class AudioEngine {
         preferredInputDeviceID: String?,
         engine: AVAudioEngine,
         inputNode: AVAudioInputNode
-    ) {
+    ) -> Bool {
         let requestedUID = preferredInputDeviceID?
             .trimmingCharacters(in: .whitespacesAndNewlines)
         let requestedDeviceID = requestedUID.flatMap(Self.inputAudioDeviceID(forUID:))
@@ -657,12 +680,12 @@ final class AudioEngine {
 
         guard let targetDeviceID = requestedDeviceID ?? defaultDeviceID else {
             VocaLogger.warning(.audioEngine, "No input device is available; retaining the current AudioUnit route")
-            return
+            return true
         }
 
         guard let audioUnit = inputNode.audioUnit else {
             VocaLogger.warning(.audioEngine, "Input node has no AudioUnit; falling back to system default input")
-            return
+            return requestedDeviceID == nil
         }
 
         let currentDeviceID = Self.currentInputDeviceID(for: audioUnit)
@@ -672,7 +695,7 @@ final class AudioEngine {
         ) else {
             let deviceName = Self.audioDeviceName(for: targetDeviceID) ?? requestedUID ?? "system default"
             VocaLogger.debug(.audioEngine, "Input device already configured: \(deviceName)")
-            return
+            return true
         }
 
         // Observe directly on Core Audio's posting queue. startRecording holds
@@ -699,7 +722,7 @@ final class AudioEngine {
 
         guard status == noErr else {
             VocaLogger.warning(.audioEngine, "Failed to set input device: OSStatus \(status); retaining the current route")
-            return
+            return requestedDeviceID == nil
         }
 
         let deviceIDImmediatelyAfterSet = Self.currentInputDeviceID(for: audioUnit)
@@ -716,14 +739,19 @@ final class AudioEngine {
         engine.reset()
 
         let deviceIDAfterReset = Self.currentInputDeviceID(for: audioUnit)
-        guard deviceIDImmediatelyAfterSet == targetDeviceID,
-              deviceIDAfterReset == targetDeviceID else {
+        if deviceIDImmediatelyAfterSet != targetDeviceID || deviceIDAfterReset != targetDeviceID {
             VocaLogger.warning(.audioEngine, "Core Audio did not apply the requested input device; rebuilt the graph using the active fallback route")
-            return
+            return Self.shouldAcceptConfiguredInputRoute(
+                requestedDeviceID: requestedDeviceID,
+                targetDeviceID: targetDeviceID,
+                deviceIDImmediatelyAfterSet: deviceIDImmediatelyAfterSet,
+                deviceIDAfterReset: deviceIDAfterReset
+            )
         }
 
         let deviceName = Self.audioDeviceName(for: targetDeviceID) ?? requestedUID ?? "system default"
         VocaLogger.info(.audioEngine, "Using input device: \(deviceName)")
+        return true
     }
 
     static func shouldReconfigureInputDevice(
@@ -731,6 +759,17 @@ final class AudioEngine {
         targetDeviceID: AudioDeviceID
     ) -> Bool {
         currentDeviceID != targetDeviceID
+    }
+
+    static func shouldAcceptConfiguredInputRoute(
+        requestedDeviceID: AudioDeviceID?,
+        targetDeviceID: AudioDeviceID,
+        deviceIDImmediatelyAfterSet: AudioDeviceID?,
+        deviceIDAfterReset: AudioDeviceID?
+    ) -> Bool {
+        requestedDeviceID == nil
+            || (deviceIDImmediatelyAfterSet == targetDeviceID
+                && deviceIDAfterReset == targetDeviceID)
     }
 
     private static func currentInputDeviceID(for audioUnit: AudioUnit) -> AudioDeviceID? {
