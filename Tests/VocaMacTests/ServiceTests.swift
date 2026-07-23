@@ -659,19 +659,78 @@ final class AudioEngineForceResetTests: XCTestCase {
 
 final class AudioEngineDeviceChangeTests: XCTestCase {
 
-    func testStartupConfigurationChangeWindow() {
-        let cases: [(elapsed: TimeInterval, expected: Bool)] = [
-            (0.10, true),
-            (AudioEngine.startupConfigurationChangeRecoveryWindow + 0.01, false),
-            (-0.01, false)
-        ]
+    func testInputRouteReconfigurationDecision() {
+        XCTAssertFalse(
+            AudioEngine.shouldReconfigureInputDevice(currentDeviceID: 42, targetDeviceID: 42),
+            "An AudioUnit already bound to the target device should not rebuild its graph"
+        )
+        XCTAssertTrue(
+            AudioEngine.shouldReconfigureInputDevice(currentDeviceID: 41, targetDeviceID: 42),
+            "Switching devices must rebuild the graph"
+        )
+        XCTAssertTrue(
+            AudioEngine.shouldReconfigureInputDevice(currentDeviceID: nil, targetDeviceID: 42),
+            "An unreadable current route must be treated as needing configuration"
+        )
+    }
 
-        for testCase in cases {
-            XCTAssertEqual(
-                AudioEngine.shouldTreatAsStartupConfigurationChange(elapsedSinceRecordingStart: testCase.elapsed),
-                testCase.expected
+    func testExplicitInputRouteMustBeVerified() {
+        XCTAssertTrue(
+            AudioEngine.shouldAcceptConfiguredInputRoute(
+                requestedDeviceID: 42,
+                targetDeviceID: 42,
+                deviceIDImmediatelyAfterSet: 42,
+                deviceIDAfterReset: 42
             )
-        }
+        )
+        XCTAssertFalse(
+            AudioEngine.shouldAcceptConfiguredInputRoute(
+                requestedDeviceID: 42,
+                targetDeviceID: 42,
+                deviceIDImmediatelyAfterSet: 41,
+                deviceIDAfterReset: 41
+            ),
+            "An explicit selection must not silently record from a fallback device"
+        )
+        XCTAssertTrue(
+            AudioEngine.shouldAcceptConfiguredInputRoute(
+                requestedDeviceID: nil,
+                targetDeviceID: 42,
+                deviceIDImmediatelyAfterSet: 41,
+                deviceIDAfterReset: 41
+            ),
+            "System Default may continue on Core Audio's active fallback route"
+        )
+    }
+
+    func testDelayedHealthyStartupConfigurationChangeIsIgnored() {
+        XCTAssertTrue(
+            AudioEngine.shouldIgnoreConfigurationChange(
+                occurredDuringRecordingPreparation: false,
+                isRecording: true,
+                engineIsRunning: true,
+                elapsedSinceRecordingStart: 0.5
+            ),
+            "A delayed startup notification must not tear down a healthy recording"
+        )
+        XCTAssertFalse(
+            AudioEngine.shouldIgnoreConfigurationChange(
+                occurredDuringRecordingPreparation: false,
+                isRecording: true,
+                engineIsRunning: false,
+                elapsedSinceRecordingStart: 0.5
+            ),
+            "A stopped engine still requires route-change recovery"
+        )
+        XCTAssertFalse(
+            AudioEngine.shouldIgnoreConfigurationChange(
+                occurredDuringRecordingPreparation: false,
+                isRecording: true,
+                engineIsRunning: true,
+                elapsedSinceRecordingStart: 1.01
+            ),
+            "Live route changes after startup must still interrupt recording"
+        )
     }
 
     func testOnAudioDeviceChangedCallbackExists() {
