@@ -101,7 +101,7 @@ final class AppState: ObservableObject {
     @AppStorage("vocamac.maxRecordingDuration") var maxRecordingDuration: Int = 60
     @AppStorage("vocamac.selectedAudioDeviceID") var selectedAudioDeviceID: String = ""
     @AppStorage("vocamac.selectedAudioDeviceName") var selectedAudioDeviceName: String = ""
-    @AppStorage("vocamac.selectedModelSize") var selectedModelSize: String = ModelSize.tiny.rawValue
+    @AppStorage(PreferenceKey.selectedModelSize) var selectedModelSize: String = ModelSize.tiny.rawValue
     @AppStorage(PreferenceKey.selectedLanguage) var selectedLanguage: String = "auto"
     @AppStorage("vocamac.launchAtLogin") var launchAtLogin: Bool = false
     @AppStorage("vocamac.preserveClipboard") var preserveClipboard: Bool = true

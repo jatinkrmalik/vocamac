@@ -166,7 +166,7 @@ make install
 
 This builds VocaMac, installs it to `/Applications`, and launches it. Permissions are granted directly to VocaMac, just like the DMG method.
 
-### Option 4: CLI Commands (For Developers)
+### Option 4: Launch/Build Helper Commands (For Developers)
 
 ```bash
 git clone https://github.com/VocaHQ/vocamac.git
@@ -174,11 +174,79 @@ cd vocamac
 make install-cli
 ```
 
-This installs two commands to `~/.local/bin`:
+This installs two development helpers to `~/.local/bin`:
+
 - `vocamac &`: Launch VocaMac in background
 - `vocamac-build`: Rebuild from source after pulling updates
 
-> **Permissions note:** In CLI mode, macOS assigns permissions to your **terminal app** (Terminal, iTerm2, etc.) rather than VocaMac itself. Grant Microphone, Accessibility, and Input Monitoring to your terminal app instead.
+These are launch/build helpers, not the headless transcription interface described below. Because the launcher runs a development binary from Terminal, macOS may assign its GUI permissions to the terminal app rather than the installed VocaMac app.
+
+### Headless File Transcription CLI
+
+The installed app binary can transcribe an existing audio file without opening the GUI, recording the microphone, injecting text, or disturbing an already-running VocaMac instance:
+
+```bash
+/Applications/VocaMac.app/Contents/MacOS/VocaMac \
+  --transcribe-file /path/to/audio.wav \
+  --json
+```
+
+By default, the command follows the model and language currently selected in the VocaMac app. `auto` language selection is passed to the engine as automatic detection. You can override either choice for one request without changing the saved app preferences:
+
+```bash
+/Applications/VocaMac.app/Contents/MacOS/VocaMac \
+  --transcribe-file /path/to/audio.wav \
+  --model parakeet-tdt-0.6b-v2 \
+  --language en \
+  --json
+```
+
+The model must already be downloaded in VocaMac. Headless mode never downloads a missing model automatically. Input is validated and converted with AVFoundation to mono, 16 kHz, Float32 PCM; files are limited to 500 MB and 30 minutes.
+
+Successful transcription writes exactly one JSON object to stdout:
+
+```json
+{
+  "audio_length_seconds": 4.3,
+  "detected_language": "en",
+  "duration_seconds": 0.72,
+  "engine": "parakeet",
+  "model": "parakeet-tdt-0.6b-v2",
+  "text": "Transcribed text"
+}
+```
+
+`engine` is one of `whisperkit`, `parakeet`, `apple_speech`, or `sherpa_onnx`. Operational messages continue to VocaMac's unified and file logs, keeping stdout safe for JSON consumers such as VocaPhone.
+
+List every known model and its current state with:
+
+```bash
+/Applications/VocaMac.app/Contents/MacOS/VocaMac --list-models --json
+```
+
+The response is a `models` array whose entries have this schema:
+
+```json
+{
+  "id": "parakeet-tdt-0.6b-v2",
+  "name": "Parakeet v2 (English)",
+  "engine": "parakeet",
+  "selected": true,
+  "downloaded": true,
+  "supported": true,
+  "system_managed": false
+}
+```
+
+Failures exit nonzero and write a JSON error to stderr, for example:
+
+```json
+{"error":"model_not_downloaded","message":"Model is not downloaded: small"}
+```
+
+Stable error categories are `invalid_arguments`, `invalid_audio`, `model_not_found`, `model_not_downloaded`, `model_unsupported`, and `transcription_failed`. Use `--help` for command syntax; it exits without launching the GUI.
+
+One-shot CLI mode loads the selected model in a separate process for each request. This preserves isolation from the running menu bar app, but the first request has the normal model-loading cost.
 
 ### First Launch
 
@@ -336,17 +404,19 @@ Open Settings from the menu bar popover or with **⌘,**
 VocaMac is built with a clean, modular architecture using native Swift and SwiftUI:
 
 ```
-VocaMacApp (SwiftUI MenuBarExtra)
-├── AppState          - Central observable state
-├── HotKeyManager     - CGEventTap global hotkey listener
-├── AudioEngine       - AVAudioEngine mic capture (16kHz, mono, Float32)
-├── WhisperService    - WhisperKit async transcription wrapper
-│   └── ModelManager  - Model download, storage, device recommendations
-│       └── SystemInfo - Hardware detection & model recommendation
-├── SoundManager      - Audio feedback (start/stop recording cues)
-├── TextInjector      - Clipboard + Cmd+V text injection
-├── MenuBarView       - Status popover UI
-└── SettingsView      - Configuration tabs (General, Models, Audio, Debug, About)
+VocaMacMain (pre-SwiftUI dispatcher)
+├── CLIEntrypoint
+│   ├── AudioFileLoader       - Existing-file validation and 16 kHz mono conversion
+│   ├── ModelManager          - Saved model resolution and local-asset checks
+│   └── TranscriptionRouter   - Whisper, Parakeet, Apple Speech, and sherpa-onnx
+└── VocaMacApp (SwiftUI MenuBarExtra)
+    ├── AppState              - Central observable state
+    ├── HotKeyManager         - CGEventTap global hotkey listener
+    ├── AudioEngine           - AVAudioEngine mic capture (16 kHz, mono, Float32)
+    ├── SoundManager          - Audio feedback (start/stop recording cues)
+    ├── TextInjector          - Clipboard + Cmd+V text injection
+    ├── MenuBarView           - Status popover UI
+    └── SettingsView          - Configuration tabs (General, Models, Audio, Debug, About)
 ```
 
 For detailed documentation, see:
@@ -370,7 +440,11 @@ VocaMac/
 ├── Sources/
 │   └── VocaMac/
 │       ├── App/
-│       │   └── VocaMacApp.swift    # Entry point, MenuBarExtra
+│       │   └── VocaMacApp.swift    # SwiftUI MenuBarExtra app
+│       ├── CLI/
+│       │   ├── CLIEntrypoint.swift # Process dispatcher and headless execution
+│       │   ├── HeadlessTranscriber.swift # Model resolution and router orchestration
+│       │   └── AudioFileLoader.swift # File validation and PCM conversion
 │       ├── Views/
 │       │   ├── MenuBarView.swift   # Menu bar popover
 │       │   └── SettingsView.swift  # Settings window (5 tabs)
@@ -392,7 +466,7 @@ VocaMac/
 ├── Makefile                        # make build, install, test, clean
 ├── scripts/
 │   ├── build.sh                    # Build .app bundle (dev)
-│   ├── install.sh                  # Install to /Applications or CLI
+│   ├── install.sh                  # Install app or development helpers
 │   └── uninstall.sh                # Full uninstall & cleanup
 ├── web/                            # Marketing website (vocamac.com)
 ├── docs/

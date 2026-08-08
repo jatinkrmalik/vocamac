@@ -124,9 +124,27 @@ final class SherpaService: @unchecked Sendable {
 
     // MARK: - Model Management
 
-    /// Load a sherpa-onnx model from its extracted directory.
+    /// Load a sherpa-onnx model using the GUI's saved language preference.
+    /// Direct service callers retain the pre-headless behavior; the router
+    /// uses the explicit-language overload below.
     func loadModel(
         name modelName: String? = nil,
+        onPhaseChange: ((String) -> Void)? = nil
+    ) async throws {
+        let stored = UserDefaults.standard.string(forKey: PreferenceKey.selectedLanguage) ?? "auto"
+        try await loadModel(
+            name: modelName,
+            language: stored == "auto" ? nil : stored,
+            onPhaseChange: onPhaseChange
+        )
+    }
+
+    /// Load a sherpa-onnx model with a caller-supplied one-request language.
+    /// `nil` explicitly means automatic language selection and never falls
+    /// back to the saved GUI preference.
+    func loadModel(
+        name modelName: String? = nil,
+        language: String?,
         onPhaseChange: ((String) -> Void)? = nil
     ) async throws {
         unloadModel()
@@ -141,15 +159,13 @@ final class SherpaService: @unchecked Sendable {
             throw SherpaError.modelFilesMissing(directory.path)
         }
 
-        VocaLogger.info(.sherpaService, "Loading ONNX model: \(size.rawValue)...")
+        let preferredLanguage = Self.normalizedLoadLanguage(language)
+        VocaLogger.info(
+            .sherpaService,
+            "Loading ONNX model: \(size.rawValue) (language: \(preferredLanguage))..."
+        )
         let startTime = CFAbsoluteTimeGetCurrent()
         onPhaseChange?("Loading ONNX model…")
-
-        // The user's language preference influences config for SenseVoice
-        // (recognition language) and Canary (source language). Both are fixed
-        // at load time by the C API, so AppState reloads the active model when
-        // the preference changes (see reloadModelForLanguageChangeIfNeeded).
-        let preferredLanguage = UserDefaults.standard.string(forKey: PreferenceKey.selectedLanguage) ?? "auto"
 
         let created: OpaquePointer? = await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
@@ -341,6 +357,13 @@ final class SherpaService: @unchecked Sendable {
     }
 
     // MARK: - Configuration
+
+    /// Convert the router's optional language into the value expected by the
+    /// sherpa config builders. A nil override is intentional `auto`, not a
+    /// request to reread persistent preferences.
+    static func normalizedLoadLanguage(_ language: String?) -> String {
+        language ?? "auto"
+    }
 
     /// Build the C recognizer config for a model spec.
     private static func recognizerConfig(

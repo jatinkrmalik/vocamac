@@ -220,7 +220,6 @@ final class OnboardingWindowManager: ObservableObject {
     }
 }
 
-@main
 struct VocaMacApp: App {
     @StateObject private var appState = AppState.production()
     @StateObject private var settingsManager = SettingsWindowManager()

@@ -79,6 +79,11 @@ final class SherpaServiceTests: XCTestCase {
         XCTAssertTrue(SherpaService.completionMarkerName.hasPrefix("."))
     }
 
+    func testExplicitLoadLanguageDoesNotFallBackToSavedPreference() {
+        XCTAssertEqual(SherpaService.normalizedLoadLanguage("de"), "de")
+        XCTAssertEqual(SherpaService.normalizedLoadLanguage(nil), "auto")
+    }
+
     func testLoadAndTranscribeAcrossThreads() async throws {
         guard let model = installedModel else {
             throw XCTSkip("No sherpa-onnx model downloaded on this machine")
